@@ -1,5 +1,93 @@
 # Changelog
 
+## 3.0.0rc1
+
+### New Features ✨
+
+#### Bedrock
+
+- Set `gen_ai.response.time_to_first_chunk` by @alexander-alderman-webb in [#8255](https://github.com/getsentry/sentry-python/pull/8255)
+- Record `gen_ai.response.finish_reasons` for streamed responses by @alexander-alderman-webb in [#8252](https://github.com/getsentry/sentry-python/pull/8252)
+- Set `gen_ai.output.messages` for streamed responses by @alexander-alderman-webb in [#8251](https://github.com/getsentry/sentry-python/pull/8251)
+- Set `gen_ai.response.finish_reasons` for non-streaming responses by @alexander-alderman-webb in [#8250](https://github.com/getsentry/sentry-python/pull/8250)
+- Set `gen_ai.output.messages` for non-streaming responses by @alexander-alderman-webb in [#8249](https://github.com/getsentry/sentry-python/pull/8249)
+- Set `gen_ai.input.messages` attribute by @alexander-alderman-webb in [#8242](https://github.com/getsentry/sentry-python/pull/8242)
+- Set `gen_ai.system_instructions` attribute by @alexander-alderman-webb in [#8239](https://github.com/getsentry/sentry-python/pull/8239)
+- Set token attributes for streamed responses by @alexander-alderman-webb in [#8235](https://github.com/getsentry/sentry-python/pull/8235)
+- Set token attributes for non-streaming responses by @alexander-alderman-webb in [#8234](https://github.com/getsentry/sentry-python/pull/8234)
+- Set `gen_ai.tool.definitions` attribute by @alexander-alderman-webb in [#8233](https://github.com/getsentry/sentry-python/pull/8233)
+- Record `inferenceConfig` parameters by @alexander-alderman-webb in [#8232](https://github.com/getsentry/sentry-python/pull/8232)
+- Set `gen_ai.request.model` attribute by @alexander-alderman-webb in [#8231](https://github.com/getsentry/sentry-python/pull/8231)
+- Add extension skeleton by @alexander-alderman-webb in [#8226](https://github.com/getsentry/sentry-python/pull/8226)
+
+#### Other
+
+- (anthropic) Set gen_ai.usage.output_tokens.reasoning attributes for non-streaming responses by @srothh in [#8329](https://github.com/getsentry/sentry-python/pull/8329)
+
+### Bug Fixes 🐛
+
+#### Gql
+
+- Scope the event processor to the query by @Mohil-Ahuja in [#8307](https://github.com/getsentry/sentry-python/pull/8307)
+- Remove credentials and query values from the transport URL by @Mohil-Ahuja in [#8227](https://github.com/getsentry/sentry-python/pull/8227)
+
+#### Other
+
+- (aws-lambda) Load path-style handlers once instead of on every invocation by @pabloDeputter and @sentrivana with @sentry-junior in [#8134](https://github.com/getsentry/sentry-python/pull/8134)
+- (scrubber) Match hyphenated header keys against the denylist by @ratomirjovanovic and @sentrivana in [#8305](https://github.com/getsentry/sentry-python/pull/8305)
+- (toxgen) Preserve caches on `--only` and `--skip` by @sentrivana in [#8240](https://github.com/getsentry/sentry-python/pull/8240)
+- (tracing) Strip whitespace around '=' in incoming baggage items by @arieleven in [#8302](https://github.com/getsentry/sentry-python/pull/8302)
+- Correct function names in deprecation warnings for start/stop_pr… by @AHS0003 in [#8268](https://github.com/getsentry/sentry-python/pull/8268)
+
+### Documentation 📚
+
+- (celery) Fix stale comment referencing removed `sentry_apply_entry` by @sentry-junior in [#8253](https://github.com/getsentry/sentry-python/pull/8253)
+- (transport) Fix stale comment referencing `get_retry_after` by @sentry-junior in [#8333](https://github.com/getsentry/sentry-python/pull/8333)
+- Add note about regression tests to AGENTS.md by @sentrivana in [#8324](https://github.com/getsentry/sentry-python/pull/8324)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Update getsentry/craft action to v3.12.2 by @sentrivana with @renovate in [#8317](https://github.com/getsentry/sentry-python/pull/8317)
+- Update github workflows by @sentrivana with @renovate and @sentry-junior in [#8270](https://github.com/getsentry/sentry-python/pull/8270)
+- Lock file maintenance by @renovate in [#8273](https://github.com/getsentry/sentry-python/pull/8273)
+- Update github workflows by @sentrivana with @renovate and @sentry-junior in [#8060](https://github.com/getsentry/sentry-python/pull/8060)
+- Lock file maintenance by @renovate in [#8217](https://github.com/getsentry/sentry-python/pull/8217)
+
+#### Mypy
+
+- Enable possibly-undefined error code by @sentrivana with @sentry-junior in [#8290](https://github.com/getsentry/sentry-python/pull/8290)
+- Enable unused-awaitable error code by @sentrivana with @sentry-junior in [#8281](https://github.com/getsentry/sentry-python/pull/8281)
+
+#### Ruff
+
+- Enable PLC0415 to flag inline imports in the SDK by @sentrivana with @sentry-junior in [#8285](https://github.com/getsentry/sentry-python/pull/8285)
+- Enable RUF100 for unused noqa directives by @sentrivana with @sentry-junior in [#8282](https://github.com/getsentry/sentry-python/pull/8282)
+- Enable PT011 for overly broad pytest.raises() by @sentrivana with @sentry-junior in [#8286](https://github.com/getsentry/sentry-python/pull/8286)
+- Enable T20 to flag print() in the SDK by @sentrivana with @sentry-junior in [#8283](https://github.com/getsentry/sentry-python/pull/8283)
+
+#### Other
+
+- (django) Strictly order cache spans to avoid flakes by @alexander-alderman-webb in [#8266](https://github.com/getsentry/sentry-python/pull/8266)
+- (fastmcp) Remove unused MCP request helpers by @sentry-junior in [#8275](https://github.com/getsentry/sentry-python/pull/8275)
+- (ray) Collect all client spans to avoid flake by @alexander-alderman-webb in [#8314](https://github.com/getsentry/sentry-python/pull/8314)
+- (renovate) Disable Java version updates in setup-java by @sentrivana with @sentry-junior in [#8276](https://github.com/getsentry/sentry-python/pull/8276)
+- (warden) Add sdk-review skill and run built-in code-review by @dingsdax with @sentry-junior in [#8247](https://github.com/getsentry/sentry-python/pull/8247)
+- Run test steps in parallel by @alexander-alderman-webb in [#8313](https://github.com/getsentry/sentry-python/pull/8313)
+- Split Web 1 test group so Django runs on its own by @sentrivana with @sentry-junior in [#8312](https://github.com/getsentry/sentry-python/pull/8312)
+- Add typos spell check by @sentrivana with @sentry-junior in [#8279](https://github.com/getsentry/sentry-python/pull/8279)
+- Fix tests that could not fail by @sentrivana with @sentry-junior in [#8288](https://github.com/getsentry/sentry-python/pull/8288)
+- 🤖 Update test matrix with new releases (11/16) by @sentrivana with @github-actions in [#8274](https://github.com/getsentry/sentry-python/pull/8274)
+- Add file change detection to workflows by @safina57 and @alexander-alderman-webb in [#7524](https://github.com/getsentry/sentry-python/pull/7524)
+- Fix typos by @sentrivana with @sentry-junior in [#8241](https://github.com/getsentry/sentry-python/pull/8241)
+- 🤖 Update test matrix with new releases (11/09) by @sentrivana with @github-actions in [#8218](https://github.com/getsentry/sentry-python/pull/8218)
+
+### Other
+
+- Next Python SDK major by @sentrivana, @pabloDeputter and 2 others with @sentry-junior in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
+- [do not merge] Testing merge by @sentrivana, @alexander-alderman-webb and 2 others with @sentry-junior, @sentry-release-bot and @renovate in [#8265](https://github.com/getsentry/sentry-python/pull/8265)
+
 ## 3.0.0b4
 
 This is a pre-release of the next Python SDK major, to be released in November 2026.
