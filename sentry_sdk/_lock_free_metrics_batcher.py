@@ -36,7 +36,7 @@ class _ThreadState:
     __slots__ = ("reservoirs", "size")
 
     def __init__(self) -> None:
-        # Keyed by metric name and whether the metric is on a sampled span
+        # Keyed by metric name and whether the metric has a span_id
         self.reservoirs: "defaultdict[tuple[str, bool], _Reservoir]" = defaultdict(
             _Reservoir
         )
@@ -153,7 +153,9 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
 
     def _add_to_window(self, item: "Metric", window: "_Window", limit: int) -> None:
         state = window.threads[threading.get_ident()]
-        reservoir = state.reservoirs[(item["name"], item.get("span_id") is not None)]
+        # With one slot there's nothing to split, so everything shares a reservoir
+        has_span = limit > 1 and item.get("span_id") is not None
+        reservoir = state.reservoirs[(item["name"], has_span)]
         reservoir.seen += 1
         if len(reservoir.kept) < limit:
             state.size += 1
@@ -223,7 +225,7 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
     def _harvest(self, window: "_Window", items: "list[Metric]") -> int:
         """Uniformly gather metrics from the window and append to `items`.
 
-        Metrics on sampled spans and other metrics are sampled separately.
+        Metrics with a span_id and other metrics are sampled separately.
         """
         by_name: "dict[str, dict[bool, list[_Reservoir]]]" = {}
         for state in window.threads.copy().values():
@@ -247,11 +249,20 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
             in_span_seen = in_span_bounds[-1] if in_span_bounds else 0
             other_seen = other_bounds[-1] if other_bounds else 0
 
-            # Prefer metrics on sampled spans, so kept metrics link to traces.
-            # Each group is sampled with its own rate and keeps at least one
-            # metric, so both still extrapolate correctly
-            other_keep = min(other_seen, max(1, limit - in_span_seen))
-            in_span_keep = min(in_span_seen, max(1, limit - other_keep))
+            # Keep at least one metric with a span_id in each window so kept
+            # metrics link to traces, and split the rest by volume. Each group
+            # is sampled with its own rate, so both extrapolate correctly
+            if in_span_seen and other_seen:
+                in_span_keep = min(
+                    in_span_seen,
+                    limit - 1,
+                    max(1, round(limit * in_span_seen / (in_span_seen + other_seen))),
+                )
+                other_keep = min(other_seen, limit - in_span_keep)
+                in_span_keep = min(in_span_seen, limit - other_keep)
+            else:
+                in_span_keep = min(in_span_seen, limit)
+                other_keep = min(other_seen, limit)
 
             for reservoirs, bounds, keep in (
                 (in_span, in_span_bounds, in_span_keep),

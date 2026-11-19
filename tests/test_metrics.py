@@ -640,14 +640,13 @@ def test_metrics_window_sampling_keeps_client_sample_rate(
 @pytest.mark.parametrize(
     "in_span,outside,expected",
     [
-        # Metrics on sampled spans are kept first, the rest fill what's left
-        (4, 100, {True: (4, None), False: (6, 6 / 100)}),
-        # Metrics outside spans always keep one, so they're still counted
-        (50, 50, {True: (9, 9 / 50), False: (1, 1 / 50)}),
+        # Metrics with a span_id always keep one, the rest is split by volume
+        (4, 100, {True: (1, 1 / 4), False: (9, 9 / 100)}),
+        (50, 50, {True: (5, 5 / 50), False: (5, 5 / 50)}),
         (50, 0, {True: (10, 10 / 50)}),
     ],
 )
-def test_metrics_window_sampling_prefers_sampled_spans(
+def test_metrics_window_sampling_splits_by_span_id(
     sentry_init, capture_items, in_span, outside, expected
 ):
     sentry_init(
@@ -674,6 +673,26 @@ def test_metrics_window_sampling_prefers_sampled_spans(
         assert len(by_span[has_span]) == count
         for metric in by_span[has_span]:
             assert metric["attributes"].get("sentry.client_sample_rate") == rate
+
+
+def test_metrics_window_sampling_single_slot_with_span_id(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"metrics_window_sampling": {"test.counter": 0.2}},
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(5):
+        sentry_sdk.metrics.count("test.counter", 1)
+    with sentry_sdk.start_span(name="test-span"):
+        for _ in range(5):
+            sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 1
+    assert metrics[0]["attributes"]["sentry.client_sample_rate"] == 1 / 10
 
 
 def test_metrics_window_sampling_new_window(sentry_init, capture_items):
