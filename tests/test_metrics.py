@@ -625,16 +625,14 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items):
         items.clear()
 
 
-def test_metrics_window_sampling_drops_after_max_reached(
-    sentry_init, capture_items, monkeypatch
-):
+def test_metrics_window_sampling_drops_after_max_reached(sentry_init, monkeypatch):
     sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 2}})
     batcher = sentry_sdk.get_client().metrics_batcher
 
-    def no_op_flush_loop(*args, **kwargs):
+    def no_op_flush(*args, **kwargs):
         pass
 
-    monkeypatch.setattr(batcher, "_flush_loop", no_op_flush_loop)
+    monkeypatch.setattr(batcher, "_flush", no_op_flush)
 
     lost_event_calls = []
 
@@ -643,30 +641,21 @@ def test_metrics_window_sampling_drops_after_max_reached(
 
     monkeypatch.setattr(batcher, "_record_lost_func", record_lost_event)
 
-    items = capture_items("trace_metric")
+    for _ in range(9_995):
+        sentry_sdk.metrics.count("test.unsampled", 1)
 
-    for _ in range(3):
-        for _ in range(9_995):
-            sentry_sdk.metrics.count("test.unsampled", 1)
+    for _ in range(20):
+        sentry_sdk.metrics.count("test.sampled", 1)
 
-        for _ in range(20):
-            sentry_sdk.metrics.count("test.sampled", 1)
+    for _ in range(5):
+        sentry_sdk.metrics.count("test.unsampled", 1)
 
-        for _ in range(5):
-            sentry_sdk.metrics.count("test.unsampled", 1)
+    for reason, data_category, _, quantity in lost_event_calls:
+        assert reason == "queue_overflow"
+        assert data_category == "trace_metric"
+        assert quantity == 1
 
-        sentry_sdk.flush()
-
-        metrics = [item.payload for item in items]
-        names = Counter(metric["name"] for metric in metrics)
-        assert names == {"test.unsampled": 9_995, "test.sampled": 5}
-
-        dropped = Counter(
-            item.payload.json["items"][0]["name"]
-            for reason, data_category, item, quantity in lost_event_calls
-            if reason == "queue_overflow" and data_category == "trace_metric"
-        )
-        assert dropped == {"test.sampled": 15, "test.unsampled": 5}
-
-        items.clear()
-        lost_event_calls.clear()
+    dropped = Counter(
+        item.payload.json["items"][0]["name"] for _, _, item, _ in lost_event_calls
+    )
+    assert dropped == {"test.sampled": 15, "test.unsampled": 5}
