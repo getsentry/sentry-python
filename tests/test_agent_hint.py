@@ -126,6 +126,14 @@ def test_coding_agent_hint_per_agent(run_app, env, init_args, hint):
     assert SETUP_CHECKLIST_PATH in printed
 
 
+def test_coding_agent_hint_not_shown_for_an_installed_tool(run_app, tmp_path):
+    tool = tmp_path / "site-packages" / "sometool" / "cli.py"
+    tool.parent.mkdir(parents=True)
+    tool.write_text("")
+
+    assert run_app({"AI_AGENT": "claude-code"}, filename=str(tool)) == ""
+
+
 def test_coding_agent_hint_shown_once(run_app):
     printed = run_app({"AI_AGENT": "claude-code"}, "traces_sample_rate=0", inits=2)
 

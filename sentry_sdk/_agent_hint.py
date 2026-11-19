@@ -5,7 +5,11 @@ import sys
 import time
 from typing import TYPE_CHECKING
 
-from sentry_sdk.utils import capture_internal_exceptions, env_to_bool
+from sentry_sdk.utils import (
+    _is_external_source,
+    capture_internal_exceptions,
+    env_to_bool,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
@@ -74,7 +78,10 @@ def _init_call_site() -> "Optional[str]":
         # A script's own path is relative on Python 3.8 and older.
         filename = os.path.abspath(frame.f_code.co_filename)
         if not filename.startswith(sdk_dir):
-            return filename if os.path.isfile(filename) else None
+            # An installed tool that uses Sentry itself isn't the user's app.
+            if _is_external_source(filename) or not os.path.isfile(filename):
+                return None
+            return filename
         frame = frame.f_back
     return None
 
