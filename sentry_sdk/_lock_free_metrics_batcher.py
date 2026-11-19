@@ -239,7 +239,7 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
 
             kept: "list[Metric]" = []
             for reservoir, count in zip(reservoirs, slots):
-                thread_kept = reservoir.kept[:]
+                thread_kept = reservoir.kept.copy()
                 kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
             if not kept:
                 continue
