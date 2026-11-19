@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
+    from types import FrameType
     from typing import Any, Dict, Optional
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
@@ -70,22 +71,6 @@ _MISSING_PRODUCTS = {
 }
 
 
-def _init_call_site() -> "Optional[str]":
-    """The file that called sentry_sdk.init()."""
-    sdk_dir = os.path.dirname(os.path.abspath(__file__)) + os.sep
-    frame = sys._getframe()
-    while frame is not None:
-        # A script's own path is relative on Python 3.8 and older.
-        filename = os.path.abspath(frame.f_code.co_filename)
-        if not filename.startswith(sdk_dir):
-            # An installed tool that uses Sentry itself isn't the user's app.
-            if _is_external_source(filename) or not os.path.isfile(filename):
-                return None
-            return filename
-        frame = frame.f_back
-    return None
-
-
 def _setup_in_progress(init_file: str) -> bool:
     """Whether this user changed the file that calls init() a short time ago."""
     now = time.time()
@@ -97,18 +82,19 @@ def _setup_in_progress(init_file: str) -> bool:
     if changed < cutoff:
         return False
 
-    cwd = os.path.dirname(init_file)
-    # A plain status rewrites the index, and can make the user's own git command fail.
+    def git(*args: str) -> "Optional[str]":
+        # Read only: don't take the index lock (the user or an agent may be running
+        # git at the same time) and don't run a configured fsmonitor command.
+        return _git(
+            "--no-optional-locks",
+            "-c",
+            "core.fsmonitor=false",
+            *args,
+            cwd=os.path.dirname(init_file),
+        )
+
     # --branch adds a header line, so an empty answer means git has no answer.
-    status = _git(
-        "--no-optional-locks",
-        "status",
-        "--porcelain",
-        "--branch",
-        "--",
-        init_file,
-        cwd=cwd,
-    )
+    status = git("status", "--porcelain", "--branch", "--", init_file)
     if not status:
         return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
     if "\n" in status:
@@ -116,10 +102,10 @@ def _setup_in_progress(init_file: str) -> bool:
 
     # A checkout also gives a clean file a new mtime, so only count a commit
     # that was made here.
-    committer = _git(
-        "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file, cwd=cwd
+    committer = git(
+        "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file
     )
-    return bool(committer) and committer == _git("config", "user.email", cwd=cwd)
+    return bool(committer) and committer == git("config", "user.email")
 
 
 def _write_coding_agent_hint(
@@ -154,7 +140,7 @@ def _write_coding_agent_hint(
         sys.stderr.flush()
 
 
-def show_coding_agent_hint(options: "Dict[str, Any]") -> None:
+def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> None:
     """Point a coding agent at the setup checklist while Sentry is being set up."""
     global _coding_agent_hint_shown
 
@@ -170,8 +156,15 @@ def show_coding_agent_hint(options: "Dict[str, Any]") -> None:
     ):
         return
 
-    init_file = _init_call_site()
-    if init_file is None:
+    # A script's own path is relative on Python 3.8 and older.
+    init_file = os.path.abspath(caller.f_code.co_filename)
+    # An installed tool that uses Sentry itself isn't the user's app.
+    if _is_external_source(init_file):
+        return
+    try:
+        if os.stat(init_file).st_mtime < time.time() - SETUP_IN_PROGRESS_SECONDS:
+            return
+    except OSError:
         return
 
     _coding_agent_hint_shown = True

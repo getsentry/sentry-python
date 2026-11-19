@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, Dict, List, cast, overload
 
-from sentry_sdk._agent_hint import show_coding_agent_hint
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk._log_batcher import LogBatcher
 from sentry_sdk._metrics_batcher import MetricsBatcher
@@ -546,8 +545,6 @@ class _Client(BaseClient):
     def __init__(self, *args: "Any", **kwargs: "Any") -> None:
         super(_Client, self).__init__(options=get_options(*args, **kwargs))
 
-        with capture_internal_exceptions():
-            show_coding_agent_hint(self.options)
         self._init_impl()
 
     def __getstate__(self) -> "Any":
