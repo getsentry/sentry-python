@@ -149,6 +149,7 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
     logs_on = bool(options["enable_logs"])
     if (
         _coding_agent_hint_shown
+        or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
         or options["agent_setup_complete"]
         or (tracing_on and logs_on)
