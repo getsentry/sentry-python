@@ -36,7 +36,10 @@ class _ThreadState:
     __slots__ = ("reservoirs", "size")
 
     def __init__(self) -> None:
-        self.reservoirs: "defaultdict[str, _Reservoir]" = defaultdict(_Reservoir)
+        # Keyed by metric name and whether the metric is on a sampled span
+        self.reservoirs: "defaultdict[tuple[str, bool], _Reservoir]" = defaultdict(
+            _Reservoir
+        )
         self.size = 0
 
 
@@ -150,7 +153,7 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
 
     def _add_to_window(self, item: "Metric", window: "_Window", limit: int) -> None:
         state = window.threads[threading.get_ident()]
-        reservoir = state.reservoirs[item["name"]]
+        reservoir = state.reservoirs[(item["name"], item.get("span_id") is not None)]
         reservoir.seen += 1
         if len(reservoir.kept) < limit:
             state.size += 1
@@ -218,40 +221,74 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         return envelope
 
     def _harvest(self, window: "_Window", items: "list[Metric]") -> int:
-        """Uniformly gather metrics from the window and append to `items`."""
-        by_name: "dict[str, list[_Reservoir]]" = {}
+        """Uniformly gather metrics from the window and append to `items`.
+
+        Metrics on sampled spans and other metrics are sampled separately.
+        """
+        by_name: "dict[str, dict[bool, list[_Reservoir]]]" = {}
         for state in window.threads.copy().values():
-            for name, reservoir in state.reservoirs.copy().items():
-                by_name.setdefault(name, []).append(reservoir)
+            for (name, in_span), reservoir in state.reservoirs.copy().items():
+                by_name.setdefault(name, {}).setdefault(in_span, []).append(reservoir)
 
         sampled_out = 0
-        for name, reservoirs in by_name.items():
+        for name, groups in by_name.items():
             limit = self._limits.get(name)
             if limit is None:
                 continue
 
-            bounds = list(
-                itertools.accumulate(reservoir.seen for reservoir in reservoirs)
+            in_span = groups.get(True, [])
+            other = groups.get(False, [])
+            in_span_bounds = list(
+                itertools.accumulate(reservoir.seen for reservoir in in_span)
             )
-            slots = [0] * len(reservoirs)
-            for position in random.sample(range(bounds[-1]), min(limit, bounds[-1])):
-                slots[bisect.bisect_right(bounds, position)] += 1
+            other_bounds = list(
+                itertools.accumulate(reservoir.seen for reservoir in other)
+            )
+            in_span_seen = in_span_bounds[-1] if in_span_bounds else 0
+            other_seen = other_bounds[-1] if other_bounds else 0
 
-            kept: "list[Metric]" = []
-            for reservoir, count in zip(reservoirs, slots):
-                thread_kept = reservoir.kept.copy()
-                kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
-            if not kept:
-                continue
+            # Prefer metrics on sampled spans, so kept metrics link to traces.
+            # Each group is sampled with its own rate and keeps at least one
+            # metric, so both still extrapolate correctly
+            other_keep = min(other_seen, max(1, limit - in_span_seen))
+            in_span_keep = min(in_span_seen, max(1, limit - other_keep))
 
-            items.extend(kept)
-            if bounds[-1] <= len(kept):
-                continue
+            for reservoirs, bounds, keep in (
+                (in_span, in_span_bounds, in_span_keep),
+                (other, other_bounds, other_keep),
+            ):
+                if not keep:
+                    continue
 
-            rate = len(kept) / bounds[-1]
-            for item in kept:
-                item["attributes"]["sentry.client_sample_rate"] = rate
-            sampled_out += bounds[-1] - len(kept)
+                slots = [0] * len(reservoirs)
+                for position in random.sample(range(bounds[-1]), keep):
+                    slots[bisect.bisect_right(bounds, position)] += 1
+
+                kept: "list[Metric]" = []
+                for reservoir, count in zip(reservoirs, slots):
+                    thread_kept = reservoir.kept.copy()
+                    kept.extend(
+                        random.sample(thread_kept, min(count, len(thread_kept)))
+                    )
+                if not kept:
+                    continue
+
+                items.extend(kept)
+                if bounds[-1] <= len(kept):
+                    continue
+
+                rate = len(kept) / bounds[-1]
+                for item in kept:
+                    attributes = item["attributes"]
+                    # Callers may have sampled already, so combine with their
+                    # rate. Relay ignores rates outside (0, 1], and so do we
+                    client_rate = attributes.get("sentry.client_sample_rate")
+                    if not (
+                        isinstance(client_rate, (int, float)) and 0 < client_rate <= 1
+                    ):
+                        client_rate = 1.0
+                    attributes["sentry.client_sample_rate"] = rate * client_rate
+                sampled_out += bounds[-1] - len(kept)
 
         return sampled_out
 

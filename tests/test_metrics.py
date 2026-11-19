@@ -610,6 +610,72 @@ def test_metrics_window_sampling(
     ]
 
 
+@pytest.mark.parametrize(
+    "client_sample_rate,expected",
+    [(0.01, 10 / 200 * 0.01), (0, 10 / 200), (2, 10 / 200), ("0.01", 10 / 200)],
+)
+def test_metrics_window_sampling_keeps_client_sample_rate(
+    sentry_init, capture_items, client_sample_rate, expected
+):
+    sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count(
+            "test.counter",
+            1,
+            attributes={"sentry.client_sample_rate": client_sample_rate},
+        )
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 10
+    for metric in metrics:
+        assert metric["attributes"]["sentry.client_sample_rate"] == pytest.approx(
+            expected
+        )
+
+
+@pytest.mark.parametrize(
+    "in_span,outside,expected",
+    [
+        # Metrics on sampled spans are kept first, the rest fill what's left
+        (4, 100, {True: (4, None), False: (6, 6 / 100)}),
+        # Metrics outside spans always keep one, so they're still counted
+        (50, 50, {True: (9, 9 / 50), False: (1, 1 / 50)}),
+        (50, 0, {True: (10, 10 / 50)}),
+    ],
+)
+def test_metrics_window_sampling_prefers_sampled_spans(
+    sentry_init, capture_items, in_span, outside, expected
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"metrics_window_sampling": {"test.counter": 2}},
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(outside):
+        sentry_sdk.metrics.count("test.counter", 1)
+    with sentry_sdk.start_span(name="test-span"):
+        for _ in range(in_span):
+            sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    by_span: "dict[bool, list[dict]]" = {}
+    for metric in metrics:
+        by_span.setdefault("span_id" in metric, []).append(metric)
+
+    assert by_span.keys() == expected.keys()
+    for has_span, (count, rate) in expected.items():
+        assert len(by_span[has_span]) == count
+        for metric in by_span[has_span]:
+            assert metric["attributes"].get("sentry.client_sample_rate") == rate
+
+
 def test_metrics_window_sampling_new_window(sentry_init, capture_items):
     sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
     items = capture_items("trace_metric")
