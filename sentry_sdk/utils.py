@@ -128,7 +128,10 @@ def json_dumps(data: "Any") -> bytes:
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
-def get_git_revision() -> "Optional[str]":
+def _git(
+    *args: str, cwd: "Optional[str]" = None, timeout: "Optional[float]" = None
+) -> "Optional[str]":
+    """A git command's output, or None when git has no answer."""
     try:
         with open(os.path.devnull, "w+") as null:
             # prevent command prompt windows from popping up on windows
@@ -137,22 +140,24 @@ def get_git_revision() -> "Optional[str]":
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-            revision = (
-                subprocess.Popen(
-                    ["git", "rev-parse", "HEAD"],
-                    startupinfo=startupinfo,
-                    stdout=subprocess.PIPE,
-                    stderr=null,
-                    stdin=null,
-                )
-                .communicate()[0]
-                .strip()
-                .decode("utf-8")
+            result = subprocess.run(
+                ["git", *args],
+                cwd=cwd,
+                startupinfo=startupinfo,
+                stdout=subprocess.PIPE,
+                stderr=null,
+                stdin=null,
+                universal_newlines=True,
+                timeout=timeout,
             )
-    except (OSError, IOError, FileNotFoundError):
+    except (OSError, subprocess.SubprocessError):
         return None
 
-    return revision
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def get_git_revision() -> "Optional[str]":
+    return _git("rev-parse", "HEAD")
 
 
 def get_default_release() -> "Optional[str]":
