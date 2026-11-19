@@ -26,8 +26,6 @@ CODING_AGENT_ENV_VARS = (
     "GEMINI_CLI",
 )
 
-GIT_TIMEOUT_SECONDS = 2
-
 # How long after a change to the file that calls init() the setup counts as in progress.
 # Without git we can't tell whose change it is, so the window is shorter.
 SETUP_IN_PROGRESS_SECONDS = 60 * 60
@@ -99,21 +97,19 @@ def _setup_in_progress(init_file: str) -> bool:
     if changed < cutoff:
         return False
 
-    def git(*args: str) -> "Optional[str]":
-        return _git(*args, cwd=os.path.dirname(init_file), timeout=GIT_TIMEOUT_SECONDS)
-
-    status = git("status", "--porcelain", "--", init_file)
-    if status is None:
-        return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
+    cwd = os.path.dirname(init_file)
+    status = _git("status", "--porcelain", "--", init_file, cwd=cwd)
     if status:
         return True
+    if _git("rev-parse", "--is-inside-work-tree", cwd=cwd) != "true":
+        return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
 
     # A checkout also gives a clean file a new mtime, so only count a commit
     # that was made here.
-    committer = git(
-        "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file
+    committer = _git(
+        "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file, cwd=cwd
     )
-    return bool(committer) and committer == git("config", "user.email")
+    return bool(committer) and committer == _git("config", "user.email", cwd=cwd)
 
 
 def _write_coding_agent_hint(

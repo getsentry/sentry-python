@@ -128,10 +128,7 @@ def json_dumps(data: "Any") -> bytes:
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
-def _git(
-    *args: str, cwd: "Optional[str]" = None, timeout: "Optional[float]" = None
-) -> "Optional[str]":
-    """A git command's output, or None when git has no answer."""
+def _git(*args: str, cwd: "Optional[str]" = None) -> "Optional[str]":
     try:
         with open(os.path.devnull, "w+") as null:
             # prevent command prompt windows from popping up on windows
@@ -140,20 +137,23 @@ def _git(
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-            result = subprocess.run(
-                ["git", *args],
-                cwd=cwd,
-                startupinfo=startupinfo,
-                stdout=subprocess.PIPE,
-                stderr=null,
-                stdin=null,
-                universal_newlines=True,
-                timeout=timeout,
+            output = (
+                subprocess.Popen(
+                    ["git", *args],
+                    cwd=cwd,
+                    startupinfo=startupinfo,
+                    stdout=subprocess.PIPE,
+                    stderr=null,
+                    stdin=null,
+                )
+                .communicate()[0]
+                .strip()
+                .decode("utf-8")
             )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, IOError, FileNotFoundError):
         return None
 
-    return result.stdout.strip() if result.returncode == 0 else None
+    return output
 
 
 def get_git_revision() -> "Optional[str]":
