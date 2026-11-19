@@ -223,7 +223,7 @@ class HttpTransportCore(Transport):
         self._worker = self._create_worker(options)
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until: "Dict[Optional[EventDataCategory], datetime]" = {}
-        # We only use this Retry() class for the `get_retry_after` method it exposes
+        # We only use this Retry() class for the `parse_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
         self._discarded_events: "DefaultDict[Tuple[EventDataCategory, str], int]" = (
             defaultdict(int)
