@@ -38,7 +38,7 @@ Do the Required and Recommended items first. Then look at the ones below. Set th
 
 - **Crons**, if the app schedules jobs with Celery beat, RQ (rq-scheduler), arq or Huey. Sentry alerts when a job fails or doesn't run, and every scheduled job gets a monitor, including ones added later. For Celery beat, pass `CeleryIntegration(monitor_beat_tasks=True)`. For RQ or arq, pass `monitor_cron_jobs=True` to `RqIntegration` or `ArqIntegration`. For Huey, pass `HueyIntegration(monitor_periodic_tasks=True)`.
 - **AI monitoring**, if the app calls an LLM. Most AI libraries are traced automatically. For LiteLLM or Mistral, add `LiteLLMIntegration()` or `MistralIntegration()`. Prompts and responses are only recorded with `send_default_pii=True`, so ask the user before you set it.
-- **Caches**, if the app uses the Django cache or Redis as a cache. Pass `cache_spans=True` to `DjangoIntegration` or `RedisIntegration`.
+- **Caches**, if the app uses the Django cache or Redis as a cache. For Django, pass `cache_spans=True` to `DjangoIntegration`. For Redis, pass the key prefixes of the cache to `RedisIntegration`, as in `cache_prefixes=["mycache:"]`.
 - **Profiling**, if the user cares about the performance of specific code paths. Set `profile_session_sample_rate` and `profile_lifecycle="trace"`.
 - **Metrics**, if the user wants to track counts or values over time (signups, queue depth). Call `sentry_sdk.metrics.count(...)`, `gauge(...)` or `distribution(...)` where they happen.
 
