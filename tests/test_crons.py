@@ -1,4 +1,5 @@
 import uuid
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
@@ -6,6 +7,9 @@ import pytest
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.utils import _get_interval_schedule
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import MonitorConfig
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")
@@ -241,7 +245,7 @@ def test_monitor_config(sentry_init, capture_envelopes):
     sentry_init()
     envelopes = capture_envelopes()
 
-    monitor_config = {
+    monitor_config: "MonitorConfig" = {
         "schedule": {"type": "crontab", "value": "0 0 * * *"},
         "failure_issue_threshold": 5,
         "recovery_threshold": 5,
@@ -266,7 +270,7 @@ def test_monitor_config_with_owner(sentry_init, capture_envelopes):
     sentry_init()
     envelopes = capture_envelopes()
 
-    monitor_config = {
+    monitor_config: "MonitorConfig" = {
         "schedule": {"type": "crontab", "value": "0 0 * * *"},
         "owner": "team:6",
     }

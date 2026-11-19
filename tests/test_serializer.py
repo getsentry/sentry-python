@@ -1,5 +1,6 @@
 import re
 from array import array
+from typing import Any, Dict
 
 import pytest
 
@@ -95,7 +96,7 @@ def test_serialize_sets(extra_normalizer):
 
 
 def test_serialize_custom_mapping(extra_normalizer):
-    class CustomReprDict(dict):
+    class CustomReprDict(Dict[str, Any]):
         def __sentry_repr__(self):
             return "custom!"
 
@@ -153,7 +154,7 @@ def test_trim_databag_breadth(body_normalizer):
 
 
 def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
-    data = {
+    data: "dict[str, Any]" = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
     }
     curr = data

@@ -104,6 +104,7 @@ def test_existing_sample_rand_kept():
     )
 
     # If sample_rand was regenerated, the value would be 0.919221 based on the trace_id
+    assert ctx.dynamic_sampling_context is not None
     assert ctx.dynamic_sampling_context["sample_rand"] == "0.5"
 
 
@@ -153,6 +154,7 @@ def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
             }
         )
 
+    assert ctx.dynamic_sampling_context is not None
     assert ctx.dynamic_sampling_context["sample_rand"] == f"{expected_interval[0]:.6f}"
     assert mock_randrange.call_count == 1
     assert mock_randrange.call_args[0] == (
@@ -178,4 +180,5 @@ def test_sample_rand_rounds_down():
             }
         )
 
+    assert ctx.dynamic_sampling_context is not None
     assert ctx.dynamic_sampling_context["sample_rand"] == "0.999999"
