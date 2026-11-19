@@ -99,13 +99,20 @@ def _setup_in_progress(init_file: str) -> bool:
 
     cwd = os.path.dirname(init_file)
     # A plain status rewrites the index, and can make the user's own git command fail.
+    # --branch adds a header line, so an empty answer means git has no answer.
     status = _git(
-        "--no-optional-locks", "status", "--porcelain", "--", init_file, cwd=cwd
+        "--no-optional-locks",
+        "status",
+        "--porcelain",
+        "--branch",
+        "--",
+        init_file,
+        cwd=cwd,
     )
-    if status:
-        return True
-    if _git("rev-parse", "--is-inside-work-tree", cwd=cwd) != "true":
+    if not status:
         return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
+    if "\n" in status:
+        return True
 
     # A checkout also gives a clean file a new mtime, so only count a commit
     # that was made here.
