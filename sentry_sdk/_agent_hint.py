@@ -1,11 +1,11 @@
 import atexit
 import os
-import subprocess
 import sys
 import time
 from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import (
+    _git,
     _is_external_source,
     capture_internal_exceptions,
     env_to_bool,
@@ -25,6 +25,8 @@ CODING_AGENT_ENV_VARS = (
     "CURSOR_AGENT",
     "GEMINI_CLI",
 )
+
+GIT_TIMEOUT_SECONDS = 2
 
 # How long after a change to the file that calls init() the setup counts as in progress.
 # Without git we can't tell whose change it is, so the window is shorter.
@@ -86,28 +88,6 @@ def _init_call_site() -> "Optional[str]":
     return None
 
 
-def _git(cwd: str, *args: str) -> "Optional[str]":
-    """A git command's output, or None when git has no answer."""
-    startupinfo = None
-    if sys.platform == "win32" or sys.platform == "cygwin":
-        # Don't let a command prompt window pop up.
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            universal_newlines=True,
-            timeout=2,
-            startupinfo=startupinfo,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return result.stdout.strip() if result.returncode == 0 else None
-
-
 def _setup_in_progress(init_file: str) -> bool:
     """Whether this user changed the file that calls init() a short time ago."""
     now = time.time()
@@ -119,8 +99,10 @@ def _setup_in_progress(init_file: str) -> bool:
     if changed < cutoff:
         return False
 
-    cwd = os.path.dirname(init_file)
-    status = _git(cwd, "status", "--porcelain", "--", init_file)
+    def git(*args: str) -> "Optional[str]":
+        return _git(*args, cwd=os.path.dirname(init_file), timeout=GIT_TIMEOUT_SECONDS)
+
+    status = git("status", "--porcelain", "--", init_file)
     if status is None:
         return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
     if status:
@@ -128,10 +110,10 @@ def _setup_in_progress(init_file: str) -> bool:
 
     # A checkout also gives a clean file a new mtime, so only count a commit
     # that was made here.
-    committer = _git(
-        cwd, "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file
+    committer = git(
+        "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file
     )
-    return bool(committer) and committer == _git(cwd, "config", "user.email")
+    return bool(committer) and committer == git("config", "user.email")
 
 
 def _write_coding_agent_hint(
