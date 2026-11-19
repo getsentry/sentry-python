@@ -68,10 +68,11 @@ _MISSING_PRODUCTS = {
 
 def _init_call_site() -> "Optional[str]":
     """The file that called sentry_sdk.init()."""
-    sdk_dir = os.path.dirname(__file__) + os.sep
+    sdk_dir = os.path.dirname(os.path.abspath(__file__)) + os.sep
     frame = sys._getframe()
     while frame is not None:
-        filename = frame.f_code.co_filename
+        # A script's own path is relative on Python 3.8 and older.
+        filename = os.path.abspath(frame.f_code.co_filename)
         if not filename.startswith(sdk_dir):
             return filename if os.path.isfile(filename) else None
         frame = frame.f_back

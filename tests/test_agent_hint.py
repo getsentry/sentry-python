@@ -26,7 +26,9 @@ def run_app(tmp_path, monkeypatch, capsys):
     )
     app = tmp_path / "app.py"
 
-    def run(env, init_args="", before_run=None, inits=1, dsn=AGENT_HINT_DSN):
+    def run(
+        env, init_args="", before_run=None, inits=1, dsn=AGENT_HINT_DSN, filename=None
+    ):
         for name, value in env.items():
             monkeypatch.setenv(name, value)
         init = f"sentry_sdk.init(dsn={dsn!r}, {init_args})\n"
@@ -35,7 +37,7 @@ def run_app(tmp_path, monkeypatch, capsys):
             before_run(app)
 
         try:
-            exec(compile(app.read_text(), str(app), "exec"), {})
+            exec(compile(app.read_text(), filename or str(app), "exec"), {})
             for hook, args in at_exit:
                 if hook is sentry_sdk._agent_hint._write_coding_agent_hint:
                     hook(*args)
@@ -168,6 +170,19 @@ def _committed_and_edited(app, minutes_ago=0):
     _commit(app, date="2020-01-01T00:00:00")
     app.write_text(app.read_text() + "\n")
     _changed_minutes_ago(app, minutes_ago)
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_coding_agent_hint_with_a_relative_script_path(run_app, tmp_path, monkeypatch):
+    # Only git can tell that a change from 20 minutes ago is this user's.
+    monkeypatch.chdir(tmp_path)
+    printed = run_app(
+        {"AI_AGENT": "claude-code"},
+        before_run=lambda app: _committed_and_edited(app, minutes_ago=20),
+        filename="app.py",
+    )
+
+    assert SETUP_CHECKLIST_PATH in printed
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
