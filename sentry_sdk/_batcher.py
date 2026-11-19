@@ -2,11 +2,10 @@ import os
 import random
 import threading
 import weakref
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.utils import capture_internal_exceptions, format_timestamp
+from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -32,7 +31,6 @@ class Batcher(Generic[T]):
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
-        self._lock = threading.Lock()
         self._active: "threading.local" = threading.local()
 
         self._flush_event: "threading.Event" = threading.Event()
@@ -54,43 +52,10 @@ class Batcher(Generic[T]):
     def _reset_thread_state(self) -> None:
         self._buffer = []
         self._running = True
-        self._lock = threading.Lock()
         self._active = threading.local()
         self._flush_event = threading.Event()
         self._flusher = None
         self._flusher_pid = None
-
-    def _ensure_thread(self) -> bool:
-        """For forking processes we might need to restart this thread.
-        This ensures that our process actually has that thread running.
-        """
-        if not self._running:
-            return False
-
-        pid = os.getpid()
-        if self._flusher_pid == pid:
-            return True
-
-        with self._lock:
-            # Recheck to make sure another thread didn't get here and start the
-            # the flusher in the meantime
-            if self._flusher_pid == pid:
-                return True
-
-            self._flusher_pid = pid
-
-            self._flusher = threading.Thread(target=self._flush_loop)
-            self._flusher.daemon = True
-
-            try:
-                self._flusher.start()
-            except RuntimeError:
-                # Unfortunately at this point the interpreter is in a state that no
-                # longer allows us to spawn a thread and we have to bail.
-                self._running = False
-                return False
-
-        return True
 
     def _flush_loop(self) -> None:
         # Mark the flush-loop thread as active for its entire lifetime so
@@ -108,34 +73,6 @@ class Batcher(Generic[T]):
             # the error instead so the loop keeps running.
             with capture_internal_exceptions():
                 self._flush()
-
-    def add(self, item: "T") -> None:
-        # Bail out if the current thread is already executing batcher code.
-        # This prevents deadlocks when code running inside the batcher (e.g.
-        # _add_to_envelope during flush, or _flush_event.wait/set) triggers
-        # a GC-emitted warning that routes back through the logging
-        # integration into add().
-        if getattr(self._active, "flag", False):
-            return None
-
-        self._active.flag = True
-        try:
-            if not self._ensure_thread() or self._flusher is None:
-                return None
-
-            with self._lock:
-                dropped = len(self._buffer) >= self.MAX_BEFORE_DROP
-                if not dropped:
-                    self._buffer.append(item)
-                    if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
-                        self._flush_event.set()
-
-            # Record the loss outside of the lock, since this might involve
-            # serializing the item to report lost bytes
-            if dropped:
-                self._record_lost(item)
-        finally:
-            self._active.flag = False
 
     def kill(self) -> None:
         if self._flusher is None:
@@ -173,18 +110,7 @@ class Batcher(Generic[T]):
         envelope.add_item(self._to_envelope_item(self._buffer))
 
     def _flush(self) -> "Optional[Envelope]":
-        envelope = Envelope(
-            headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
-        )
-        with self._lock:
-            if len(self._buffer) == 0:
-                return None
-
-            self._add_to_envelope(envelope)
-            self._buffer.clear()
-
-        self._capture_func(envelope)
-        return envelope
+        raise NotImplementedError
 
     def _record_lost(self, item: "T") -> None:
         envelope_item = None
