@@ -98,7 +98,10 @@ def _setup_in_progress(init_file: str) -> bool:
         return False
 
     cwd = os.path.dirname(init_file)
-    status = _git("status", "--porcelain", "--", init_file, cwd=cwd)
+    # A plain status rewrites the index, and can make the user's own git command fail.
+    status = _git(
+        "--no-optional-locks", "status", "--porcelain", "--", init_file, cwd=cwd
+    )
     if status:
         return True
     if _git("rev-parse", "--is-inside-work-tree", cwd=cwd) != "true":
