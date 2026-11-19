@@ -612,19 +612,17 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items):
     sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
     items = capture_items("trace_metric")
 
-    for _ in range(30):
-        sentry_sdk.metrics.count("test.counter", 1)
-    get_client().flush()
+    for count in (30, 50):
+        for _ in range(count):
+            sentry_sdk.metrics.count("test.counter", 1)
+        get_client().flush()
 
-    for _ in range(30):
-        sentry_sdk.metrics.count("test.counter", 1)
-    get_client().flush()
+        metrics = [item.payload for item in items]
+        assert len(metrics) == 10
+        for metric in metrics:
+            assert metric["attributes"]["sentry.client_sample_rate"] == 10 / count
 
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 20
-
-    for metric in metrics:
-        assert metric["attributes"]["sentry.client_sample_rate"] == 1 / 3
+        items.clear()
 
 
 def test_metrics_window_sampling_drops_after_max_reached(
