@@ -228,7 +228,6 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         return envelope
 
     def _harvest(self, window: "_Window", items: "list[Metric]") -> int:
-        """Uniformly gather metrics from the window and append to `items`."""
         by_name: "dict[str, list[_Reservoir]]" = {}
         for state in window.threads.copy().values():
             for name, reservoir in state.reservoirs.copy().items():
