@@ -112,6 +112,16 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
         ), "Problem with checking auto enabling {}".format(import_string)
 
 
+def test_deferred_auto_enabling_integrations_library_not_installed(sentry_init):
+    if importlib.util.find_spec("openai") is not None:
+        pytest.skip("openai is installed")
+
+    meta_path = list(sys.meta_path)
+    sentry_init(_experiments={"deferred_auto_enabling_integrations": True})
+
+    assert sys.meta_path == meta_path
+
+
 def test_generic_mechanism(sentry_init, capture_events):
     sentry_init()
     events = capture_events()

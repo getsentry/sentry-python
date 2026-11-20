@@ -16,16 +16,22 @@ if TYPE_CHECKING:
     from types import ModuleType
     from typing import (
         Any,
-        Callable,
         Dict,
         Iterator,
         List,
         Optional,
+        Protocol,
         Set,
-        Tuple,
         Type,
         Union,
     )
+
+    class _DefaultIntegrationsIterator(Protocol):
+        def __call__(
+            self,
+            with_auto_enabling_integrations: bool,
+            exclude: "Container[str]" = (),
+        ) -> "Iterator[Type[Integration]]": ...
 
 
 _DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
@@ -39,9 +45,9 @@ _processed_integrations: "Set[str]" = set()
 # Set of all integration identifiers we have actually installed
 _installed_integrations: "Set[str]" = set()
 
-# Trigger module -> (integration import string, client options) of deferred
-# integrations waiting for the application to import the trigger module
-_pending_deferred_integrations: "Dict[str, Tuple[str, Optional[Dict[str, Any]]]]" = {}
+# Trigger module -> import string of the deferred integration waiting for the
+# application to import the trigger module
+_pending_deferred_integrations: "Dict[str, str]" = {}
 
 _deferred_setup_finder_guard = local()
 
@@ -49,7 +55,7 @@ _deferred_setup_finder_guard = local()
 def _generate_default_integrations_iterator(
     integrations: "List[str]",
     auto_enabling_integrations: "List[str]",
-) -> "Callable[..., Iterator[Type[Integration]]]":
+) -> "_DefaultIntegrationsIterator":
     def iter_default_integrations(
         with_auto_enabling_integrations: bool,
         exclude: "Container[str]" = (),
@@ -243,7 +249,10 @@ def setup_integrations(
 
     logger.debug("Setting up integrations (with default = %s)", with_defaults)
 
-    deferred: "Dict[str, Optional[str]]" = {}
+    # Identifier -> import string of deferred integrations whose library is installed
+    deferred: "Dict[str, str]" = {}
+    # Deferred integrations, plus those whose library isn't installed
+    excluded: "Set[str]" = set()
     if (
         with_defaults
         and with_auto_enabling_integrations
@@ -253,11 +262,15 @@ def setup_integrations(
         for import_string, trigger in _DEFERRED_INTEGRATION_TRIGGERS.items():
             if trigger in sys.modules:
                 continue
-            spec = importlib.util.find_spec(trigger)
+            try:
+                spec = importlib.util.find_spec(trigger)
+            except Exception:
+                spec = None
             if spec is None:
-                deferred[import_string] = None
+                excluded.add(import_string)
             elif hasattr(spec.loader, "exec_module"):
-                deferred[import_string] = trigger
+                excluded.add(import_string)
+                deferred[import_string.rsplit(".", 2)[1]] = import_string
 
     user_provided_integrations = set(integrations.keys())
 
@@ -272,7 +285,7 @@ def setup_integrations(
 
     if with_defaults:
         for integration_cls in iter_default_integrations(
-            with_auto_enabling_integrations, exclude=deferred
+            with_auto_enabling_integrations, exclude=excluded
         ):
             if integration_cls.identifier not in integrations:
                 instance = integration_cls()
@@ -292,7 +305,7 @@ def setup_integrations(
             for target in targets_to_deactivate:
                 if target not in user_provided_integrations:
                     deactivated_identifiers.add(target)
-                    for cls in iter_default_integrations(True, exclude=deferred):
+                    for cls in iter_default_integrations(True, exclude=excluded):
                         if cls.identifier == target:
                             if cls not in disabled_integrations:
                                 disabled_integrations.append(cls)
@@ -326,20 +339,19 @@ def setup_integrations(
 
                 _processed_integrations.add(identifier)
 
-    for import_string, trigger in deferred.items():
-        identifier = import_string.rsplit(".", 2)[1]
+    for identifier, import_string in deferred.items():
         if (
-            trigger is None
-            or identifier in disabled_integration_identifiers
+            identifier in disabled_integration_identifiers
             or identifier in deactivated_identifiers
         ):
             continue
 
+        trigger = _DEFERRED_INTEGRATION_TRIGGERS[import_string]
         with _installer_lock:
             if identifier in _processed_integrations:
                 continue
             _processed_integrations.add(identifier)
-            _pending_deferred_integrations[trigger] = (import_string, options)
+            _pending_deferred_integrations[trigger] = import_string
             if _deferred_setup_finder not in sys.meta_path:
                 sys.meta_path.insert(0, _deferred_setup_finder)
 
@@ -362,30 +374,23 @@ def setup_integrations(
 
 
 def _set_up_deferred_integration(trigger: str) -> None:
-    with _installer_lock:
-        pending = _pending_deferred_integrations.pop(trigger, None)
-        if (
-            not _pending_deferred_integrations
-            and _deferred_setup_finder in sys.meta_path
-        ):
-            sys.meta_path.remove(_deferred_setup_finder)
-
-    if pending is None:
+    import_string = _pending_deferred_integrations.pop(trigger, None)
+    if import_string is None:
         return
 
-    import_string, options = pending
     with capture_internal_exceptions():
+        client = sentry_sdk.get_client()
         module, cls = import_string.rsplit(".", 1)
         try:
             integration = getattr(import_module(module), cls)()
             type(integration).setup_once()
-            integration.setup_once_with_options(options)
+            integration.setup_once_with_options(client.options)
         except DidNotEnable as e:
             logger.debug("Did not enable default integration %s: %s", import_string, e)
             return
 
         _installed_integrations.add(integration.identifier)
-        sentry_sdk.get_client().integrations[integration.identifier] = integration
+        client.integrations[integration.identifier] = integration
         logger.debug("Enabling integration %s", integration.identifier)
 
 
@@ -435,6 +440,12 @@ class _DeferredSetupFinder(MetaPathFinder):
 
         if hasattr(spec.loader, "exec_module"):
             spec.loader = _DeferredSetupLoader(spec.loader, fullname)
+        else:
+            _pending_deferred_integrations.pop(fullname, None)
+            logger.debug(
+                "Not setting up deferred integration for %s: its loader has no exec_module",
+                fullname,
+            )
         return spec
 
 
