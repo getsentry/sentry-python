@@ -39,6 +39,11 @@ TEST_SUITE_CONFIG = {
         "python": ">=3.8",
         "num_versions": 2,
     },
+    "apscheduler": {
+        "package": "apscheduler",
+        # 4.x is a rewrite with a different API and isn't supported.
+        "include": "<4",
+    },
     "arq": {
         "package": "arq",
         "deps": {
