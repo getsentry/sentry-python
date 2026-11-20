@@ -27,6 +27,7 @@ from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 from sentry_sdk.utils import package_version
+from tests.integrations.utils import run_deferred_setup_app
 
 PYDANTIC_AI_VERSION = package_version("pydantic-ai")
 
@@ -4869,3 +4870,20 @@ async def test_data_collection_gen_ai_request_messages_keep_tool_returns_when_ou
     assert tool_messages[0]["content"] == [
         {"type": "text", "text": expected_tool_return}
     ]
+
+
+def test_deferred_setup_on_import(tmp_path):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="pydantic_ai",
+        trigger="pydantic_ai",
+        app_imports="from pydantic_ai import Agent",
+        patched="Agent.run",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }

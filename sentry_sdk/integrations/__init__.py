@@ -142,6 +142,8 @@ _DEFERRED_INTEGRATION_TRIGGERS = {
     "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration": "google.genai",
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration": "huggingface_hub.inference._client",
     "sentry_sdk.integrations.openai.OpenAIIntegration": "openai",
+    "sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration": "agents",
+    "sentry_sdk.integrations.pydantic_ai.PydanticAIIntegration": "pydantic_ai",
 }
 
 iter_default_integrations = _generate_default_integrations_iterator(
@@ -290,11 +292,18 @@ def setup_integrations(
     }
     deactivated_identifiers = set()
 
+    # A deferred integration can't be set up yet, so it deactivates its targets
+    # whenever its library is installed, even if it later turns out too old to enable.
+    installed_deferred_identifiers = {
+        import_string.rsplit(".", 2)[1]
+        for import_string, trigger in deferred.items()
+        if trigger is not None
+    }
+
     for integration, targets_to_deactivate in _INTEGRATION_DEACTIVATES.items():
         if (
-            integration in integrations
-            and integration not in disabled_integration_identifiers
-        ):
+            integration in integrations or integration in installed_deferred_identifiers
+        ) and integration not in disabled_integration_identifiers:
             for target in targets_to_deactivate:
                 if target not in user_provided_integrations:
                     deactivated_identifiers.add(target)
