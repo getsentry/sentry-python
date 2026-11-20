@@ -44,6 +44,7 @@ from sentry_sdk.transport import (
     AsyncHttpTransport,
     HttpTransport,
     _parse_rate_limits,
+    _keep_longer_rate_limit,
 )
 
 server = None
@@ -471,6 +472,50 @@ NOW = datetime(2014, 6, 2)
 )
 def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
+
+
+def test_shorter_rate_limit_keeps_the_longer_deadline():
+    disabled = {}
+    longer = NOW + timedelta(seconds=3600)
+    shorter = NOW + timedelta(seconds=0)
+    _keep_longer_rate_limit(disabled, "error", longer)
+    _keep_longer_rate_limit(disabled, "error", shorter)
+    assert disabled["error"] == longer
+    # An expired deadline still yields to a newer one.
+    _keep_longer_rate_limit(disabled, "error", NOW - timedelta(seconds=5))
+    assert disabled["error"] == longer
+    renewed = NOW + timedelta(seconds=10)
+    disabled["error"] = NOW - timedelta(seconds=5)
+    _keep_longer_rate_limit(disabled, "error", renewed)
+    assert disabled["error"] == renewed
+
+
+class _HeaderResponse:
+    def __init__(self, status, headers):
+        self.status = status
+        self.headers = headers
+
+
+def test_rate_limit_header_does_not_shorten_active_limit(capturing_server, make_client):
+    client = make_client(send_client_reports=False)
+    capturing_server.respond_with(
+        code=200,
+        headers={"X-Sentry-Rate-Limits": "3600:error:organization, 0:error:project"},
+    )
+    client.capture_event({"type": "event"})
+    client.flush()
+    until = client.transport._disabled_until["error"]
+    assert until > datetime.now(timezone.utc) + timedelta(seconds=3000)
+
+    client.transport._update_rate_limits(
+        _HeaderResponse(200, {"x-sentry-rate-limits": "1:error"})
+    )
+    assert client.transport._disabled_until["error"] == until
+
+    client.transport._disabled_until[None] = datetime.now(timezone.utc) + timedelta(seconds=3600)
+    kept = client.transport._disabled_until[None]
+    client.transport._update_rate_limits(_HeaderResponse(429, {"retry-after": "1"}))
+    assert client.transport._disabled_until[None] == kept
 
 
 def test_envelope_too_large_response(capturing_server, make_client):

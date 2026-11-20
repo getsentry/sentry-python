@@ -193,6 +193,15 @@ class Transport(ABC):
         return True
 
 
+
+def _keep_longer_rate_limit(disabled_until, category, until):
+    # type: (Dict[Optional[EventDataCategory], datetime], Optional[EventDataCategory], datetime) -> None
+    """Store until unless a later deadline is already recorded for category."""
+    previous = disabled_until.get(category)
+    if previous is None or until > previous:
+        disabled_until[category] = until
+
+
 def _parse_rate_limits(
     header: str, now: "Optional[datetime]" = None
 ) -> "Iterable[Tuple[Optional[EventDataCategory], datetime]]":
@@ -341,7 +350,10 @@ class HttpTransportCore(Transport):
         header = self._get_header_value(response, "x-sentry-rate-limits")
         if header:
             logger.warning("Rate-limited via x-sentry-rate-limits")
-            self._disabled_until.update(_parse_rate_limits(header))
+            # A later, shorter limit must not replace one that is still active.
+            # https://develop.sentry.dev/sdk/foundations/transport/rate-limiting/
+            for category, until in _parse_rate_limits(header):
+                _keep_longer_rate_limit(self._disabled_until, category, until)
 
         # old sentries only communicate global rate limit hits via the
         # retry-after header on 429.  This header can also be emitted on new
@@ -354,8 +366,10 @@ class HttpTransportCore(Transport):
                 if retry_after_value is not None
                 else None
             ) or 60
-            self._disabled_until[None] = datetime.now(timezone.utc) + timedelta(
-                seconds=retry_after
+            _keep_longer_rate_limit(
+                self._disabled_until,
+                None,
+                datetime.now(timezone.utc) + timedelta(seconds=retry_after),
             )
 
     def _handle_request_error(
