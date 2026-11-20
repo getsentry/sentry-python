@@ -71,12 +71,8 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
     ) -> None:
         super().__init__(capture_func, record_lost_func)
 
-        # Metric name -> metrics kept per window. Never below 1, so there's
-        # always at least one metric per name to extrapolate from
         self._limits = {
-            name: min(
-                max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_KEPT_PER_WINDOW
-            )
+            name: int(rate * self.FLUSH_WAIT_TIME)
             for name, rate in window_sampling.items()
         }
 

@@ -135,14 +135,28 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         valid_rates = {}
         if isinstance(window_sampling, dict):
             for name, rate in window_sampling.items():
-                if isinstance(rate, (int, float)) and math.isfinite(rate) and rate > 0:
-                    valid_rates[name] = rate
-                else:
+                if (
+                    isinstance(rate, bool)
+                    or not isinstance(rate, (int, float))
+                    or not math.isfinite(rate)
+                    or rate <= 0
+                ):
                     logger.warning(
                         "[Metrics] Given window sampling rate for %s is invalid. It must be a positive number. Got %s, not sampling it.",
                         name,
                         rate,
                     )
+                    continue
+
+                clamped = min(max(rate, 0.2), 2000)
+                if clamped != rate:
+                    logger.warning(
+                        "[Metrics] Window sampling rate for %s must be between 0.2 and 2000 metrics per second. Got %s, using %s.",
+                        name,
+                        rate,
+                        clamped,
+                    )
+                valid_rates[name] = clamped
         else:
             logger.warning(
                 "[Metrics] metrics_window_sampling must map metric names to rates. Got %s, not sampling.",
