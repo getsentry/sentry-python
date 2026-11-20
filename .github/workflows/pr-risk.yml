@@ -1,0 +1,116 @@
+name: PR Risk Experiment
+
+on:
+  # The action reads PR Git objects through the API; no step checks out or runs PR code.
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-risk-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  risk:
+    name: Score PR risk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: github.event.pull_request.draft == false
+    env:
+      RESULT_PATH: risk-pr-result.json
+
+    steps:
+      - name: Classify PR risk
+        id: risk
+        uses: getsentry/pr-risk-action@1cdeab5ada06969e5376666b3a79f444c2f41a67
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+          result-path: ${{ env.RESULT_PATH }}
+
+      - name: Publish risk label
+        if: ${{ !cancelled() && steps.risk.outcome != 'skipped' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            if (!fs.existsSync(process.env.RESULT_PATH)) {
+              core.warning('Risk analysis did not produce a result; no label was published.');
+              return;
+            }
+            const result = JSON.parse(fs.readFileSync(process.env.RESULT_PATH, 'utf8'));
+            const prNumber = Number(process.env.PR_NUMBER);
+            const repo = context.repo;
+            const colors = { low: '0E8A16', medium: 'FBCA04', high: 'D93F0B' };
+            const riskLabels = Object.keys(colors).map(risk => `risk: ${risk}`);
+            if (!Number.isSafeInteger(prNumber) || prNumber <= 0
+                || result.number !== prNumber || result.repo !== `${repo.owner}/${repo.repo}`
+                || typeof result.status !== 'string'
+                || (result.status === 'ok' && !Object.hasOwn(colors, result.risk_label))) {
+              throw new Error('Risk result does not match this PR or a valid risk class.');
+            }
+            const snapshot = result.snapshot;
+            if (result.status === 'pr_changed' || !snapshot?.source_head_sha || !snapshot?.source_base_sha) {
+              core.warning('Risk analysis has no current revision; no label was published.');
+              return;
+            }
+            const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number: prNumber });
+            if (pr.state !== 'open' || pr.head.sha !== snapshot.source_head_sha
+                || pr.base.sha !== snapshot.source_base_sha) {
+              core.warning('PR changed after risk analysis; no label was published.');
+              return;
+            }
+            const target = result.status === 'ok' ? `risk: ${result.risk_label}` : null;
+            const existing = pr.labels.map(label => label.name);
+            if (target && !existing.includes(target)) {
+              try {
+                await github.rest.issues.getLabel({ ...repo, name: target });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                try {
+                  await github.rest.issues.createLabel({
+                    ...repo, name: target, color: colors[result.risk_label],
+                    description: `PR risk score: ${result.risk_label}`,
+                  });
+                } catch (error) {
+                  if (error.status !== 422) throw error;
+                  // Another PR may have created the shared repository label.
+                  await github.rest.issues.getLabel({ ...repo, name: target });
+                }
+              }
+              await github.rest.issues.addLabels({ ...repo, issue_number: prNumber, labels: [target] });
+            }
+            // A failed classification must not leave an earlier low/medium/high verdict.
+            for (const name of existing.filter(name => riskLabels.includes(name) && name !== target)) {
+              try {
+                await github.rest.issues.removeLabel({ ...repo, issue_number: prNumber, name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+            const { data: latest } = await github.rest.pulls.get({ ...repo, pull_number: prNumber });
+            if (target && (latest.state !== 'open' || latest.head.sha !== pr.head.sha
+                || latest.base.sha !== pr.base.sha || latest.title !== pr.title || latest.body !== pr.body)) {
+              await github.rest.issues.removeLabel({ ...repo, issue_number: prNumber, name: target });
+              core.warning('PR changed while publishing; removed the outdated risk label.');
+              return;
+            }
+            if (!target) core.warning(`PR remains unclassified: ${result.status}. Previous risk labels were cleared.`);
+            core.info(target ? `Published ${target}` : 'No risk label published.');
+
+      - name: Upload risk result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: risk-pr-result
+          path: ${{ env.RESULT_PATH }}
+          if-no-files-found: warn
+          retention-days: 30
