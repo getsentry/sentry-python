@@ -1,6 +1,5 @@
 import os
 import sys
-from collections import Counter
 from unittest import mock
 
 import pytest
@@ -627,40 +626,31 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items):
         items.clear()
 
 
-def test_metrics_window_sampling_drops_after_max_reached(sentry_init, monkeypatch):
-    sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 2}})
-    batcher = sentry_sdk.get_client().metrics_batcher
-
-    def no_op_flush(*args, **kwargs):
-        pass
-
-    monkeypatch.setattr(batcher, "_flush", no_op_flush)
-
-    lost_event_calls = []
-
-    def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
-        lost_event_calls.append((reason, data_category, item, quantity))
-
-    monkeypatch.setattr(batcher, "_record_lost_func", record_lost_event)
-
-    for _ in range(9_995):
-        sentry_sdk.metrics.count("test.unsampled", 1)
-
-    for _ in range(20):
-        sentry_sdk.metrics.count("test.sampled", 1)
-
-    for _ in range(5):
-        sentry_sdk.metrics.count("test.unsampled", 1)
-
-    for reason, data_category, _, quantity in lost_event_calls:
-        assert reason == "queue_overflow"
-        assert data_category == "trace_metric"
-        assert quantity == 1
-
-    dropped = Counter(
-        item.payload.json["items"][0]["name"] for _, _, item, _ in lost_event_calls
+def test_metrics_window_sampling_drops_after_max_reached(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    sentry_init(
+        _experiments={"metrics_window_sampling": {"test.sampled": 2000, "test.late": 2}}
     )
-    assert dropped == {"test.sampled": 15, "test.unsampled": 5}
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    for _ in range(10_020):
+        sentry_sdk.metrics.count("test.sampled", 1)
+    for _ in range(5):
+        sentry_sdk.metrics.count("test.late", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 10_000
+    for metric in metrics:
+        assert metric["name"] == "test.sampled"
+        assert metric["attributes"]["sentry.client_sample_rate"] == 10_000 / 10_020
+
+    assert record_lost_event_calls == [
+        ("sample_rate", "trace_metric", None, 25),
+    ]
 
 
 @pytest.mark.skipif(

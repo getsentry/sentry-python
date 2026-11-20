@@ -14,8 +14,6 @@ T = TypeVar("T")
 
 
 class Batcher(Generic[T]):
-    MAX_BEFORE_FLUSH = 100
-    MAX_BEFORE_DROP = 1_000
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = ""

@@ -58,8 +58,9 @@ class _Window:
 
 
 class LockFreeMetricsBatcher(Batcher["Metric"]):
-    MAX_BEFORE_FLUSH = 1000
-    MAX_BEFORE_DROP = 10_000
+    MAX_UNSAMPLED_BEFORE_FLUSH = 1000
+    MAX_UNSAMPLED_BEFORE_DROP = 10_000
+    MAX_KEPT_PER_WINDOW = 10_000
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "trace_metric"
@@ -77,7 +78,9 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         # Metric name -> metrics kept per window. Never below 1, so there's
         # always at least one metric per name to extrapolate from
         self._limits = {
-            name: min(max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_BEFORE_DROP)
+            name: min(
+                max(1, int(rate * self.FLUSH_WAIT_TIME)), self.MAX_KEPT_PER_WINDOW
+            )
             for name, rate in window_sampling.items()
         }
 
@@ -133,14 +136,17 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
             self._retire_window(window)
             window = self._window
 
-        if len(self._queue) + window.size() >= self.MAX_BEFORE_DROP:
-            self._record_lost(item)
-            return None
-
         limit = self._limits.get(item["name"])
         if limit is None:
+            if len(self._queue) >= self.MAX_UNSAMPLED_BEFORE_DROP:
+                self._record_lost(item)
+                return None
+
             self._queue.append(item)
-            if len(self._queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
+            if (
+                len(self._queue) < self.MAX_UNSAMPLED_BEFORE_FLUSH
+                or self._flush_event.is_set()
+            ):
                 return
 
             self._flush_event.set()
@@ -152,13 +158,13 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         state = window.threads[threading.get_ident()]
         reservoir = state.reservoirs[item["name"]]
         reservoir.seen += 1
-        if len(reservoir.kept) < limit:
+        if len(reservoir.kept) < limit and window.size() < self.MAX_KEPT_PER_WINDOW:
             state.size += 1
             reservoir.kept.append(item)
             return
 
         index = random.randrange(reservoir.seen)
-        if index >= limit:
+        if index >= len(reservoir.kept):
             return
 
         reservoir.kept[index] = item
@@ -249,6 +255,7 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
                 thread_kept = reservoir.kept.copy()
                 kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
             if not kept:
+                sampled_out += bounds[-1]
                 continue
 
             items.extend(kept)
