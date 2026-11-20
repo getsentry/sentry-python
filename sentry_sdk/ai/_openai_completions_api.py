@@ -26,7 +26,7 @@ def _get_system_instructions(
     messages: "Iterable[ChatCompletionMessageParam]",
 ) -> "list[ChatCompletionSystemMessageParam]":
     if not isinstance(messages, Iterable):
-        return []
+        return []  # type: ignore[unreachable]  # defensive check on user input
 
     return [message for message in messages if _is_system_instruction(message)]
 
@@ -38,7 +38,7 @@ def _get_text_items(
         return [content]
 
     if not isinstance(content, Iterable):
-        return []
+        return []  # type: ignore[unreachable]  # defensive check on user input
 
     text_items: "list[str]" = []
     for part in content:
@@ -57,11 +57,11 @@ def _transform_system_instructions(
 
     for instruction in system_instructions:
         if not isinstance(instruction, dict):
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         content = instruction.get("content")
         if content is None:
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         text_parts: "list[TextPart]" = [
             {"type": "text", "content": text} for text in _get_text_items(content)
@@ -78,12 +78,12 @@ def _transform_tool_definitions(
     Transform tool definitions to the schema used by the "gen_ai.tool.definitions" attribute.
     """
     if not isinstance(tools, Iterable):
-        return []
+        return []  # type: ignore[unreachable]  # defensive check on user input
 
     tool_definitions = []
     for tool in tools:
         if not isinstance(tool, dict) or "type" not in tool:
-            continue
+            continue  # type: ignore[unreachable]  # defensive check on user input
 
         if tool["type"] == "function":
             tool_definition: "ToolDefinition" = {
@@ -91,7 +91,7 @@ def _transform_tool_definitions(
             }
 
             if "function" not in tool:
-                tool_definitions.append(tool_definition)
+                tool_definitions.append(tool_definition)  # type: ignore[unreachable]  # defensive check on user input
                 continue
 
             if "name" in tool["function"]:
@@ -112,7 +112,7 @@ def _transform_tool_definitions(
             }
 
             if "custom" not in tool:
-                tool_definitions.append(tool_definition)
+                tool_definitions.append(tool_definition)  # type: ignore[unreachable]  # defensive check on user input
                 continue
 
             if "name" in tool["custom"]:

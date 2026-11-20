@@ -236,7 +236,7 @@ class CaptureInternalException:
 _CAPTURE_INTERNAL_EXCEPTION = CaptureInternalException()
 
 
-def capture_internal_exceptions() -> "ContextManager[Any]":
+def capture_internal_exceptions() -> "CaptureInternalException":
     return _CAPTURE_INTERNAL_EXCEPTION
 
 
@@ -1851,7 +1851,7 @@ def package_version(package: str) -> "Optional[Tuple[int, ...]]":
         except importlib_metadata.PackageNotFoundError:
             return None
 
-    installed_packages = {
+    installed_packages = {  # type: ignore[unreachable]  # importlib.metadata is missing on Python < 3.8
         _replace_hyphens_dots_and_underscores_with_dashes(module): v
         for module, v in _get_installed_modules().items()
     }

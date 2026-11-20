@@ -325,6 +325,28 @@ async def test_trace_decorator_async_child_span_streaming(sentry_init, capture_i
     assert "parent_span_id" not in segment_span
 
 
+def test_legacy_trace_decorator_warns_in_span_streaming(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.trace
+    def traced_function():
+        return "ok"
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        with pytest.warns(DeprecationWarning, match="sentry_sdk.traces.trace"):
+            result = traced_function()
+
+    assert result == "ok"
+
+    sentry_sdk.flush()
+    assert [item.payload["name"] for item in items] == ["segment"]
+
+
 def test_functions_to_trace_signature_unchanged_sync(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,

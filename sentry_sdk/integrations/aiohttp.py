@@ -492,7 +492,9 @@ def create_trace_config() -> "TraceConfig":
             # `baggage` with Sentry members (e.g. merged by the boto3 integration
             # before signing): skip so Sentry members are not duplicated.
             with capture_internal_exceptions():
-                baggage = params.headers.get(BAGGAGE_HEADER_NAME)
+                baggage: "Optional[Union[str, bytes]]" = params.headers.get(
+                    BAGGAGE_HEADER_NAME
+                )
                 if baggage:
                     if isinstance(baggage, bytes):
                         baggage = baggage.decode("latin-1")
@@ -503,7 +505,9 @@ def create_trace_config() -> "TraceConfig":
                         headers_to_skip.add(BAGGAGE_HEADER_NAME)
 
             with capture_internal_exceptions():
-                authorization = params.headers.get("Authorization")
+                authorization: "Optional[Union[str, bytes]]" = params.headers.get(
+                    "Authorization"
+                )
                 if authorization:
                     if isinstance(authorization, bytes):
                         authorization = authorization.decode("latin-1")

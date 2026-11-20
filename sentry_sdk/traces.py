@@ -690,7 +690,7 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def _start(self) -> None:
         if self._scope is None:
-            return
+            return  # type: ignore[unreachable]  # NoOpStreamedSpan can be created without a scope
 
         old_span = self._scope.streamed_span
         self._scope.streamed_span = self

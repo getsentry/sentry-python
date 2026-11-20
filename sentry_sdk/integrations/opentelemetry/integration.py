@@ -31,7 +31,7 @@ except ImportError:
     DjangoInstrumentor = None
 
 
-CONFIGURABLE_INSTRUMENTATIONS = {
+CONFIGURABLE_INSTRUMENTATIONS: "Dict[Any, Dict[str, Any]]" = {
     DjangoInstrumentor: {"is_sql_commentor_enabled": True},
 }
 

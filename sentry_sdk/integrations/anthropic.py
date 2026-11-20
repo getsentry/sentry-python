@@ -138,7 +138,7 @@ if TYPE_CHECKING:
         _integration: "AnthropicIntegration"
 
         _max_tokens: int
-        _messages: Iterable[MessageParam]
+        _messages: Optional[Iterable[MessageParam]]
         _model: Optional[ModelParam]
         _system: Optional[Union[str, Iterable[TextBlockParam]]]
         _temperature: Optional[float]
@@ -151,7 +151,7 @@ if TYPE_CHECKING:
         _integration: "AnthropicIntegration"
 
         _max_tokens: int
-        _messages: Iterable[MessageParam]
+        _messages: Optional[Iterable[MessageParam]]
         _model: Optional[ModelParam]
         _system: Optional[Union[str, Iterable[TextBlockParam]]]
         _temperature: Optional[float]

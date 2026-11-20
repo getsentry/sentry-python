@@ -1125,8 +1125,8 @@ class _Client(BaseClient):
         if exceptions:
             errored = True
             for error in exceptions:
-                if isinstance(error, AnnotatedValue):
-                    error = error.value or {}
+                if isinstance(error, AnnotatedValue):  # type: ignore[unreachable]  # the event may already contain annotated values
+                    error = error.value or {}  # type: ignore[unreachable]
                 mechanism = error.get("mechanism")
                 if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
@@ -1475,14 +1475,14 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush_async`.
         """
         if self.transport is not None:
-            if not self._has_async_transport():
+            if not isinstance(self.transport, AsyncHttpTransport):
                 logger.debug(
                     "close_async() used with non-async transport, aborting. Please use close() instead."
                 )
                 return
             await self.flush_async(timeout=timeout, callback=callback)
             self._close_components()
-            kill_task = self.transport.kill()  # type: ignore
+            kill_task = self.transport.kill()
             if kill_task is not None:
                 await kill_task
             self.transport = None
@@ -1525,7 +1525,7 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if not self._has_async_transport():
+            if not isinstance(self.transport, AsyncHttpTransport):
                 logger.debug(
                     "flush_async() used with non-async transport, aborting. Please use flush() instead."
                 )
@@ -1533,7 +1533,7 @@ class _Client(BaseClient):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self._flush_components()
-            flush_task = self.transport.flush(timeout=timeout, callback=callback)  # type: ignore
+            flush_task = self.transport.flush(timeout=timeout, callback=callback)
             if flush_task is not None:
                 await flush_task
 

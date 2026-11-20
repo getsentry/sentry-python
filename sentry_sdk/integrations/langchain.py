@@ -1117,7 +1117,7 @@ def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
         elif isinstance(local_callbacks, list):
             callbacks_list = local_callbacks
         else:
-            logger.debug("Unknown callback type: %s", local_callbacks)
+            logger.debug("Unknown callback type: %s", local_callbacks)  # type: ignore[unreachable]  # defensive fallback
             # Just proceed with original function call
             return f(
                 callback_manager_cls,

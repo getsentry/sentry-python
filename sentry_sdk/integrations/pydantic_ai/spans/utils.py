@@ -60,7 +60,7 @@ def _set_usage_data(
         usage: RequestUsage or RunUsage object containing token usage information.
     """
     if usage is None:
-        return
+        return  # type: ignore[unreachable]  # defensive check
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data

@@ -153,6 +153,7 @@ python_version = "3.11"
 strict_equality = true
 strict_optional = true
 warn_redundant_casts = true
+warn_unreachable = true
 warn_unused_configs = true
 warn_unused_ignores = true
 

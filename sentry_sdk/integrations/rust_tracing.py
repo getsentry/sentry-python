@@ -70,7 +70,7 @@ def tracing_level_to_sentry_level(level: str) -> "sentry_sdk._types.LogLevelStr"
         return "error"
     else:
         # Better this than crashing
-        return "info"
+        return "info"  # type: ignore[unreachable]
 
 
 def extract_contexts(event: "Dict[str, Any]") -> "Dict[str, Any]":
@@ -139,7 +139,7 @@ def default_event_type_mapping(metadata: "Dict[str, Any]") -> "EventTypeMapping"
     elif level in (RustTracingLevel.Debug, RustTracingLevel.Trace):
         return EventTypeMapping.Ignore
     else:
-        return EventTypeMapping.Ignore
+        return EventTypeMapping.Ignore  # type: ignore[unreachable]  # defensive fallback
 
 
 class RustTracingLayer:
@@ -242,14 +242,19 @@ class RustTracingLayer:
         sentry_span.__enter__()
         return sentry_span
 
-    def on_close(self, span_id: str, sentry_span: "SentrySpan") -> None:
+    def on_close(
+        self, span_id: str, sentry_span: "Optional[Union[SentrySpan, StreamedSpan]]"
+    ) -> None:
         if sentry_span is None:
             return
 
         sentry_span.__exit__(None, None, None)
 
     def on_record(
-        self, span_id: str, values: str, sentry_span: "Union[SentrySpan, StreamedSpan]"
+        self,
+        span_id: str,
+        values: str,
+        sentry_span: "Optional[Union[SentrySpan, StreamedSpan]]",
     ) -> None:
         if sentry_span is None:
             return

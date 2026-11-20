@@ -85,7 +85,7 @@ class EnvironHeaders(Mapping):  # type: ignore
     def __iter__(self) -> "Generator[str, None, None]":
         for k in self.environ:
             if not isinstance(k, str):
-                continue
+                continue  # type: ignore[unreachable]  # WSGI environ keys are not guaranteed to be str
 
             k = k.replace("-", "_").upper()
             if not k.startswith(self.prefix):
@@ -1086,6 +1086,14 @@ def create_span_decorator(
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+            if get_current_streamed_span() is not None:
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return await f(*args, **kwargs)
+
             current_span = get_current_span()
 
             if current_span is None:
@@ -1093,14 +1101,6 @@ def create_span_decorator(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
                     qualname_from_function(f),
-                )
-                return await f(*args, **kwargs)
-
-            if isinstance(current_span, StreamedSpan):
-                warnings.warn(
-                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
                 )
                 return await f(*args, **kwargs)
 
@@ -1132,6 +1132,14 @@ def create_span_decorator(
 
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+            if get_current_streamed_span() is not None:
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return f(*args, **kwargs)
+
             current_span = get_current_span()
 
             if current_span is None:
@@ -1139,14 +1147,6 @@ def create_span_decorator(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
                     qualname_from_function(f),
-                )
-                return f(*args, **kwargs)
-
-            if isinstance(current_span, StreamedSpan):
-                warnings.warn(
-                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
                 )
                 return f(*args, **kwargs)
 
@@ -1813,6 +1813,9 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
 from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
     StreamedSpan,
+)
+from sentry_sdk.traces import (
+    get_current_span as get_current_streamed_span,
 )
 from sentry_sdk.traces import (
     start_span as start_streaming_span,
