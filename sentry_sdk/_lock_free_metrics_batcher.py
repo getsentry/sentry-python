@@ -188,11 +188,18 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
 
         sampled_out = 0
 
+        now = time.monotonic()
         window = self._window
-        if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
+        if now - window.start >= self.FLUSH_WAIT_TIME:
             self._retire_window(window)
+
         for _ in range(len(self._retired)):
             try:
+                if (
+                    threading.current_thread() is self._flusher
+                    and now - self._retired[0].start < self.FLUSH_WAIT_TIME + 0.05
+                ):
+                    break
                 window = self._retired.popleft()
             except IndexError:
                 break
