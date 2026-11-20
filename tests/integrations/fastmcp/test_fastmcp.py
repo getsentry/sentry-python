@@ -41,6 +41,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
+from tests.integrations.utils import run_deferred_setup_app
 
 try:
     from fastmcp.prompts import Message
@@ -1473,3 +1474,24 @@ async def test_fastmcp_mixed_sync_async_tools(
         assert len(mcp_spans) == 2
         assert mcp_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "sync_add"
         assert mcp_spans[1]["data"][SPANDATA.MCP_TOOL_NAME] == "async_multiply"
+
+
+@pytest.mark.parametrize("method", ["_get_prompt_mcp", "_read_resource_mcp"])
+def test_deferred_setup_on_import(tmp_path, method):
+    if not hasattr(StandaloneFastMCP, method):
+        pytest.skip(f"Requires standalone fastmcp with FastMCP.{method}")
+
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="mcp",
+        trigger="mcp",
+        app_imports="from fastmcp import FastMCP",
+        patched=f"FastMCP.{method}",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }

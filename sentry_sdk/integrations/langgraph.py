@@ -10,9 +10,6 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-
-# This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
-from sentry_sdk.integrations.langchain import LangchainIntegration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
@@ -27,6 +24,10 @@ try:
     from langgraph.pregel import Pregel
 except ImportError:
     raise DidNotEnable("langgraph not installed")
+
+# Imported after the langgraph check, so langchain_core is only loaded when langgraph
+# is installed. langgraph depends on langchain-core, which is all LangchainIntegration needs.
+from sentry_sdk.integrations.langchain import LangchainIntegration
 
 
 class LanggraphIntegration(Integration):
