@@ -101,13 +101,12 @@
         run: |
           uv sync
 
-      - parallel:
-        {% for framework in frameworks %}
-          - name: Test {{ framework }}
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
-        {% endfor %}
+      {% for framework in frameworks %}
+      - name: Test {{ framework }}
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
+      {% endfor %}
 
       - name: Upload coverage data
         if: {% raw %}${{ !cancelled() }}{% endraw %}
