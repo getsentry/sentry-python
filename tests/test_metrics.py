@@ -729,7 +729,38 @@ def test_metrics_window_sampling_before_send(
         assert metric["attributes"]["drop"] is False
         assert metric["attributes"]["sentry.client_sample_rate"] == 10 / 200
 
-    assert ("sample_rate", "trace_metric", None, 190) in record_lost_event_calls
+    # Every metric is either sent or recorded as lost exactly once
+    lost = Counter()
+    for reason, data_category, _, quantity in record_lost_event_calls:
+        if data_category == "trace_metric":
+            lost[reason] += quantity
+    assert lost.keys() <= {"sample_rate", "before_send"}
+    assert len(metrics) + lost["sample_rate"] + lost["before_send"] == 200
+
+
+def test_metrics_window_sampling_before_send_captures_metric(
+    sentry_init, capture_items
+):
+    def _before_metric(record, hint):
+        if record["name"] == "test.counter":
+            sentry_sdk.metrics.count("test.inner", 1)
+        return record
+
+    sentry_init(
+        before_send_metric=_before_metric,
+        _experiments={"metrics_window_sampling": {"test.counter": 2, "test.inner": 2}},
+    )
+    items = capture_items("trace_metric")
+
+    for _ in range(200):
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+
+    metrics = [item.payload for item in items if item.payload["name"] == "test.counter"]
+    assert len(metrics) == 10
+    for metric in metrics:
+        assert metric["attributes"]["sentry.client_sample_rate"] == 10 / 200
 
 
 def test_metrics_window_sampling_new_window(sentry_init, capture_items):
@@ -749,14 +780,15 @@ def test_metrics_window_sampling_new_window(sentry_init, capture_items):
         items.clear()
 
 
-def test_metrics_window_sampling_drops_after_max_reached(sentry_init, monkeypatch):
+def test_metrics_window_sampling_drops_after_max_reached(
+    sentry_init, capture_items, monkeypatch
+):
     sentry_init(_experiments={"metrics_window_sampling": {"test.sampled": 2}})
+    items = capture_items("trace_metric")
     batcher = sentry_sdk.get_client().metrics_batcher
 
-    def no_op_flush(*args, **kwargs):
-        pass
-
-    monkeypatch.setattr(batcher, "_flush", no_op_flush)
+    # Without a flusher thread, nothing is sent until the test flushes
+    monkeypatch.setattr(batcher, "_ensure_thread", lambda: True)
 
     lost_event_calls = []
 
@@ -768,8 +800,7 @@ def test_metrics_window_sampling_drops_after_max_reached(sentry_init, monkeypatc
     for _ in range(9_995):
         sentry_sdk.metrics.count("test.unsampled", 1)
 
-    # All of these are sampled in, since the window holds 10
-    for _ in range(10):
+    for _ in range(20):
         sentry_sdk.metrics.count("test.sampled", 1)
 
     for _ in range(5):
@@ -783,7 +814,20 @@ def test_metrics_window_sampling_drops_after_max_reached(sentry_init, monkeypatc
     dropped = Counter(
         item.payload.json["items"][0]["name"] for _, _, item, _ in lost_event_calls
     )
-    assert dropped == {"test.sampled": 5, "test.unsampled": 5}
+    assert dropped["test.unsampled"] == 5
+    # Only 5 fit in the buffer, so the other sampled in ones are dropped
+    assert 5 <= dropped["test.sampled"] <= 15
+
+    lost_event_calls.clear()
+    get_client().flush()
+
+    sent = [item.payload for item in items if item.payload["name"] == "test.sampled"]
+    sampled_out = sum(
+        quantity
+        for reason, _, _, quantity in lost_event_calls
+        if reason == "sample_rate"
+    )
+    assert len(sent) + dropped["test.sampled"] + sampled_out == 20
 
 
 @pytest.mark.skipif(
