@@ -55,6 +55,12 @@ class SpanBatcher(Batcher["SpanJSON"]):
         self._lock = threading.Lock()
         self._active: "threading.local" = threading.local()
 
+        # See Batcher: batches taken from the buffer but not yet handed to
+        # the transport, so flush() can wait for in-flight batches.
+        self._in_flight = 0
+        self._flushes_done = 0
+        self._in_flight_cond = threading.Condition()
+
         self._last_full_flush: float = time.monotonic()  # drives time-based flushes
         self._flush_event = threading.Event()
         self._pending_flush: set[str] = set()  # buckets to be flushed
@@ -80,6 +86,10 @@ class SpanBatcher(Batcher["SpanJSON"]):
 
         self._lock = threading.Lock()
         self._active = threading.local()
+
+        self._in_flight = 0
+        self._flushes_done = 0
+        self._in_flight_cond = threading.Condition()
 
         self._last_full_flush = time.monotonic()
         self._flush_event = threading.Event()
@@ -240,5 +250,14 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 del self._span_buffer[bucket_id]
                 del self._running_size[bucket_id]
 
-        for envelope in envelopes:
-            self._capture_func(envelope)
+            if envelopes:
+                self._mark_in_flight()
+
+        if not envelopes:
+            return
+
+        try:
+            for envelope in envelopes:
+                self._capture_func(envelope)
+        finally:
+            self._mark_flushed()
