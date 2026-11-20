@@ -695,6 +695,43 @@ def test_metrics_window_sampling_single_slot_with_span_id(sentry_init, capture_i
     assert metrics[0]["attributes"]["sentry.client_sample_rate"] == 1 / 10
 
 
+def test_metrics_window_sampling_before_send(
+    sentry_init, capture_items, capture_record_lost_event_calls
+):
+    before_send_calls = 0
+
+    def _before_metric(record, hint):
+        nonlocal before_send_calls
+        before_send_calls += 1
+        if record["attributes"]["drop"]:
+            return None
+        return record
+
+    sentry_init(
+        before_send_metric=_before_metric,
+        _experiments={"metrics_window_sampling": {"test.counter": 2}},
+    )
+    items = capture_items("trace_metric")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    for i in range(200):
+        sentry_sdk.metrics.count("test.counter", 1, attributes={"drop": i % 2 == 0})
+
+    get_client().flush()
+
+    # Metrics that are sampled out never reach before_send_metric
+    assert 10 <= before_send_calls < 200
+
+    # Metrics dropped by before_send_metric still count towards the rate
+    metrics = [item.payload for item in items]
+    assert len(metrics) <= 10
+    for metric in metrics:
+        assert metric["attributes"]["drop"] is False
+        assert metric["attributes"]["sentry.client_sample_rate"] == 10 / 200
+
+    assert ("sample_rate", "trace_metric", None, 190) in record_lost_event_calls
+
+
 def test_metrics_window_sampling_new_window(sentry_init, capture_items):
     sentry_init(_experiments={"metrics_window_sampling": {"test.counter": 2}})
     items = capture_items("trace_metric")
@@ -731,7 +768,8 @@ def test_metrics_window_sampling_drops_after_max_reached(sentry_init, monkeypatc
     for _ in range(9_995):
         sentry_sdk.metrics.count("test.unsampled", 1)
 
-    for _ in range(20):
+    # All of these are sampled in, since the window holds 10
+    for _ in range(10):
         sentry_sdk.metrics.count("test.sampled", 1)
 
     for _ in range(5):
@@ -745,7 +783,7 @@ def test_metrics_window_sampling_drops_after_max_reached(sentry_init, monkeypatc
     dropped = Counter(
         item.payload.json["items"][0]["name"] for _, _, item, _ in lost_event_calls
     )
-    assert dropped == {"test.sampled": 15, "test.unsampled": 5}
+    assert dropped == {"test.sampled": 5, "test.unsampled": 5}
 
 
 @pytest.mark.skipif(

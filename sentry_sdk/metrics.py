@@ -2,6 +2,8 @@ import time
 from typing import TYPE_CHECKING, Any, Optional
 
 import sentry_sdk
+from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
+from sentry_sdk.traces import NoOpSpan
 from sentry_sdk.utils import format_attribute
 
 if TYPE_CHECKING:
@@ -15,6 +17,16 @@ def _capture_metric(
     unit: "Optional[str]" = None,
     attributes: "Optional[Attributes]" = None,
 ) -> None:
+    scope = sentry_sdk.get_current_scope()
+
+    # Window sampling decides first, so metrics it drops skip all the work below
+    batcher = scope.get_client().metrics_batcher
+    if isinstance(batcher, LockFreeMetricsBatcher):
+        span = scope.span
+        has_span = span is not None and not isinstance(span, NoOpSpan)
+        if not batcher.should_capture(name, has_span):
+            return
+
     attrs: "Attributes" = {}
 
     if attributes:
@@ -32,7 +44,7 @@ def _capture_metric(
         "attributes": attrs,
     }
 
-    sentry_sdk.get_current_scope()._capture_metric(metric)
+    scope._capture_metric(metric)
 
 
 def count(
