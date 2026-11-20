@@ -76,6 +76,7 @@ import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
+from tests.integrations.utils import run_deferred_setup_app
 
 
 def _get_response(session_message):
@@ -2611,3 +2612,20 @@ async def test_include_prompts_ignored_when_data_collection_set(
 
     assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps({"value": 42})
     assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT] == 1
+
+
+def test_deferred_setup_on_import(tmp_path):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="mcp",
+        trigger="mcp",
+        app_imports="from mcp.server.streamable_http import StreamableHTTPServerTransport",
+        patched="StreamableHTTPServerTransport.handle_request",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }

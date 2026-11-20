@@ -45,11 +45,22 @@ _processed_integrations: "Set[str]" = set()
 # Set of all integration identifiers we have actually installed
 _installed_integrations: "Set[str]" = set()
 
-# Trigger module -> import string of the deferred integration waiting for the
-# application to import the trigger module
-_pending_deferred_integrations: "Dict[str, str]" = {}
+# Import strings of the deferred integrations waiting for the application to
+# import one of their trigger modules
+_pending_deferred_integrations: "Set[str]" = set()
 
-_deferred_setup_finder_guard = local()
+
+class _DeferredSetupState(local):
+    def __init__(self) -> None:
+        # Guards the finder against recursion
+        self.finding = False
+        # Trigger imports and setups in progress
+        self.import_depth = 0
+        # Set up once the outermost trigger import completes
+        self.completed_triggers: "List[str]" = []
+
+
+_deferred_setup_state = _DeferredSetupState()
 
 
 def _generate_default_integrations_iterator(
@@ -141,15 +152,45 @@ _AUTO_ENABLING_INTEGRATIONS = [
 ]
 
 # With the `deferred_auto_enabling_integrations` experiment on, these auto-enabling
-# integrations are only set up once the application imports the trigger module.
+# integrations are only set up once the application imports one of their trigger
+# modules, and the outermost trigger import in progress completes. The first trigger
+# decides whether the library is installed. When an integration imports from several
+# packages, each of them is a trigger, so none is half-initialised when the setup runs.
 # This can't live on the integration class, since loading the class imports the library.
 _DEFERRED_INTEGRATION_TRIGGERS = {
-    "sentry_sdk.integrations.anthropic.AnthropicIntegration": "anthropic",
-    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration": "google.genai",
-    "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration": "huggingface_hub.inference._client",
-    "sentry_sdk.integrations.openai.OpenAIIntegration": "openai",
-    "sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration": "agents",
-    "sentry_sdk.integrations.pydantic_ai.PydanticAIIntegration": "pydantic_ai",
+    "sentry_sdk.integrations.anthropic.AnthropicIntegration": ("anthropic",),
+    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration": ("google.genai",),
+    "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration": (
+        "huggingface_hub.inference._client",
+    ),
+    "sentry_sdk.integrations.langchain.LangchainIntegration": (
+        "langchain_core",
+        "langchain",
+        "langchain_classic",
+        "langchain_openai",
+        "langchain_google_vertexai",
+        "langchain_aws",
+        "langchain_cohere",
+        "langchain_mistralai",
+        "langchain_huggingface",
+        "langchain_ollama",
+    ),
+    # `langgraph` is a namespace package, so it can't be a trigger
+    "sentry_sdk.integrations.langgraph.LanggraphIntegration": (
+        "langgraph.graph",
+        "langgraph.func",
+        "langgraph.pregel",
+    ),
+    "sentry_sdk.integrations.mcp.MCPIntegration": ("mcp", "fastmcp"),
+    "sentry_sdk.integrations.openai.OpenAIIntegration": ("openai",),
+    "sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration": ("agents",),
+    "sentry_sdk.integrations.pydantic_ai.PydanticAIIntegration": ("pydantic_ai",),
+}
+
+_DEFERRED_INTEGRATION_BY_TRIGGER = {
+    trigger: import_string
+    for import_string, triggers in _DEFERRED_INTEGRATION_TRIGGERS.items()
+    for trigger in triggers
 }
 
 iter_default_integrations = _generate_default_integrations_iterator(
@@ -264,9 +305,10 @@ def setup_integrations(
         and options is not None
         and options["_experiments"].get("deferred_auto_enabling_integrations")
     ):
-        for import_string, trigger in _DEFERRED_INTEGRATION_TRIGGERS.items():
-            if trigger in sys.modules:
+        for import_string, triggers in _DEFERRED_INTEGRATION_TRIGGERS.items():
+            if any(trigger in sys.modules for trigger in triggers):
                 continue
+            trigger = triggers[0]
             try:
                 spec = importlib.util.find_spec(trigger)
             except Exception:
@@ -355,19 +397,18 @@ def setup_integrations(
         ):
             continue
 
-        trigger = _DEFERRED_INTEGRATION_TRIGGERS[import_string]
         with _installer_lock:
             if identifier in _processed_integrations:
                 continue
             _processed_integrations.add(identifier)
-            _pending_deferred_integrations[trigger] = import_string
+            _pending_deferred_integrations.add(import_string)
             if _deferred_setup_finder not in sys.meta_path:
                 sys.meta_path.insert(0, _deferred_setup_finder)
 
         logger.debug(
-            "Deferring setup of integration %s until %s is imported",
+            "Deferring setup of integration %s until one of %s is imported",
             identifier,
-            trigger,
+            ", ".join(_DEFERRED_INTEGRATION_TRIGGERS[import_string]),
         )
 
     integrations = {
@@ -383,8 +424,10 @@ def setup_integrations(
 
 
 def _set_up_deferred_integration(trigger: str) -> None:
-    import_string = _pending_deferred_integrations.pop(trigger, None)
-    if import_string is None:
+    import_string = _DEFERRED_INTEGRATION_BY_TRIGGER[trigger]
+    try:
+        _pending_deferred_integrations.remove(import_string)
+    except KeyError:
         return
 
     with capture_internal_exceptions():
@@ -412,21 +455,39 @@ class _DeferredSetupLoader(Loader):
         return self._loader.create_module(spec)
 
     def exec_module(self, module: "ModuleType") -> None:
-        self._loader.exec_module(module)
-        module.__loader__ = self._loader
-        if module.__spec__ is not None:
-            module.__spec__.loader = self._loader
+        state = _deferred_setup_state
+        state.import_depth += 1
+        try:
+            self._loader.exec_module(module)
+            module.__loader__ = self._loader
+            if module.__spec__ is not None:
+                module.__spec__.loader = self._loader
 
-        # Setup may access the trigger as an attribute of its parent package
-        # before the import system binds it there
-        with capture_internal_exceptions():
-            parent, _, child = self._trigger.rpartition(".")
-            if parent:
-                setattr(
-                    sys.modules[parent], child, sys.modules.get(self._trigger, module)
-                )
+            # Setup may access the trigger as an attribute of its parent package
+            # before the import system binds it there
+            with capture_internal_exceptions():
+                parent, _, child = self._trigger.rpartition(".")
+                if parent:
+                    setattr(
+                        sys.modules[parent],
+                        child,
+                        sys.modules.get(self._trigger, module),
+                    )
 
-        _set_up_deferred_integration(self._trigger)
+            state.completed_triggers.append(self._trigger)
+        finally:
+            state.import_depth -= 1
+
+        if state.import_depth > 0:
+            return
+
+        # Trigger imports during a setup are queued rather than set up halfway through it
+        state.import_depth += 1
+        try:
+            while state.completed_triggers:
+                _set_up_deferred_integration(state.completed_triggers.pop(0))
+        finally:
+            state.import_depth -= 1
 
     def __getattr__(self, name: str) -> "Any":
         return getattr(self._loader, name)
@@ -439,12 +500,15 @@ class _DeferredSetupFinder(MetaPathFinder):
         path: "Optional[Sequence[str]]" = None,
         target: "Optional[ModuleType]" = None,
     ) -> "Optional[ModuleSpec]":
-        if fullname not in _pending_deferred_integrations or getattr(
-            _deferred_setup_finder_guard, "active", False
+        state = _deferred_setup_state
+        if (
+            _DEFERRED_INTEGRATION_BY_TRIGGER.get(fullname)
+            not in _pending_deferred_integrations
+            or state.finding
         ):
             return None
 
-        _deferred_setup_finder_guard.active = True
+        state.finding = True
         try:
             for finder in sys.meta_path:
                 if finder is self or not hasattr(finder, "find_spec"):
@@ -455,12 +519,14 @@ class _DeferredSetupFinder(MetaPathFinder):
             else:
                 return None
         finally:
-            _deferred_setup_finder_guard.active = False
+            state.finding = False
 
         if hasattr(spec.loader, "exec_module"):
             spec.loader = _DeferredSetupLoader(spec.loader, fullname)
         else:
-            _pending_deferred_integrations.pop(fullname, None)
+            _pending_deferred_integrations.discard(
+                _DEFERRED_INTEGRATION_BY_TRIGGER[fullname]
+            )
             logger.debug(
                 "Not setting up deferred integration for %s: its loader has no exec_module",
                 fullname,

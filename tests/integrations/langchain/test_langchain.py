@@ -1,4 +1,5 @@
 import json
+from textwrap import dedent
 from typing import Any, Iterator, List, Optional
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -7357,4 +7358,69 @@ def test_deferred_setup_skips_deactivated_integration(tmp_path):
         "integration_enabled": False,
         "patched": False,
         "reported_in_event": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "app_imports, patched",
+    [
+        pytest.param(
+            "from langchain_openai import OpenAIEmbeddings",
+            "OpenAIEmbeddings.embed_documents",
+            id="langchain_openai_first",
+        ),
+        pytest.param(
+            "from langchain_classic.agents import AgentExecutor",
+            "AgentExecutor.invoke",
+            id="langchain_classic_agents_first",
+            marks=pytest.mark.skipif(
+                package_version("langchain-classic") is None,
+                reason="Requires langchain-classic",
+            ),
+        ),
+    ],
+)
+def test_deferred_setup_on_import(tmp_path, app_imports, patched):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="langchain",
+        trigger="langchain_core",
+        app_imports=app_imports,
+        patched=patched,
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }
+
+
+def test_deferred_setup_of_langgraph_imported_by_langchain_agents(tmp_path):
+    pytest.importorskip("langchain.agents.factory")
+
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="langgraph",
+        trigger="langchain_core",
+        app_imports="import langchain.agents\nfrom langgraph.pregel import Pregel",
+        patched="Pregel.invoke",
+        before_init=dedent(
+            """
+            class HideLangchainClassic:
+                def find_spec(self, fullname, path=None, target=None):
+                    if fullname == "langchain_classic":
+                        raise ImportError(fullname)
+
+            sys.meta_path.insert(0, HideLangchainClassic())
+            """
+        ),
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
     }

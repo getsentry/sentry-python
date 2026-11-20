@@ -12,6 +12,7 @@ from langgraph.errors import GraphBubbleUp
 import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
+from tests.integrations.utils import run_deferred_setup_app
 
 
 def mock_langgraph_imports():
@@ -2655,3 +2656,35 @@ def test_state_graph_compile_gates_available_tools_only_when_data_collection_con
         assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in data
 
     assert data[SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+
+
+@pytest.mark.parametrize(
+    "app_imports, patched",
+    [
+        pytest.param(
+            "from langgraph.graph import StateGraph",
+            "StateGraph.compile",
+            id="langgraph_graph",
+        ),
+        pytest.param(
+            "from langgraph.func import entrypoint\nfrom langgraph.pregel import Pregel",
+            "Pregel.invoke",
+            id="langgraph_func_only",
+        ),
+    ],
+)
+def test_deferred_setup_on_import(tmp_path, app_imports, patched):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="langgraph",
+        trigger="langchain_core",
+        app_imports=app_imports,
+        patched=patched,
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }
