@@ -1,6 +1,7 @@
 import contextlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -1841,3 +1842,168 @@ async def test_async_socks_proxy(testcase):
     )
 
     await client.close_async()
+
+
+@pytest.fixture
+def run_app(tmp_path, monkeypatch, capsys):
+    """Run a script that calls sentry_sdk.init() and return what the SDK prints at exit."""
+    for name in (
+        "CI",
+        "SENTRY_AGENT_HINTS",
+        "AI_AGENT",
+        "CLAUDECODE",
+        "CODEX_THREAD_ID",
+        "CODEX_SANDBOX",
+        "CURSOR_AGENT",
+        "GEMINI_CLI",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        sentry_sdk._init_implementation, "_coding_agent_hint_shown", False
+    )
+    at_exit = []
+    monkeypatch.setattr(
+        sentry_sdk._init_implementation.atexit,
+        "register",
+        lambda hook, *args: at_exit.append((hook, args)),
+    )
+    app = tmp_path / "app.py"
+
+    def run(env, init_args="", before_run=None):
+        for name, value in env.items():
+            monkeypatch.setenv(name, value)
+        app.write_text(
+            f"import sentry_sdk\nsentry_sdk.init(dsn='https://public@sentry.example.com/1', {init_args})\n"
+        )
+        if before_run:
+            before_run(app)
+
+        try:
+            exec(compile(app.read_text(), str(app), "exec"), {})
+            for hook, args in at_exit:
+                if hook is sentry_sdk._init_implementation._write_coding_agent_hint:
+                    hook(*args)
+        finally:
+            sentry_sdk.get_client().close()
+        return capsys.readouterr().err
+
+    return run
+
+
+@pytest.mark.parametrize(
+    "env, init_args",
+    [
+        ({}, "traces_sample_rate=0"),
+        ({"AI_AGENT": "claude-code"}, "traces_sample_rate=0.1, enable_logs=True"),
+        ({"AI_AGENT": "claude-code"}, "traces_sampler=lambda _: 1.0, enable_logs=True"),
+        ({"AI_AGENT": "0"}, "traces_sample_rate=0"),
+        ({"AI_AGENT": "claude-code", "CI": "true"}, "traces_sample_rate=0"),
+        ({"CLAUDECODE": "1", "SENTRY_AGENT_HINTS": "0"}, "traces_sample_rate=0"),
+    ],
+)
+def test_coding_agent_hint_not_shown(run_app, env, init_args):
+    assert "[sentry]" not in run_app(env, init_args)
+
+
+@pytest.mark.parametrize(
+    "env, init_args, off",
+    [
+        (
+            {"CLAUDECODE": "1"},
+            "",
+            "Tracing and logs are off, so Sentry only gets errors.",
+        ),
+        (
+            {"CODEX_THREAD_ID": "1"},
+            "enable_logs=True",
+            "Tracing is off, so Sentry gets errors and logs but no traces.",
+        ),
+        (
+            {"AI_AGENT": "codex"},
+            "traces_sample_rate=0.1",
+            "Logs are off, so Sentry gets errors and traces but no logs.",
+        ),
+    ],
+)
+def test_coding_agent_hint_says_what_is_off(run_app, env, init_args, off):
+    assert f"[sentry] {off} " in run_app(env, init_args)
+
+
+def _agent_hint_git(app, *args, committer="dev@example.com", date=None):
+    env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_AUTHOR_NAME": "Dev",
+        "GIT_AUTHOR_EMAIL": committer,
+        "GIT_COMMITTER_NAME": "Dev",
+        "GIT_COMMITTER_EMAIL": committer,
+    }
+    if date:
+        env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = date
+    subprocess.run(
+        ["git", *args],
+        cwd=str(app.parent),
+        env=env,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
+def _commit(app, **kwargs):
+    _agent_hint_git(app, "init", "-q")
+    _agent_hint_git(app, "config", "user.email", "dev@example.com")
+    _agent_hint_git(app, "add", app.name)
+    _agent_hint_git(app, "commit", "-q", "-m", "Set up Sentry", **kwargs)
+
+
+def _changed_minutes_ago(app, minutes):
+    changed = time.time() - minutes * 60
+    os.utime(app, (changed, changed))
+
+
+def _committed_and_edited(app, minutes_ago=0):
+    _commit(app, date="2020-01-01T00:00:00")
+    app.write_text(app.read_text() + "\n")
+    _changed_minutes_ago(app, minutes_ago)
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+@pytest.mark.parametrize(
+    "before_run, shown",
+    [
+        pytest.param(None, True, id="new file, no git repo"),
+        pytest.param(
+            lambda app: _changed_minutes_ago(app, 20),
+            False,
+            id="no git repo, changed 20 minutes ago",
+        ),
+        pytest.param(_committed_and_edited, True, id="uncommitted change"),
+        pytest.param(
+            lambda app: _committed_and_edited(app, minutes_ago=20),
+            True,
+            id="uncommitted change, 20 minutes ago",
+        ),
+        pytest.param(
+            lambda app: _committed_and_edited(app, minutes_ago=120),
+            False,
+            id="uncommitted change, two hours ago",
+        ),
+        pytest.param(_commit, True, id="committed here a moment ago"),
+        pytest.param(
+            lambda app: _commit(app, committer="teammate@example.com"),
+            False,
+            id="a teammate's new commit",
+        ),
+        pytest.param(
+            lambda app: _commit(app, date="2020-01-01T00:00:00"),
+            False,
+            id="fresh checkout of an old commit",
+        ),
+    ],
+)
+def test_coding_agent_hint_only_during_setup(run_app, before_run, shown):
+    printed = run_app({"AI_AGENT": "claude-code"}, before_run=before_run)
+
+    assert ("SETUP_CHECKLIST.md" in printed) is shown
