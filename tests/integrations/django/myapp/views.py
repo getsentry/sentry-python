@@ -392,7 +392,7 @@ async def post_echo_async(request):
     return HttpResponse(request.body)
 
 
-post_echo_async.csrf_exempt = True
+post_echo_async.csrf_exempt = True  # type: ignore[attr-defined]
 
 
 @csrf_exempt

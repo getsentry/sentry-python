@@ -4,6 +4,8 @@
 extend-ignore-re = [
     "baGGage",           # tests that header matching ignores case
     "deprecat\\(",       # regex prefix in .github/release.yml
+    "ot-demo-test",      # example S3 bucket name from sentry-conventions
+    "\\b[0-9a-f]{16}\\b", # span IDs
 ]
 
 [default.extend-words]

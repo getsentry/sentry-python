@@ -17,7 +17,7 @@ Use **tox** for testing (not pytest directly):
 ## Type Checking
 
 Mypy and its type stubs live in the opt-in `typing` dependency group:
-- Run `uv run --group typing mypy sentry_sdk` before committing (must pass with zero errors)
+- Run `uv run --group typing mypy sentry_sdk tests` before committing (must pass with zero errors)
 - Strict mode enabled (`check_untyped_defs`, `disallow_untyped_defs`)
 
 ## Linting & Formatting

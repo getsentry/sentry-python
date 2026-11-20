@@ -1,0 +1,6 @@
+IDENTIFIER = "aws_lambda"
+ORIGIN = f"auto.function.{IDENTIFIER}"
+
+CLOUD_PROVIDER = "aws"
+CLOUD_PLATFORM = "aws_lambda"
+LATEST_FUNCTION_VERSION = "$LATEST"

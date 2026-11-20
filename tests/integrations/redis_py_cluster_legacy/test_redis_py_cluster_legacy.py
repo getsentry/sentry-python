@@ -3,11 +3,10 @@ from unittest import mock
 import pytest
 import rediscluster
 
+import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.api import start_transaction
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
-from tests.conftest import ApproxDict
 
 MOCK_CONNECTION_POOL = mock.MagicMock()
 MOCK_CONNECTION_POOL.connection_kwargs = {
@@ -17,32 +16,21 @@ MOCK_CONNECTION_POOL.connection_kwargs = {
 }
 
 
-rediscluster_classes = [rediscluster.RedisCluster]
-
-if hasattr(rediscluster, "StrictRedisCluster"):
-    rediscluster_classes.append(rediscluster.StrictRedisCluster)
-
-
 @pytest.fixture(autouse=True)
 def monkeypatch_rediscluster_classes(reset_integrations):
-    try:
-        pipeline_cls = rediscluster.pipeline.ClusterPipeline
-    except AttributeError:
-        pipeline_cls = rediscluster.StrictClusterPipeline
+    pipeline_cls = rediscluster.pipeline.ClusterPipeline
     rediscluster.RedisCluster.pipeline = lambda *_, **__: pipeline_cls(
         connection_pool=MOCK_CONNECTION_POOL
     )
     pipeline_cls.execute = lambda *_, **__: None
-    for cls in rediscluster_classes:
-        cls.execute_command = lambda *_, **__: None
+    rediscluster.RedisCluster.execute_command = lambda *_, **__: None
 
 
-@pytest.mark.parametrize("rediscluster_cls", rediscluster_classes)
-def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
+def test_rediscluster_breadcrumb(sentry_init, capture_events):
     sentry_init(integrations=[RedisIntegration()])
     events = capture_events()
 
-    rc = rediscluster_cls(connection_pool=MOCK_CONNECTION_POOL)
+    rc = rediscluster.RedisCluster(connection_pool=MOCK_CONNECTION_POOL)
     rc.get("foobar")
     capture_message("hi")
 
@@ -52,120 +40,76 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
     assert crumb == {
         "category": "redis",
         "message": "GET 'foobar'",
-        "data": ApproxDict(
-            {
-                "db.operation": "GET",
-                "redis.key": "foobar",
-                "redis.command": "GET",
-                "redis.is_cluster": True,
-            }
-        ),
+        "data": {
+            "db.operation": "GET",
+            "redis.key": "foobar",
+            "redis.command": "GET",
+            "redis.is_cluster": True,
+        },
         "timestamp": crumb["timestamp"],
         "type": "redis",
     }
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, expected_first_ten",
+    "data_collection, description",
     [
-        (False, ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"]),
-        (True, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
+        ({"database_query_data": False}, "SET 'bar' [Filtered]"),
+        ({"database_query_data": True}, "SET 'bar' 1"),
     ],
 )
-def test_rediscluster_pipeline(
-    sentry_init, capture_events, send_default_pii, expected_first_ten
-):
+def test_rediscluster_basic(sentry_init, capture_items, data_collection, description):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
+        data_collection=data_collection,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     rc = rediscluster.RedisCluster(connection_pool=MOCK_CONNECTION_POOL)
-    with start_transaction():
+    with sentry_sdk.start_span(name="custom parent"):
+        rc.set("bar", 1)
+    sentry_sdk.flush()
+
+    span, parent_span = [item.payload for item in items]
+    assert parent_span["name"] == "custom parent"
+    assert span["name"] == description
+
+    attrs = span["attributes"]
+    assert attrs["sentry.op"] == OP.DB_QUERY
+    assert attrs["sentry.origin"] == "auto.db.redis"
+    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
+    assert attrs[SPANDATA.DB_NAMESPACE] == "1"
+    assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
+    assert attrs[SPANDATA.SERVER_PORT] == 63791
+    assert attrs[SPANDATA.DB_OPERATION_NAME] == "SET"
+    assert attrs["db.redis.key"] == "bar"
+
+
+def test_rediscluster_pipeline(sentry_init, capture_items):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+    )
+    items = capture_items("span")
+
+    rc = rediscluster.RedisCluster(connection_pool=MOCK_CONNECTION_POOL)
+    with sentry_sdk.start_span(name="custom parent"):
         pipeline = rc.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
         pipeline.set("baz", 2)
         pipeline.execute()
+    sentry_sdk.flush()
 
-    (event,) = events
-    (span,) = event["spans"]
-    assert span["op"] == "db.redis"
-    assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == ApproxDict(
-        {
-            "redis.commands": {
-                "count": 3,
-                "first_ten": expected_first_ten,
-            },
-            SPANDATA.DB_SYSTEM: "redis",
-            SPANDATA.DB_NAME: "1",
-            SPANDATA.SERVER_ADDRESS: "localhost",
-            SPANDATA.SERVER_PORT: 63791,
-        }
-    )
-    assert span["tags"] == {
-        "redis.transaction": False,  # For Cluster, this is always False
-        "redis.is_cluster": True,
-    }
+    span, parent_span = [item.payload for item in items]
+    assert parent_span["name"] == "custom parent"
+    assert span["name"] == "redis.pipeline.execute"
 
-
-@pytest.mark.parametrize("rediscluster_cls", rediscluster_classes)
-def test_db_connection_attributes_client(sentry_init, capture_events, rediscluster_cls):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[RedisIntegration()],
-    )
-    events = capture_events()
-
-    rc = rediscluster_cls(connection_pool=MOCK_CONNECTION_POOL)
-    with start_transaction():
-        rc.get("foobar")
-
-    (event,) = events
-    (span,) = event["spans"]
-
-    assert span["data"] == ApproxDict(
-        {
-            SPANDATA.DB_SYSTEM: "redis",
-            SPANDATA.DB_NAME: "1",
-            SPANDATA.SERVER_ADDRESS: "localhost",
-            SPANDATA.SERVER_PORT: 63791,
-        }
-    )
-
-
-@pytest.mark.parametrize("rediscluster_cls", rediscluster_classes)
-def test_db_connection_attributes_pipeline(
-    sentry_init, capture_events, rediscluster_cls
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[RedisIntegration()],
-    )
-    events = capture_events()
-
-    rc = rediscluster.RedisCluster(connection_pool=MOCK_CONNECTION_POOL)
-    with start_transaction():
-        pipeline = rc.pipeline()
-        pipeline.get("foo")
-        pipeline.execute()
-
-    (event,) = events
-    (span,) = event["spans"]
-    assert span["op"] == "db.redis"
-    assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == ApproxDict(
-        {
-            "redis.commands": {
-                "count": 1,
-                "first_ten": ["GET 'foo'"],
-            },
-            SPANDATA.DB_SYSTEM: "redis",
-            SPANDATA.DB_NAME: "1",
-            SPANDATA.SERVER_ADDRESS: "localhost",
-            SPANDATA.SERVER_PORT: 63791,
-        }
-    )
+    attrs = span["attributes"]
+    assert attrs["sentry.op"] == OP.DB_QUERY
+    assert attrs["sentry.origin"] == "auto.db.redis"
+    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
+    assert attrs[SPANDATA.DB_NAMESPACE] == "1"
+    assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
+    assert attrs[SPANDATA.SERVER_PORT] == 63791

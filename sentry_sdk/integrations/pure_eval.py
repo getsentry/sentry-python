@@ -16,18 +16,18 @@ if TYPE_CHECKING:
 try:
     from executing import Source
 except ImportError:
-    raise DidNotEnable("executing is not installed")
+    raise DidNotEnable("executing is not installed or incompatible")
 
 try:
     from pure_eval import Evaluator
 except ImportError:
-    raise DidNotEnable("pure_eval is not installed")
+    raise DidNotEnable("pure_eval is not installed or incompatible")
 
 try:
     # Used implicitly, just testing it's available
     import asttokens  # noqa
 except ImportError:
-    raise DidNotEnable("asttokens is not installed")
+    raise DidNotEnable("asttokens is not installed or incompatible")
 
 
 class PureEvalIntegration(Integration):
