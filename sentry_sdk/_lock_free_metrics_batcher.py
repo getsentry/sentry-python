@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 from sentry_sdk._batcher import Batcher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.utils import (
-    capture_internal_exceptions,
     format_timestamp,
     serialize_attribute,
 )
@@ -224,10 +223,8 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         envelope = Envelope(
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
         )
-        with capture_internal_exceptions():
-            envelope.add_item(self._to_envelope_item(items))
-            self._capture_func(envelope)
-
+        envelope.add_item(self._to_envelope_item(items))
+        self._capture_func(envelope)
         return envelope
 
     def _harvest(self, window: "_Window", items: "list[Metric]") -> int:
