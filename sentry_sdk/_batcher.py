@@ -35,6 +35,14 @@ class Batcher(Generic[T]):
         self._lock = threading.Lock()
         self._active: "threading.local" = threading.local()
 
+        # Batches the flusher thread has taken from the buffer but not yet
+        # handed to the transport. flush() waits for the ones that were
+        # in flight when it started, so it does not return while a batch
+        # taken before the flush is still on its way to the transport.
+        self._in_flight = 0
+        self._flushes_done = 0
+        self._in_flight_cond = threading.Condition()
+
         self._flush_event: "threading.Event" = threading.Event()
 
         self._flusher: "Optional[threading.Thread]" = None
@@ -56,6 +64,9 @@ class Batcher(Generic[T]):
         self._running = True
         self._lock = threading.Lock()
         self._active = threading.local()
+        self._in_flight = 0
+        self._flushes_done = 0
+        self._in_flight_cond = threading.Condition()
         self._flush_event = threading.Event()
         self._flusher = None
         self._flusher_pid = None
@@ -150,8 +161,33 @@ class Batcher(Generic[T]):
         self._active.flag = True
         try:
             self._flush()
+            if was_active:
+                # Re-entrant call from inside batcher code (e.g. a transport
+                # calling flush() from within _capture_func): waiting for an
+                # in-flight batch here would deadlock on our own handoff.
+                return
+            # Wait for batches the flusher thread had already taken when this
+            # flush() started. Batches taken afterwards are new work and are
+            # not covered by this flush.
+            with self._in_flight_cond:
+                target = self._flushes_done + self._in_flight
+                while self._flushes_done < target:
+                    self._in_flight_cond.wait()
+            self._flush()
         finally:
             self._active.flag = was_active
+
+    def _mark_in_flight(self) -> None:
+        # Call while holding _lock, atomically with taking the batch, so a
+        # concurrent flush() cannot snapshot between the take and the mark.
+        with self._in_flight_cond:
+            self._in_flight += 1
+
+    def _mark_flushed(self) -> None:
+        with self._in_flight_cond:
+            self._in_flight -= 1
+            self._flushes_done += 1
+            self._in_flight_cond.notify_all()
 
     @classmethod
     def _to_envelope_item(cls, items: "list[T]") -> "Item":
@@ -182,8 +218,12 @@ class Batcher(Generic[T]):
 
             self._add_to_envelope(envelope)
             self._buffer.clear()
+            self._mark_in_flight()
 
-        self._capture_func(envelope)
+        try:
+            self._capture_func(envelope)
+        finally:
+            self._mark_flushed()
         return envelope
 
     def _record_lost(self, item: "T") -> None:

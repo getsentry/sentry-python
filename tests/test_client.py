@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import warnings
 from collections import Counter, defaultdict
@@ -1781,6 +1782,45 @@ async def test_flush_async_no_transport():
     client.transport = None
     # Should not raise
     await client.flush_async()
+
+
+def test_flush_waits_for_in_flight_span_batch():
+    """flush() waits for a batch the flusher thread already took (#8300).
+
+    The flusher thread removes a batch from the buffer and calls the
+    transport after releasing the lock, so a flush() in that window used
+    to find an empty buffer and return before the batch was delivered.
+    The client is built directly (not via the sentry_init fixture) so the
+    test-suite flush handshake does not mask the race.
+    """
+    received = []
+    taken = threading.Event()
+
+    class SlowTransport(Transport):
+        def capture_envelope(self, envelope):
+            if threading.current_thread() is not threading.main_thread():
+                taken.set()
+                time.sleep(0.5)
+            received.extend(item.type for item in envelope.items)
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        transport=SlowTransport(),
+        trace_lifecycle="stream",
+        traces_sample_rate=1.0,
+    )
+    old_client = sentry_sdk.get_global_scope().client
+    sentry_sdk.get_global_scope().set_client(client)
+    try:
+        with sentry_sdk.traces.start_span(name="segment"):
+            pass
+
+        assert taken.wait(timeout=10)
+        client.flush()
+        assert received == ["span"]
+    finally:
+        sentry_sdk.get_global_scope().set_client(old_client)
+        client.close()
 
 
 @skip_under_gevent
