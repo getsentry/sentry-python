@@ -395,6 +395,26 @@ def test_should_propagate_trace(
         ),
         (
             "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "https://SQUIRRELCHASERS.INGEST.SENTRY.IO/12312012",
+            False,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "https://squirrelchasers.ingest.sentry.io.evil.test/12312012",
+            True,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "https://squirrelchasers.ingest.sentry.io@attacker.test/12312012",
+            True,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "https://attacker.test/?next=squirrelchasers.ingest.sentry.io",
+            True,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
             "http://ingest.sentry.io/12312012",
             True,
         ),
