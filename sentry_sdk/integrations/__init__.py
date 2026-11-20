@@ -138,6 +138,9 @@ _AUTO_ENABLING_INTEGRATIONS = [
 # integrations are only set up once the application imports the trigger module.
 # This can't live on the integration class, since loading the class imports the library.
 _DEFERRED_INTEGRATION_TRIGGERS = {
+    "sentry_sdk.integrations.anthropic.AnthropicIntegration": "anthropic",
+    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration": "google.genai",
+    "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration": "huggingface_hub.inference._client",
     "sentry_sdk.integrations.openai.OpenAIIntegration": "openai",
 }
 
@@ -253,7 +256,10 @@ def setup_integrations(
         for import_string, trigger in _DEFERRED_INTEGRATION_TRIGGERS.items():
             if trigger in sys.modules:
                 continue
-            spec = importlib.util.find_spec(trigger)
+            try:
+                spec = importlib.util.find_spec(trigger)
+            except ImportError:
+                spec = None
             if spec is None:
                 deferred[import_string] = None
             elif hasattr(spec.loader, "exec_module"):
@@ -402,6 +408,13 @@ class _DeferredSetupLoader(Loader):
         module.__loader__ = self._loader
         if module.__spec__ is not None:
             module.__spec__.loader = self._loader
+
+        # The import system only binds a submodule to its parent after exec_module
+        # returns, but setup may already access it as an attribute of the parent.
+        parent, _, child = self._trigger.rpartition(".")
+        if parent:
+            setattr(sys.modules[parent], child, sys.modules.get(self._trigger, module))
+
         _set_up_deferred_integration(self._trigger)
 
     def __getattr__(self, name: str) -> "Any":
