@@ -75,6 +75,7 @@ from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.utils import package_version, parse_version
+from tests.integrations.utils import run_deferred_setup_app
 
 OPENAI_VERSION = package_version("openai")
 
@@ -7678,3 +7679,20 @@ async def test_runner_run_streamed_with_starting_agent_kwarg(
 
     (transaction,) = events
     assert transaction["transaction"] == "test_agent workflow"
+
+
+def test_deferred_setup_on_import(tmp_path):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="openai_agents",
+        trigger="agents",
+        app_imports="from agents.run import DEFAULT_AGENT_RUNNER",
+        patched="DEFAULT_AGENT_RUNNER.run",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }

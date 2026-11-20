@@ -8,7 +8,7 @@ from threading import Lock, local
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.utils import capture_internal_exceptions, logger, package_version
 
 if TYPE_CHECKING:
     from collections.abc import Container, Sequence
@@ -144,7 +144,12 @@ _AUTO_ENABLING_INTEGRATIONS = [
 # integrations are only set up once the application imports the trigger module.
 # This can't live on the integration class, since loading the class imports the library.
 _DEFERRED_INTEGRATION_TRIGGERS = {
+    "sentry_sdk.integrations.anthropic.AnthropicIntegration": "anthropic",
+    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration": "google.genai",
+    "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration": "huggingface_hub.inference._client",
     "sentry_sdk.integrations.openai.OpenAIIntegration": "openai",
+    "sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration": "agents",
+    "sentry_sdk.integrations.pydantic_ai.PydanticAIIntegration": "pydantic_ai",
 }
 
 iter_default_integrations = _generate_default_integrations_iterator(
@@ -266,7 +271,10 @@ def setup_integrations(
                 spec = importlib.util.find_spec(trigger)
             except Exception:
                 spec = None
-            if spec is None:
+            # `agents` is a generic module name, so make sure it's openai-agents'
+            if spec is None or (
+                trigger == "agents" and package_version("openai-agents") is None
+            ):
                 excluded.add(import_string)
             elif hasattr(spec.loader, "exec_module"):
                 excluded.add(import_string)
@@ -297,11 +305,12 @@ def setup_integrations(
     }
     deactivated_identifiers = set()
 
+    # A deferred integration can't be set up yet, so it deactivates its targets
+    # whenever its library is installed, even if it later turns out too old to enable.
     for integration, targets_to_deactivate in _INTEGRATION_DEACTIVATES.items():
         if (
-            integration in integrations
-            and integration not in disabled_integration_identifiers
-        ):
+            integration in integrations or integration in deferred
+        ) and integration not in disabled_integration_identifiers:
             for target in targets_to_deactivate:
                 if target not in user_provided_integrations:
                     deactivated_identifiers.add(target)
@@ -407,6 +416,16 @@ class _DeferredSetupLoader(Loader):
         module.__loader__ = self._loader
         if module.__spec__ is not None:
             module.__spec__.loader = self._loader
+
+        # Setup may access the trigger as an attribute of its parent package
+        # before the import system binds it there
+        with capture_internal_exceptions():
+            parent, _, child = self._trigger.rpartition(".")
+            if parent:
+                setattr(
+                    sys.modules[parent], child, sys.modules.get(self._trigger, module)
+                )
+
         _set_up_deferred_integration(self._trigger)
 
     def __getattr__(self, name: str) -> "Any":

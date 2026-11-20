@@ -2,6 +2,7 @@ import pytest
 
 from sentry_sdk import get_client
 from sentry_sdk.integrations import _INTEGRATION_DEACTIVATES
+from tests.integrations.utils import run_deferred_setup_app
 
 try:
     from sentry_sdk.integrations.langchain import LangchainIntegration
@@ -41,13 +42,7 @@ except Exception:
 
 
 pytestmark = pytest.mark.skipif(
-    not (
-        has_langchain
-        and has_openai
-        and has_anthropic
-        and has_openai_agents
-        and has_pydantic_ai
-    ),
+    not (has_langchain and has_openai and has_anthropic),
     reason="Requires langchain, openai, and anthropic packages to be installed",
 )
 
@@ -130,6 +125,10 @@ def test_user_can_override_with_both_explicit_integrations(
     assert AnthropicIntegration in integration_types
 
 
+@pytest.mark.skipif(
+    not (has_openai_agents and has_pydantic_ai),
+    reason="Requires openai-agents and pydantic-ai",
+)
 def test_disabling_integrations_allows_openai_and_anthropic(
     sentry_init, reset_integrations
 ):
@@ -249,3 +248,86 @@ def test_only_auto_enabling_integrations_without_defaults(
     if LangchainIntegration in integration_types:
         assert OpenAIIntegration not in integration_types
         assert AnthropicIntegration not in integration_types
+
+
+@pytest.mark.parametrize(
+    "explicit_target",
+    [
+        pytest.param(False, id="target_auto_enabled"),
+        pytest.param(True, id="target_in_integrations"),
+    ],
+)
+@pytest.mark.parametrize(
+    "deactivator_trigger, target, target_integration, target_imports, patched",
+    [
+        pytest.param(
+            "agents",
+            "openai",
+            "OpenAIIntegration",
+            "from openai.resources.chat.completions import Completions",
+            "Completions.create",
+            id="deferred_auto_enabling_integrations-openai_agents-openai",
+            marks=pytest.mark.skipif(
+                not has_openai_agents, reason="Requires openai-agents"
+            ),
+        ),
+        pytest.param(
+            "pydantic_ai",
+            "openai",
+            "OpenAIIntegration",
+            "from openai.resources.chat.completions import Completions",
+            "Completions.create",
+            id="deferred_auto_enabling_integrations-pydantic_ai-openai",
+            marks=pytest.mark.skipif(
+                not has_pydantic_ai, reason="Requires pydantic-ai"
+            ),
+        ),
+        pytest.param(
+            "pydantic_ai",
+            "anthropic",
+            "AnthropicIntegration",
+            "from anthropic.resources import Messages",
+            "Messages.create",
+            id="deferred_auto_enabling_integrations-pydantic_ai-anthropic",
+            marks=pytest.mark.skipif(
+                not has_pydantic_ai, reason="Requires pydantic-ai"
+            ),
+        ),
+    ],
+)
+def test_deactivator_imported_after_target(
+    tmp_path,
+    deactivator_trigger,
+    target,
+    target_integration,
+    target_imports,
+    patched,
+    explicit_target,
+):
+    hidden_deactivators = sorted(
+        {"agents", "langchain_core", "pydantic_ai"} - {deactivator_trigger}
+    )
+    before_init = (
+        f"for name in {hidden_deactivators!r}:\n    sys.modules[name] = None\n"
+    )
+    if explicit_target:
+        before_init += (
+            f"from sentry_sdk.integrations.{target} import {target_integration}\n"
+            f"integrations.append({target_integration}())\n"
+        )
+
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier=target,
+        trigger=target,
+        app_imports=f"{target_imports}\nimport {deactivator_trigger}",
+        patched=patched,
+        before_init=before_init,
+    )
+
+    assert result == {
+        "imported_during_init": explicit_target,
+        "integration_enabled": explicit_target,
+        "patched": explicit_target,
+        "reported_in_event": explicit_target,
+    }

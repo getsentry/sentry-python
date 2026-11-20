@@ -38,6 +38,7 @@ from sentry_sdk.integrations.langchain import (
 )
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.utils import package_version
+from tests.integrations.utils import run_deferred_setup_app
 
 try:
     # langchain v1+
@@ -7338,3 +7339,22 @@ async def test_langchain_embeddings_data_collection(
     # Data collection never gates non-PII attributes
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-ada-002"
+
+
+def test_deferred_setup_skips_deactivated_integration(tmp_path):
+    pytest.importorskip("google.genai")
+
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="google_genai",
+        trigger="google.genai",
+        app_imports="from google.genai.models import Models",
+        patched="Models.generate_content",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": False,
+        "patched": False,
+        "reported_in_event": False,
+    }

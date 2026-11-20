@@ -1,3 +1,8 @@
+import json
+import subprocess
+import sys
+from textwrap import dedent
+
 import pytest
 
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
@@ -118,3 +123,60 @@ DATA_COLLECTION_QUEUES_CASES = [
         id="data_collection_queues_on_with_no_pii",
     ),
 ]
+
+
+def run_deferred_setup_app(
+    tmp_path, identifier, trigger, app_imports, patched, before_init=""
+):
+    """
+    Runs an app in a fresh interpreter that calls ``init()`` with deferred setup of
+    auto-enabling integrations on, and only afterwards runs ``app_imports``.
+    ``before_init`` runs before ``init()`` and can append to ``integrations``.
+    """
+    app = tmp_path / "app.py"
+    app.write_text(
+        dedent(
+            """
+            import json
+            import os
+            import sys
+
+            import sentry_sdk
+
+            integrations = []
+            {before_init}
+
+            events = []
+
+            def before_send(event, hint):
+                events.append(event)
+                return None
+
+            sentry_sdk.init(
+                before_send=before_send,
+                integrations=integrations,
+                _experiments={{"deferred_auto_enabling_integrations": True}},
+            )
+            imported_during_init = {trigger!r} in sys.modules
+
+            {app_imports}
+
+            sentry_sdk.capture_message("hi")
+
+            print(json.dumps({{
+                "imported_during_init": imported_during_init,
+                "integration_enabled": sentry_sdk.get_client().get_integration({identifier!r}) is not None,
+                "patched": os.path.join("sentry_sdk", "integrations") in {patched}.__code__.co_filename,
+                "reported_in_event": {identifier!r} in events[0]["sdk"]["integrations"],
+            }}))
+            """
+        ).format(
+            identifier=identifier,
+            trigger=trigger,
+            app_imports=app_imports,
+            patched=patched,
+            before_init=before_init,
+        )
+    )
+
+    return json.loads(subprocess.check_output([sys.executable, str(app)]))

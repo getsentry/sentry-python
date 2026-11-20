@@ -12,6 +12,7 @@ from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
 from sentry_sdk.integrations.google_genai.utils import extract_contents_messages
+from tests.integrations.utils import run_deferred_setup_app
 
 
 @pytest.fixture
@@ -4762,3 +4763,20 @@ async def test_async_embed_content_data_collection(
 
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+
+
+def test_deferred_setup_on_import(tmp_path):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="google_genai",
+        trigger="google.genai",
+        app_imports="from google.genai.models import Models",
+        patched="Models.generate_content",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }

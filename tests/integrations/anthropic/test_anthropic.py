@@ -78,6 +78,7 @@ from sentry_sdk.integrations.anthropic import (
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import package_version
+from tests.integrations.utils import run_deferred_setup_app
 
 ANTHROPIC_VERSION = package_version("anthropic")
 
@@ -10015,3 +10016,20 @@ def test_stream_messages_reasoning_tokens(
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
+
+
+def test_deferred_setup_on_import(tmp_path):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="anthropic",
+        trigger="anthropic",
+        app_imports="from anthropic.resources import Messages",
+        patched="Messages.create",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }

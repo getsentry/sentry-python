@@ -10,6 +10,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 from sentry_sdk.utils import package_version, safe_serialize
 from tests.conftest import ApproxDict
+from tests.integrations.utils import run_deferred_setup_app
 
 try:
     from huggingface_hub.utils._errors import HfHubHTTPError
@@ -2712,3 +2713,20 @@ def test_chat_completion_streaming_data_collection_tools(
         assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 183
         assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 14
         assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 197
+
+
+def test_deferred_setup_on_import(tmp_path):
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier="huggingface_hub",
+        trigger="huggingface_hub.inference._client",
+        app_imports="from huggingface_hub import InferenceClient",
+        patched="InferenceClient.chat_completion",
+    )
+
+    assert result == {
+        "imported_during_init": False,
+        "integration_enabled": True,
+        "patched": True,
+        "reported_in_event": True,
+    }
