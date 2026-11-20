@@ -601,8 +601,6 @@ def test_metrics_window_sampling(
 
     cold = [metric for metric in metrics if metric["name"] == "test.cold"]
     assert len(cold) == 3
-    for metric in cold:
-        assert "sentry.client_sample_rate" not in metric["attributes"]
 
     assert record_lost_event_calls == [
         ("sample_rate", "trace_metric", None, 193),

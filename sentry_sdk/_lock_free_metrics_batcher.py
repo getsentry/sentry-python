@@ -239,10 +239,7 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
 
         sampled_out = 0
         for name, reservoirs in by_name.items():
-            limit = self._limits.get(name)
-            if limit is None:
-                continue
-
+            limit = self._limits[name]
             bounds = list(
                 itertools.accumulate(reservoir.seen for reservoir in reservoirs)
             )
@@ -259,9 +256,6 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
                 continue
 
             items.extend(kept)
-            if bounds[-1] <= len(kept):
-                continue
-
             rate = len(kept) / bounds[-1]
             for item in kept:
                 item["attributes"]["sentry.client_sample_rate"] = rate
