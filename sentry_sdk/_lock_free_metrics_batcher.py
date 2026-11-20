@@ -211,6 +211,13 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
                 break
             sampled_out += self._harvest(window, items)
 
+        if sampled_out:
+            self._record_lost_func(
+                reason="sample_rate",
+                data_category=self.CLIENT_REPORT_TYPE,
+                quantity=sampled_out,
+            )
+
         if not items:
             return None
 
@@ -220,13 +227,6 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         with capture_internal_exceptions():
             envelope.add_item(self._to_envelope_item(items))
             self._capture_func(envelope)
-
-        if sampled_out:
-            self._record_lost_func(
-                reason="sample_rate",
-                data_category=self.CLIENT_REPORT_TYPE,
-                quantity=sampled_out,
-            )
 
         return envelope
 
