@@ -49,15 +49,3 @@ paths = [".agents/**", ".claude/**", "**/SKILL.md", "AGENTS.md", "CLAUDE.md", "a
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
-
-[[skills]]
-name = "sdk-review"
-paths = ["sentry_sdk/**"]
-incremental = true
-reportOn = "medium"
-failOn = "off"
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-draft = false
