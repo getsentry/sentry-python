@@ -208,7 +208,7 @@ def test_nonstreaming_chat_completion(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
-        assert spans[2]["name"] == "litellm test"
+        assert spans[1]["name"] == "litellm test"
         chat_spans = list(
             x
             for x in spans
@@ -417,7 +417,7 @@ async def test_async_nonstreaming_chat_completion(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
-        assert spans[2]["name"] == "litellm test"
+        assert spans[1]["name"] == "litellm test"
         chat_spans = list(
             x
             for x in spans
@@ -1539,6 +1539,7 @@ def test_exception_handling(
         # Find the error event
         error_events = [e for e in events if e.get("level") == "error"]
     assert len(error_events) == 1
+    assert error_events[0]["exception"]["values"][-1]["mechanism"]["type"] == "litellm"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1605,6 +1606,7 @@ async def test_async_exception_handling(
         # Find the error event
         error_events = [e for e in events if e.get("level") == "error"]
     assert len(error_events) == 1
+    assert error_events[0]["exception"]["values"][-1]["mechanism"]["type"] == "litellm"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1664,9 +1666,10 @@ def test_span_origin(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
-        assert spans[2]["is_segment"] is True
-        assert spans[2]["attributes"]["sentry.origin"] == "manual"
-        assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        assert len(spans) == 2
+        assert spans[1]["is_segment"] is True
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.litellm"
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -1784,7 +1787,7 @@ def test_multiple_providers(
             return_value=anthropic_model_response,
         ), sentry_sdk.traces.start_span(name="test claude-3-opus-20240229"):
             litellm.completion(
-                model="claude-3-opus-20240229",
+                model="anthropic/claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
                 api_key="test-key",
@@ -1852,7 +1855,7 @@ def test_multiple_providers(
             return_value=anthropic_model_response,
         ), start_transaction(name="test claude-3-opus-20240229"):
             litellm.completion(
-                model="claude-3-opus-20240229",
+                model="anthropic/claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
                 api_key="test-key",
@@ -1921,7 +1924,7 @@ def test_multiple_providers(
             return_value=anthropic_model_response,
         ), start_transaction(name="test claude-3-opus-20240229"):
             litellm.completion(
-                model="claude-3-opus-20240229",
+                model="anthropic/claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
                 api_key="test-key",
@@ -2033,7 +2036,7 @@ async def test_async_multiple_providers(
             return_value=anthropic_model_response,
         ), sentry_sdk.traces.start_span(name="test claude-3-opus-20240229"):
             await litellm.acompletion(
-                model="claude-3-opus-20240229",
+                model="anthropic/claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
                 api_key="test-key",
@@ -2104,7 +2107,7 @@ async def test_async_multiple_providers(
             return_value=anthropic_model_response,
         ), start_transaction(name="test claude-3-opus-20240229"):
             await litellm.acompletion(
-                model="claude-3-opus-20240229",
+                model="anthropic/claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
                 api_key="test-key",
@@ -2176,7 +2179,7 @@ async def test_async_multiple_providers(
             return_value=anthropic_model_response,
         ), start_transaction(name="test claude-3-opus-20240229"):
             await litellm.acompletion(
-                model="claude-3-opus-20240229",
+                model="anthropic/claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
                 api_key="test-key",

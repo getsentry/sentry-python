@@ -311,13 +311,21 @@ async def _async_success_callback(
 
 def _failure_callback(
     kwargs: "Dict[str, Any]",
-    exception: Exception,
+    completion_response: "Any",
     start_time: "datetime",
     end_time: "datetime",
 ) -> None:
     """Handle request failure."""
     span = _pop_span(kwargs)
     if span is None:
+        return
+
+    # LiteLLM calls failure callbacks with the same arguments as success
+    # callbacks, so the second argument is the (empty) response. The exception
+    # itself is in kwargs.
+    exception = kwargs.get("exception")
+    if not isinstance(exception, BaseException):
+        span.__exit__(None, None, None)
         return
 
     try:
