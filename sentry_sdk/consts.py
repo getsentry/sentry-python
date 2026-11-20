@@ -91,6 +91,7 @@ if TYPE_CHECKING:
             ],
             "suppress_asgi_chained_exceptions": Optional[bool],
             "data_collection": Optional[DataCollectionUserOptions],
+            "deferred_auto_enabling_integrations": Optional[bool],
         },
         total=False,
     )

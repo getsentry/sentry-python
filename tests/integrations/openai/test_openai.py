@@ -1,4 +1,8 @@
 import json
+import os
+import subprocess
+import sys
+from textwrap import dedent
 
 import pytest
 
@@ -8271,3 +8275,58 @@ async def test_streaming_responses_api_ttft_async(
 
     assert isinstance(ttft, float)
     assert ttft > 0
+
+
+def test_deferred_setup_on_import(tmp_path):
+    app = tmp_path / "app.py"
+    app.write_text(
+        dedent(
+            """
+            import json
+            import sys
+
+            import sentry_sdk
+
+            events = []
+
+            def before_send(event, hint):
+                events.append(event)
+                return None
+
+            sentry_sdk.init(
+                before_send=before_send,
+                _experiments={"deferred_auto_enabling_integrations": True},
+            )
+            imported_during_init = "openai" in sys.modules
+
+            from openai.resources.chat.completions import Completions
+
+            sentry_sdk.capture_message("hi")
+
+            print(json.dumps({
+                "imported_during_init": imported_during_init,
+                "integration_enabled": sentry_sdk.get_client().get_integration("openai") is not None,
+                "patched_by": Completions.create.__code__.co_filename,
+                "sdk_integrations": events[0]["sdk"]["integrations"],
+            }))
+            """
+        )
+    )
+
+    output = subprocess.check_output([sys.executable, str(app)])
+    result = json.loads(output)
+
+    assert result["imported_during_init"] is False
+    assert result["integration_enabled"] is True
+    assert result["patched_by"].endswith(
+        os.path.join("sentry_sdk", "integrations", "openai.py")
+    )
+    assert "openai" in result["sdk_integrations"]
+
+
+def test_deferred_setup_when_already_imported(sentry_init):
+    sentry_init(_experiments={"deferred_auto_enabling_integrations": True})
+
+    assert isinstance(
+        sentry_sdk.get_client().get_integration(OpenAIIntegration), OpenAIIntegration
+    )
