@@ -1,6 +1,10 @@
+import bisect
+import itertools
 import os
+import random
 import threading
-from collections import deque
+import time
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -17,9 +21,42 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Metric
 
 
+class _Reservoir:
+    __slots__ = ("kept", "seen")
+
+    def __init__(self) -> None:
+        self.kept: "list[Metric]" = []
+        self.seen = 0
+
+
+class _ThreadState:
+    """The metrics collected by one thread in a given window."""
+
+    __slots__ = ("reservoirs",)
+
+    def __init__(self) -> None:
+        self.reservoirs: "defaultdict[str, _Reservoir]" = defaultdict(_Reservoir)
+
+
+class _Window:
+    """
+    One time window in which multiple threads concurrently capture metrics.
+    Only the thread with the given identifier should change its local state.
+    """
+
+    __slots__ = ("start", "threads", "retire_claims", "number_kept")
+
+    def __init__(self) -> None:
+        self.start = time.monotonic()
+        self.threads: "defaultdict[int, _ThreadState]" = defaultdict(_ThreadState)
+        self.retire_claims: "list[object]" = []
+        self.number_kept = 0
+
+
 class LockFreeMetricsBatcher(Batcher["Metric"]):
-    MAX_BEFORE_FLUSH = 1000
-    MAX_BEFORE_DROP = 10_000
+    MAX_UNSAMPLED_BEFORE_FLUSH = 1000
+    MAX_UNSAMPLED_BEFORE_DROP = 10_000
+    MAX_KEPT_PER_WINDOW = 10_000
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "trace_metric"
@@ -30,15 +67,26 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         self,
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
+        window_sampling: "dict[str, float]",
     ) -> None:
         super().__init__(capture_func, record_lost_func)
+
+        self._limits = {
+            name: int(rate * self.FLUSH_WAIT_TIME)
+            for name, rate in window_sampling.items()
+        }
+
         self._queue: "deque[Metric]" = deque()
+        self._window = _Window()
+        self._retired: "deque[_Window]" = deque()
         # Holds the claim of the one thread that gets to start the flusher.
         self._flusher_claim: "dict[str, object]" = {}
 
     def _reset_thread_state(self) -> None:
         super()._reset_thread_state()
         self._queue = deque()
+        self._window = _Window()
+        self._retired = deque()
         self._flusher_claim = {}
 
     def _ensure_thread(self) -> bool:
@@ -75,16 +123,59 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         if not self._ensure_thread():
             return None
 
-        queue = self._queue
-        if len(queue) >= self.MAX_BEFORE_DROP:
-            self._record_lost(item)
-            return None
+        window = self._window
+        if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
+            self._retire_window(window)
+            window = self._window
 
-        queue.append(item)
-        if len(queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
+        limit = self._limits.get(item["name"])
+        if limit is None:
+            if len(self._queue) >= self.MAX_UNSAMPLED_BEFORE_DROP:
+                self._record_lost(item)
+                return None
+
+            self._queue.append(item)
+            if (
+                len(self._queue) < self.MAX_UNSAMPLED_BEFORE_FLUSH
+                or self._flush_event.is_set()
+            ):
+                return
+
+            self._flush_event.set()
             return
 
-        self._flush_event.set()
+        self._add_to_window(item, window, limit)
+
+    def _add_to_window(self, item: "Metric", window: "_Window", limit: int) -> None:
+        state = window.threads[threading.get_ident()]
+        reservoir = state.reservoirs[item["name"]]
+        reservoir.seen += 1
+        if (
+            len(reservoir.kept) < limit
+            and window.number_kept < self.MAX_KEPT_PER_WINDOW
+        ):
+            window.number_kept += 1
+            reservoir.kept.append(item)
+            return
+
+        index = random.randrange(reservoir.seen)
+        if index >= len(reservoir.kept):
+            return
+
+        reservoir.kept[index] = item
+
+    def _retire_window(self, window: "_Window") -> None:
+        claim = object()
+        window.retire_claims.append(claim)
+        if window.retire_claims[0] is not claim:
+            return
+
+        self._window = _Window()
+        self._retired.append(window)
+
+    def flush(self) -> None:
+        self._retire_window(self._window)
+        super().flush()
 
     def _flush(self) -> "Optional[Envelope]":
         queue = self._queue
@@ -96,6 +187,32 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
             except IndexError:
                 break
 
+        sampled_out = 0
+
+        now = time.monotonic()
+        window = self._window
+        if now - window.start >= self.FLUSH_WAIT_TIME:
+            self._retire_window(window)
+
+        for window in self._retired.copy():
+            if (
+                threading.current_thread() is self._flusher
+                and now - window.start < self.FLUSH_WAIT_TIME + 0.05
+            ):
+                break
+            try:
+                window = self._retired.popleft()
+            except IndexError:
+                break
+            sampled_out += self._harvest(window, items)
+
+        if sampled_out:
+            self._record_lost_func(
+                reason="sample_rate",
+                data_category=self.CLIENT_REPORT_TYPE,
+                quantity=sampled_out,
+            )
+
         if not items:
             return None
 
@@ -105,6 +222,38 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         envelope.add_item(self._to_envelope_item(items))
         self._capture_func(envelope)
         return envelope
+
+    def _harvest(self, window: "_Window", items: "list[Metric]") -> int:
+        by_name: "dict[str, list[_Reservoir]]" = {}
+        for state in window.threads.copy().values():
+            for name, reservoir in state.reservoirs.copy().items():
+                by_name.setdefault(name, []).append(reservoir)
+
+        sampled_out = 0
+        for name, reservoirs in by_name.items():
+            limit = self._limits[name]
+            bounds = list(
+                itertools.accumulate(reservoir.seen for reservoir in reservoirs)
+            )
+            slots = [0] * len(reservoirs)
+            for position in random.sample(range(bounds[-1]), min(limit, bounds[-1])):
+                slots[bisect.bisect_right(bounds, position)] += 1
+
+            kept: "list[Metric]" = []
+            for reservoir, count in zip(reservoirs, slots):
+                thread_kept = reservoir.kept.copy()
+                kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
+            if not kept:
+                sampled_out += bounds[-1]
+                continue
+
+            items.extend(kept)
+            rate = len(kept) / bounds[-1]
+            for item in kept:
+                item["attributes"]["sentry.client_sample_rate"] = rate
+            sampled_out += bounds[-1] - len(kept)
+
+        return sampled_out
 
     @staticmethod
     def _to_transport_format(item: "Metric") -> "Any":
