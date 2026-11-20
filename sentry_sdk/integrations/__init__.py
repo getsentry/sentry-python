@@ -8,7 +8,7 @@ from threading import Lock, local
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.utils import capture_internal_exceptions, logger, package_version
 
 if TYPE_CHECKING:
     from collections.abc import Container, Sequence
@@ -271,7 +271,10 @@ def setup_integrations(
                 spec = importlib.util.find_spec(trigger)
             except Exception:
                 spec = None
-            if spec is None:
+            # `agents` is a generic module name, so make sure it's openai-agents'
+            if spec is None or (
+                trigger == "agents" and package_version("openai-agents") is None
+            ):
                 excluded.add(import_string)
             elif hasattr(spec.loader, "exec_module"):
                 excluded.add(import_string)
@@ -414,11 +417,14 @@ class _DeferredSetupLoader(Loader):
         if module.__spec__ is not None:
             module.__spec__.loader = self._loader
 
-        # The import system only binds a submodule to its parent after exec_module
-        # returns, but setup may already access it as an attribute of the parent.
-        parent, _, child = self._trigger.rpartition(".")
-        if parent:
-            setattr(sys.modules[parent], child, sys.modules.get(self._trigger, module))
+        # Setup may access the trigger as an attribute of its parent package
+        # before the import system binds it there
+        with capture_internal_exceptions():
+            parent, _, child = self._trigger.rpartition(".")
+            if parent:
+                setattr(
+                    sys.modules[parent], child, sys.modules.get(self._trigger, module)
+                )
 
         _set_up_deferred_integration(self._trigger)
 

@@ -1,12 +1,8 @@
-import json
-import subprocess
-import sys
-from textwrap import dedent
-
 import pytest
 
 from sentry_sdk import get_client
 from sentry_sdk.integrations import _INTEGRATION_DEACTIVATES
+from tests.integrations.utils import run_deferred_setup_app
 
 try:
     from sentry_sdk.integrations.langchain import LangchainIntegration
@@ -46,13 +42,7 @@ except Exception:
 
 
 pytestmark = pytest.mark.skipif(
-    not (
-        has_langchain
-        and has_openai
-        and has_anthropic
-        and has_openai_agents
-        and has_pydantic_ai
-    ),
+    not (has_langchain and has_openai and has_anthropic),
     reason="Requires langchain, openai, and anthropic packages to be installed",
 )
 
@@ -135,6 +125,10 @@ def test_user_can_override_with_both_explicit_integrations(
     assert AnthropicIntegration in integration_types
 
 
+@pytest.mark.skipif(
+    not (has_openai_agents and has_pydantic_ai),
+    reason="Requires openai-agents and pydantic-ai",
+)
 def test_disabling_integrations_allows_openai_and_anthropic(
     sentry_init, reset_integrations
 ):
@@ -256,131 +250,84 @@ def test_only_auto_enabling_integrations_without_defaults(
         assert AnthropicIntegration not in integration_types
 
 
-OPENAI_CALL = (
-    "openai.OpenAI(api_key='x', base_url='http://localhost:1', max_retries=0)"
-    ".chat.completions.create(model='gpt-4o', messages=[{'role': 'user', 'content': 'hi'}])"
-)
-ANTHROPIC_CALL = (
-    "anthropic.Anthropic(api_key='x', base_url='http://localhost:1', max_retries=0)"
-    ".messages.create(model='claude', max_tokens=1, messages=[{'role': 'user', 'content': 'hi'}])"
-)
-GOOGLE_GENAI_CALL = (
-    "google.genai.Client(api_key='x', http_options={'base_url': 'http://localhost:1', 'retry_options': {'attempts': 1}})"
-    ".models.generate_content(model='gemini', contents='hi')"
-)
-
-
 @pytest.mark.parametrize(
-    "deactivator_trigger, target, target_module, target_call",
+    "explicit_target",
+    [
+        pytest.param(False, id="target_auto_enabled"),
+        pytest.param(True, id="target_in_integrations"),
+    ],
+)
+@pytest.mark.parametrize(
+    "deactivator_trigger, target, target_integration, target_imports, patched",
     [
         pytest.param(
-            "langchain_core", "openai", "openai", OPENAI_CALL, id="langchain-openai"
+            "agents",
+            "openai",
+            "OpenAIIntegration",
+            "from openai.resources.chat.completions import Completions",
+            "Completions.create",
+            id="deferred_auto_enabling_integrations-openai_agents-openai",
+            marks=pytest.mark.skipif(
+                not has_openai_agents, reason="Requires openai-agents"
+            ),
         ),
         pytest.param(
-            "langchain_core",
-            "anthropic",
-            "anthropic",
-            ANTHROPIC_CALL,
-            id="langchain-anthropic",
-        ),
-        pytest.param(
-            "langchain_core",
-            "google_genai",
-            "google.genai",
-            GOOGLE_GENAI_CALL,
-            id="langchain-google_genai",
-        ),
-        pytest.param(
-            "agents", "openai", "openai", OPENAI_CALL, id="openai_agents-openai"
-        ),
-        pytest.param(
-            "pydantic_ai", "openai", "openai", OPENAI_CALL, id="pydantic_ai-openai"
+            "pydantic_ai",
+            "openai",
+            "OpenAIIntegration",
+            "from openai.resources.chat.completions import Completions",
+            "Completions.create",
+            id="deferred_auto_enabling_integrations-pydantic_ai-openai",
+            marks=pytest.mark.skipif(
+                not has_pydantic_ai, reason="Requires pydantic-ai"
+            ),
         ),
         pytest.param(
             "pydantic_ai",
             "anthropic",
-            "anthropic",
-            ANTHROPIC_CALL,
-            id="pydantic_ai-anthropic",
+            "AnthropicIntegration",
+            "from anthropic.resources import Messages",
+            "Messages.create",
+            id="deferred_auto_enabling_integrations-pydantic_ai-anthropic",
+            marks=pytest.mark.skipif(
+                not has_pydantic_ai, reason="Requires pydantic-ai"
+            ),
         ),
     ],
 )
-@pytest.mark.parametrize(
-    "explicit_target",
-    [
-        pytest.param(False, id="auto_enabled_target"),
-        pytest.param(True, id="explicit_target"),
-    ],
-)
 def test_deactivator_imported_after_target(
-    tmp_path, deactivator_trigger, target, target_module, target_call, explicit_target
+    tmp_path,
+    deactivator_trigger,
+    target,
+    target_integration,
+    target_imports,
+    patched,
+    explicit_target,
 ):
-    target_integration = {
-        "openai": "OpenAIIntegration",
-        "anthropic": "AnthropicIntegration",
-        "google_genai": "GoogleGenAIIntegration",
-    }[target]
-
-    app = tmp_path / "app.py"
-    app.write_text(
-        dedent(
-            """
-            import json
-            import sys
-
-            import sentry_sdk
-
-            # Makes the other deactivating libraries look uninstalled
-            for name in {other_deactivator_triggers!r}:
-                sys.modules[name] = None
-
-            integrations = []
-            if {explicit_target}:
-                from sentry_sdk.integrations.{target} import {target_integration}
-
-                integrations.append({target_integration}())
-
-            transactions = []
-
-            def before_send_transaction(event, hint):
-                transactions.append(event)
-                return None
-
-            sentry_sdk.init(
-                traces_sample_rate=1.0,
-                before_send_transaction=before_send_transaction,
-                integrations=integrations,
-                _experiments={{"deferred_auto_enabling_integrations": True}},
-            )
-
-            import {target_module}
-            import {deactivator_trigger}
-
-            with sentry_sdk.start_transaction(name="ai"):
-                try:
-                    {target_call}
-                except Exception:
-                    pass
-
-            print(json.dumps([
-                span["origin"]
-                for span in transactions[0]["spans"]
-                if span["origin"].startswith("auto.ai.")
-            ]))
-            """
-        ).format(
-            target=target,
-            other_deactivator_triggers=sorted(
-                {"agents", "langchain_core", "pydantic_ai"} - {deactivator_trigger}
-            ),
-            explicit_target=explicit_target,
-            target_integration=target_integration,
-            target_module=target_module,
-            deactivator_trigger=deactivator_trigger,
-            target_call=target_call,
+    hidden_deactivators = sorted(
+        {"agents", "langchain_core", "pydantic_ai"} - {deactivator_trigger}
+    )
+    before_init = (
+        f"for name in {hidden_deactivators!r}:\n    sys.modules[name] = None\n"
+    )
+    if explicit_target:
+        before_init += (
+            f"from sentry_sdk.integrations.{target} import {target_integration}\n"
+            f"integrations.append({target_integration}())\n"
         )
+
+    result = run_deferred_setup_app(
+        tmp_path,
+        identifier=target,
+        trigger=target,
+        app_imports=f"{target_imports}\nimport {deactivator_trigger}",
+        patched=patched,
+        before_init=before_init,
     )
 
-    ai_span_origins = json.loads(subprocess.check_output([sys.executable, str(app)]))
-
-    assert ai_span_origins == ([f"auto.ai.{target}"] if explicit_target else [])
+    assert result == {
+        "imported_during_init": explicit_target,
+        "integration_enabled": explicit_target,
+        "patched": explicit_target,
+        "reported_in_event": explicit_target,
+    }

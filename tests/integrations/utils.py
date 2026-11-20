@@ -125,10 +125,13 @@ DATA_COLLECTION_QUEUES_CASES = [
 ]
 
 
-def run_deferred_setup_app(tmp_path, identifier, trigger, app_imports, patched):
+def run_deferred_setup_app(
+    tmp_path, identifier, trigger, app_imports, patched, before_init=""
+):
     """
     Runs an app in a fresh interpreter that calls ``init()`` with deferred setup of
     auto-enabling integrations on, and only afterwards runs ``app_imports``.
+    ``before_init`` runs before ``init()`` and can append to ``integrations``.
     """
     app = tmp_path / "app.py"
     app.write_text(
@@ -140,6 +143,9 @@ def run_deferred_setup_app(tmp_path, identifier, trigger, app_imports, patched):
 
             import sentry_sdk
 
+            integrations = []
+            {before_init}
+
             events = []
 
             def before_send(event, hint):
@@ -148,6 +154,7 @@ def run_deferred_setup_app(tmp_path, identifier, trigger, app_imports, patched):
 
             sentry_sdk.init(
                 before_send=before_send,
+                integrations=integrations,
                 _experiments={{"deferred_auto_enabling_integrations": True}},
             )
             imported_during_init = {trigger!r} in sys.modules
@@ -168,6 +175,7 @@ def run_deferred_setup_app(tmp_path, identifier, trigger, app_imports, patched):
             trigger=trigger,
             app_imports=app_imports,
             patched=patched,
+            before_init=before_init,
         )
     )
 

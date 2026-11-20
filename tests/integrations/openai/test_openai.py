@@ -8274,7 +8274,20 @@ async def test_streaming_responses_api_ttft_async(
     assert ttft > 0
 
 
-def test_deferred_setup_on_import(tmp_path):
+@pytest.mark.parametrize(
+    "local_agents_package",
+    [
+        pytest.param(False, id="without_local_agents_package"),
+        pytest.param(True, id="with_local_agents_package"),
+    ],
+)
+def test_deferred_setup_on_import(tmp_path, local_agents_package):
+    if local_agents_package:
+        if package_version("openai-agents") is not None:
+            pytest.skip("openai-agents is installed")
+        (tmp_path / "agents").mkdir()
+        (tmp_path / "agents" / "__init__.py").write_text("")
+
     result = run_deferred_setup_app(
         tmp_path,
         identifier="openai",
