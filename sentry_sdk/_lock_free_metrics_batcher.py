@@ -31,13 +31,12 @@ class _Reservoir:
 
 
 class _ThreadState:
-    """The metrics collected by one thread in a given window and their count."""
+    """The metrics collected by one thread in a given window."""
 
-    __slots__ = ("reservoirs", "size")
+    __slots__ = ("reservoirs",)
 
     def __init__(self) -> None:
         self.reservoirs: "defaultdict[str, _Reservoir]" = defaultdict(_Reservoir)
-        self.size = 0
 
 
 class _Window:
@@ -46,15 +45,13 @@ class _Window:
     Only the thread with the given identifier should change its local state.
     """
 
-    __slots__ = ("start", "threads", "retire_claims")
+    __slots__ = ("start", "threads", "retire_claims", "number_kept")
 
     def __init__(self) -> None:
         self.start = time.monotonic()
         self.threads: "defaultdict[int, _ThreadState]" = defaultdict(_ThreadState)
         self.retire_claims: "list[object]" = []
-
-    def size(self) -> int:
-        return sum(state.size for state in self.threads.copy().values())
+        self.number_kept = 0
 
 
 class LockFreeMetricsBatcher(Batcher["Metric"]):
@@ -158,8 +155,11 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         state = window.threads[threading.get_ident()]
         reservoir = state.reservoirs[item["name"]]
         reservoir.seen += 1
-        if len(reservoir.kept) < limit and window.size() < self.MAX_KEPT_PER_WINDOW:
-            state.size += 1
+        if (
+            len(reservoir.kept) < limit
+            and window.number_kept < self.MAX_KEPT_PER_WINDOW
+        ):
+            window.number_kept += 1
             reservoir.kept.append(item)
             return
 
