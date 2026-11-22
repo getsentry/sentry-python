@@ -1,5 +1,5 @@
-import sys
 from copy import deepcopy
+from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -10,15 +10,14 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.utils import has_data_collection_enabled, transaction_from_function
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional
-
-    from sentry_sdk._types import Event
+    from typing import Any, Callable, Optional
 
 try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
         StarletteRequestExtractor,
         _get_cached_request_body_attribute,
+        _is_async_callable,
         _wrap_sync_handler,
     )
 except DidNotEnable:
@@ -26,6 +25,7 @@ except DidNotEnable:
 
 try:
     import fastapi  # type: ignore
+    from starlette.requests import HTTPConnection, Request
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
 
@@ -33,19 +33,141 @@ except ImportError:
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
 
 
-# Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
-if sys.version_info >= (3, 13):  # pragma: no cover
-    from inspect import iscoroutinefunction
-else:
-    from asyncio import iscoroutinefunction
-
-
 class FastApiIntegration(StarletteIntegration):
     identifier = "fastapi"
 
     @staticmethod
     def setup_once() -> None:
-        patch_get_request_handler()
+        # FastAPI uses the Starlette ASGI lifecycle, so make sure the
+        # request-scoped isolation scope is installed even when the FastAPI
+        # integration is enabled without the Starlette integration.
+        StarletteIntegration.setup_once()
+        patch_fastapi_init()
+
+
+async def _sentry_fastapi_dependency(request: "HTTPConnection"):
+    if not isinstance(request, Request):
+        yield
+        return
+
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(FastApiIntegration)
+    if integration is None:
+        yield
+        return
+
+    current_scope = sentry_sdk.get_current_scope()
+    effective_route_context = request.scope.get("fastapi", {}).get(
+        "effective_route_context"
+    )
+    route = request.scope.get("route")
+
+    route_path = None
+    if effective_route_context is not None:
+        route_path = getattr(effective_route_context, "path", None)
+
+    if route_path is None and route is not None:
+        route_path = getattr(route, "path", None)
+
+    server_span = current_scope._server_segment_span
+    if server_span is not None and route_path is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
+    _set_transaction_name_and_source(
+        current_scope,
+        integration.transaction_style,
+        endpoint=request.scope.get("endpoint"),
+        route_path=route_path,
+    )
+
+    # FastAPI may execute the dependant stored on the effective route context
+    # instead of the original APIRoute.
+    dependant = getattr(effective_route_context, "dependant", None)
+    if dependant is None:
+        dependant = getattr(route, "dependant", None)
+    if (
+        dependant is not None
+        and dependant.call is not None
+        and not _is_async_callable(dependant.call)
+    ):
+        dependant.call = _wrap_sync_handler(dependant.call)
+
+    sentry_scope = sentry_sdk.get_isolation_scope()
+    extractor = StarletteRequestExtractor(request)
+    info = await extractor.extract_request_info()
+
+    def _make_request_event_processor(
+        info: "dict[str, Any]",
+    ) -> "Callable[[Any, dict[str, Any]], Any]":
+        def event_processor(
+            event: "dict[str, Any]", hint: "dict[str, Any]"
+        ) -> "dict[str, Any]":
+            event_request = event.get("request", {})
+            if info:
+                if "cookies" in info:
+                    event_request["cookies"] = info["cookies"]
+                if "data" in info:
+                    attach_request_data = True
+                    if has_data_collection_enabled(client.options):
+                        attach_request_data = (
+                            "incoming_request"
+                            in client.options["data_collection"]["http_bodies"]
+                        )
+
+                    if attach_request_data:
+                        event_request["data"] = info["data"]
+            event["request"] = deepcopy(event_request)
+            return event
+
+        return event_processor
+
+    sentry_scope._name = FastApiIntegration.identifier
+    sentry_scope.add_event_processor(_make_request_event_processor(info))
+
+    try:
+        yield
+    finally:
+        current_span = get_current_span()
+        if type(current_span) is StreamedSpan:
+            attach_request_data = True
+            if has_data_collection_enabled(client.options):
+                attach_request_data = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
+                )
+
+            if attach_request_data:
+                request_body = _get_cached_request_body_attribute(
+                    client=client, request=request
+                )
+                if request_body:
+                    current_span._segment.set_attribute(
+                        SPANDATA.HTTP_REQUEST_BODY_DATA,
+                        request_body,
+                    )
+
+
+def patch_fastapi_init() -> None:
+    old_fastapi_init = fastapi.FastAPI.__init__
+
+    if getattr(old_fastapi_init, "_sentry_is_patched", False):
+        return
+
+    @wraps(old_fastapi_init)
+    def _sentry_fastapi_init(self: "Any", *args: "Any", **kwargs: "Any") -> None:
+        dependencies = kwargs.get("dependencies")
+        if dependencies is None:
+            dependencies = []
+
+        kwargs["dependencies"] = [
+            fastapi.Depends(_sentry_fastapi_dependency),
+            *dependencies,
+        ]
+
+        old_fastapi_init(self, *args, **kwargs)
+
+    _sentry_fastapi_init._sentry_is_patched = True  # type: ignore[attr-defined]
+    fastapi.FastAPI.__init__ = _sentry_fastapi_init
 
 
 def _set_transaction_name_and_source(
@@ -69,128 +191,3 @@ def _set_transaction_name_and_source(
         source = SOURCE_FOR_STYLE[transaction_style]
 
     scope.set_transaction_name(name, source=source)
-
-
-async def _wrap_async_handler(
-    handler: "Callable[..., Awaitable[Any]]", *args: "Any", **kwargs: "Any"
-) -> "Any":
-    """
-    Wraps an asynchronous handler function to attach request info to errors and the server segment span.
-    The request body cached on the Starlette Request object is attached to streamed spans, but consuming the request body in the event
-    processor can still cause application hangs.
-    """
-    client = sentry_sdk.get_client()
-    integration = client.get_integration(FastApiIntegration)
-    if integration is None:
-        return await handler(*args, **kwargs)
-
-    request = args[0]
-
-    route = request.scope.get("route")
-
-    route_path = None
-    if route:
-        # FastAPI >= 0.137 stores the prefix-resolved path on an
-        # effective_route_context in scope["fastapi"], while
-        # scope["route"].path holds the unprefixed original.
-        # Prefer the effective context path when available.
-        effective_route_context = request.scope.get("fastapi", {}).get(
-            "effective_route_context"
-        )
-        context_path = getattr(effective_route_context, "path", None)
-
-        if context_path:
-            route_path = context_path
-        else:
-            path = getattr(route, "path", None)
-            if path is not None:
-                route_path = path
-
-    server_span = sentry_sdk.get_current_scope()._server_segment_span
-    if server_span is not None and route_path is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
-
-    _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(),
-        integration.transaction_style,
-        endpoint=request.scope.get("endpoint"),
-        route_path=route_path,
-    )
-    sentry_scope = sentry_sdk.get_isolation_scope()
-    extractor = StarletteRequestExtractor(request)
-    info = await extractor.extract_request_info()
-
-    def _make_request_event_processor(
-        req: "Any", integration: "Any"
-    ) -> "Callable[[Event, Dict[str, Any]], Event]":
-        def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
-            # Extract information from request
-            request_info = event.get("request", {})
-            if info:
-                if "cookies" in info:
-                    request_info["cookies"] = info["cookies"]
-                if "data" in info:
-                    attach_request_data = True
-                    if has_data_collection_enabled(client.options):
-                        attach_request_data = (
-                            "incoming_request"
-                            in client.options["data_collection"]["http_bodies"]
-                        )
-
-                    if attach_request_data:
-                        request_info["data"] = info["data"]
-            event["request"] = deepcopy(request_info)
-
-            return event
-
-        return event_processor
-
-    sentry_scope._name = FastApiIntegration.identifier
-    sentry_scope.add_event_processor(
-        _make_request_event_processor(request, integration)
-    )
-
-    try:
-        return await handler(*args, **kwargs)
-    finally:
-        current_span = get_current_span()
-
-        if type(current_span) is StreamedSpan:
-            attach_request_data = True
-            if has_data_collection_enabled(client.options):
-                attach_request_data = (
-                    "incoming_request"
-                    in client.options["data_collection"]["http_bodies"]
-                )
-
-            if attach_request_data:
-                request_body = _get_cached_request_body_attribute(
-                    client=client, request=request
-                )
-                if request_body:
-                    current_span._segment.set_attribute(
-                        SPANDATA.HTTP_REQUEST_BODY_DATA,
-                        request_body,
-                    )
-
-
-def patch_get_request_handler() -> None:
-    old_get_request_handler = fastapi.routing.get_request_handler
-
-    def _sentry_get_request_handler(*args: "Any", **kwargs: "Any") -> "Any":
-        dependant = kwargs.get("dependant")
-        if (
-            dependant
-            and dependant.call is not None
-            and not iscoroutinefunction(dependant.call)
-        ):
-            dependant.call = _wrap_sync_handler(dependant.call)
-
-        old_app = old_get_request_handler(*args, **kwargs)
-
-        async def _sentry_app(*args: "Any", **kwargs: "Any") -> "Any":
-            return await _wrap_async_handler(old_app, *args, **kwargs)
-
-        return _sentry_app
-
-    fastapi.routing.get_request_handler = _sentry_get_request_handler
