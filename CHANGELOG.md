@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1b1
+
+- No documented changes.
+
 ## 3.0.0
 
 New major release of the Python SDK is out now!
