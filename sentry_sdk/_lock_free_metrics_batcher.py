@@ -258,6 +258,13 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
             items.extend(kept)
             rate = len(kept) / bounds[-1]
             for item in kept:
+                user_rate = item["attributes"].get("sentry.client_sample_rate")
+                if isinstance(user_rate, (int, float)) and not isinstance(
+                    user_rate, bool
+                ):
+                    item["attributes"]["sentry.client_sample_rate"] = rate * user_rate
+                    continue
+
                 item["attributes"]["sentry.client_sample_rate"] = rate
             sampled_out += bounds[-1] - len(kept)
 

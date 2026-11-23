@@ -586,7 +586,9 @@ def test_metrics_window_sampling(
     record_lost_event_calls = capture_record_lost_event_calls()
 
     for _ in range(200):
-        sentry_sdk.metrics.count("test.hot", 1)
+        sentry_sdk.metrics.count(
+            "test.hot", 1, attributes={"sentry.client_sample_rate": 0.5}
+        )
     for _ in range(3):
         sentry_sdk.metrics.count("test.cold", 1)
 
@@ -597,7 +599,7 @@ def test_metrics_window_sampling(
     hot = [metric for metric in metrics if metric["name"] == "test.hot"]
     assert len(hot) == 7
     for metric in hot:
-        assert metric["attributes"]["sentry.client_sample_rate"] == 7 / 200
+        assert metric["attributes"]["sentry.client_sample_rate"] == 7 / 200 * 0.5
 
     cold = [metric for metric in metrics if metric["name"] == "test.cold"]
     assert len(cold) == 3
