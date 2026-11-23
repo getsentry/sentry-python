@@ -41,27 +41,26 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - parallel:
-          - name: Test aws_lambda
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda"
-          - name: Test boto3
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3"
-          - name: Test chalice
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice"
-          - name: Test cloud_resource_context
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context"
-          - name: Test gcp
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp"
+      - name: Test aws_lambda
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda"
+      - name: Test boto3
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3"
+      - name: Test chalice
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice"
+      - name: Test cloud_resource_context
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context"
+      - name: Test gcp
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true

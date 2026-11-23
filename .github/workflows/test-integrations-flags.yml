@@ -37,23 +37,22 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - parallel:
-          - name: Test launchdarkly
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly"
-          - name: Test openfeature
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature"
-          - name: Test statsig
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-statsig"
-          - name: Test unleash
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-unleash"
+      - name: Test launchdarkly
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly"
+      - name: Test openfeature
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature"
+      - name: Test statsig
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-statsig"
+      - name: Test unleash
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-unleash"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
