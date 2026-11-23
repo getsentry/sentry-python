@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.0.1b2
+
+### New Features ✨
+
+- Add per-metric windows to lock free metrics batcher by @alexander-alderman-webb with @sentry-release-bot in [#8327](https://github.com/getsentry/sentry-python/pull/8327)
+- Add basic lock-free metrics batcher by @alexander-alderman-webb and @claude in [#8326](https://github.com/getsentry/sentry-python/pull/8326)
+
+### Internal Changes 🔧
+
+- Move locks into batcher subclasses by @alexander-alderman-webb in [#8325](https://github.com/getsentry/sentry-python/pull/8325)
+
+## 3.0.1b1
+
+- No documented changes.
+
 ## 3.0.0
 
 New major release of the Python SDK is out now!

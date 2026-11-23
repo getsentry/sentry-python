@@ -1,3 +1,4 @@
+import math
 import os
 import random
 import socket
@@ -9,6 +10,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Dict, cast, overload
 
 from sentry_sdk._compat import check_uwsgi_thread_support
+from sentry_sdk._lock_free_metrics_batcher import LockFreeMetricsBatcher
 from sentry_sdk._log_batcher import LogBatcher
 from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk._span_batcher import SpanBatcher
@@ -128,6 +130,43 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
     rv["data_collection"] = _resolve_data_collection(rv)
 
+    window_sampling = rv["_experiments"].get("metrics_window_sampling")
+    if window_sampling is not None:
+        valid_rates = {}
+        if isinstance(window_sampling, dict):
+            for name, rate in window_sampling.items():
+                if (
+                    isinstance(rate, bool)
+                    or not isinstance(rate, (int, float))
+                    or not math.isfinite(rate)
+                    or rate <= 0
+                ):
+                    logger.warning(
+                        "[Metrics] Given window sampling rate for %s is invalid. It must be a positive number. Got %s, not sampling it.",
+                        name,
+                        rate,
+                    )
+                    continue
+
+                clamped = min(max(rate, 0.2), 2000)
+                if clamped != rate:
+                    logger.warning(
+                        "[Metrics] Window sampling rate for %s must be between 0.2 and 2000 metrics per second. Got %s, using %s.",
+                        name,
+                        rate,
+                        clamped,
+                    )
+                valid_rates[name] = clamped
+        else:
+            logger.warning(
+                "[Metrics] metrics_window_sampling must map metric names to rates. Got %s, not sampling.",
+                window_sampling,
+            )
+        rv["_experiments"] = {
+            **rv["_experiments"],
+            "metrics_window_sampling": valid_rates,
+        }
+
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
             "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
@@ -160,7 +199,7 @@ class BaseClient:
         self.transport: "Optional[Transport]" = None
         self.monitor: "Optional[Monitor]" = None
         self.log_batcher: "Optional[LogBatcher]" = None
-        self.metrics_batcher: "Optional[MetricsBatcher]" = None
+        self.metrics_batcher: "Optional[Union[MetricsBatcher, LockFreeMetricsBatcher]]" = None
         self.span_batcher: "Optional[SpanBatcher]" = None
         self.integrations: "dict[str, Integration]" = {}
 
@@ -379,10 +418,20 @@ class _Client(BaseClient):
                 record_lost_func=_record_lost_event,
             )
 
-            self.metrics_batcher = MetricsBatcher(
-                capture_func=_capture_envelope,
-                record_lost_func=_record_lost_event,
+            window_sampling = self.options["_experiments"].get(
+                "metrics_window_sampling"
             )
+            if window_sampling:
+                self.metrics_batcher = LockFreeMetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                    window_sampling=window_sampling,
+                )
+            else:
+                self.metrics_batcher = MetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
 
             self.span_batcher = SpanBatcher(
                 capture_func=_capture_envelope,

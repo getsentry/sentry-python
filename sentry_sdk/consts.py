@@ -73,6 +73,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
+            "metrics_window_sampling": Optional[Dict[str, float]],
         },
         total=False,
     )
@@ -2064,4 +2065,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "3.0.0"
+VERSION = "3.0.1b2"
