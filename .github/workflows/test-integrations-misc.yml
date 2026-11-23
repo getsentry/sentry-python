@@ -37,43 +37,42 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - parallel:
-          - name: Test loguru
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru"
-          - name: Test opentelemetry
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry"
-          - name: Test otlp
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-otlp"
-          - name: Test potel
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-potel"
-          - name: Test pure_eval
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval"
-          - name: Test trytond
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond"
-          - name: Test typer
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-typer"
-          - name: Test integration_deactivation
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-integration_deactivation"
-          - name: Test shadowed_module
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-shadowed_module"
+      - name: Test loguru
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru"
+      - name: Test opentelemetry
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry"
+      - name: Test otlp
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-otlp"
+      - name: Test potel
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-potel"
+      - name: Test pure_eval
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval"
+      - name: Test trytond
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond"
+      - name: Test typer
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-typer"
+      - name: Test integration_deactivation
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-integration_deactivation"
+      - name: Test shadowed_module
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-shadowed_module"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
