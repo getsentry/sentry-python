@@ -196,7 +196,7 @@ class HttpTransportCore(Transport):
         self._worker = self._create_worker(options)
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until: "Dict[Optional[EventDataCategory], datetime]" = {}
-        # We only use this Retry() class for the `get_retry_after` method it exposes
+        # We only use this Retry() class for the `parse_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
         self._discarded_events: "DefaultDict[Tuple[EventDataCategory, str], int]" = (
             defaultdict(int)
@@ -755,21 +755,17 @@ class HttpTransport(BaseHttpTransport):
                 opts["proxy_headers"] = proxy_headers
 
             if proxy.startswith("socks"):
-                use_socks_proxy = True
                 try:
                     # Check if PySocks dependency is available
                     from urllib3.contrib.socks import SOCKSProxyManager  # noqa: PLC0415
                 except ImportError:
-                    use_socks_proxy = False
                     logger.warning(
                         "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
                         proxy,
                     )
-
-                if use_socks_proxy:
-                    return SOCKSProxyManager(proxy, **opts)
-                else:
                     return urllib3.PoolManager(**opts)
+
+                return SOCKSProxyManager(proxy, **opts)
             else:
                 return urllib3.ProxyManager(proxy, **opts)
         else:

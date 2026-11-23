@@ -67,6 +67,18 @@ try:
     )
 except ImportError:
     SKIP_RESPONSES_TESTS = True
+    CustomToolParam = None  # type: ignore[assignment, misc]
+    FunctionToolParam = None  # type: ignore[assignment, misc]
+    Response = None  # type: ignore[assignment, misc]
+    ResponseOutputMessage = None  # type: ignore[assignment, misc]
+    ResponseOutputText = None  # type: ignore[assignment, misc]
+    ResponseUsage = None  # type: ignore[assignment, misc]
+    WebSearchToolParam = None  # type: ignore[assignment, misc]
+    ResponseCompletedEvent = None  # type: ignore[assignment, misc]
+    ResponseCreatedEvent = None  # type: ignore[assignment, misc]
+    ResponseTextDeltaEvent = None  # type: ignore[assignment, misc]
+    InputTokensDetails = None  # type: ignore[assignment, misc]
+    OutputTokensDetails = None  # type: ignore[assignment, misc]
 
 from unittest import mock  # python 3.3 and above
 

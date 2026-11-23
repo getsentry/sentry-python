@@ -2,17 +2,13 @@ import uuid
 
 import pytest
 
-try:
-    import fakeredis
-    from fakeredis.aioredis import FakeRedis as FakeRedisAsync
-except ModuleNotFoundError:
-    FakeRedisAsync = None
+pytest.importorskip(
+    "fakeredis.aioredis",
+    reason="Skipping tests because fakeredis.aioredis not available",
+)
 
-if FakeRedisAsync is None:
-    pytest.skip(
-        "Skipping tests because fakeredis.aioredis not available",
-        allow_module_level=True,
-    )
+import fakeredis
+from fakeredis.aioredis import FakeRedis as FakeRedisAsync
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA

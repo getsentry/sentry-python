@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           enable-cache: false
       - name: Mark workspace safe for git (3.7 container)
@@ -37,46 +37,18 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Test aiohttp
+      - name: Test flask
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiohttp"
-      - name: Test asgi
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-flask"
+      - name: Test starlette
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-asgi"
-      - name: Test bottle
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette"
+      - name: Test fastapi
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-bottle"
-      - name: Test falcon
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon"
-      - name: Test litestar
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-litestar"
-      - name: Test pyramid
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pyramid"
-      - name: Test quart
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-quart"
-      - name: Test sanic
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sanic"
-      - name: Test starlite
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlite"
-      - name: Test tornado
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-tornado"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
