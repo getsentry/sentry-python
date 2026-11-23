@@ -98,3 +98,4 @@ When integrating with a package:
 - Avoid testing things that can't realistically break.
 - Avoid duplicating tests (extend an existing one or use `parametrize`).
 - Assert on what Sentry captures with `capture_events`/`capture_items`.
+- When adding regression tests, they must fail without the fix. Verify that that's the case before committing them.
