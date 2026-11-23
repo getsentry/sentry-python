@@ -13,11 +13,13 @@ Use **tox** for testing (not pytest directly):
 - Common tests: `uv run tox -e py3.14-common`
 - Run specific test file: `TESTPATH=tests/integrations/logging/test_logging.py uv run tox -e py3.14-common`
 - Run single test: `TESTPATH=tests/path/to/test_file.py uv run tox -e py3.14-common -- -k "test_name"`
+- Use the latest Python and library versions by default. For version-specific issues, test only the affected versions.
+- Run only tests relevant to the change, selecting them with `-- -k <test>` and narrowing `TESTPATH` where appropriate. Do not run the full test matrix locally.
 
 ## Type Checking
 
 Mypy and its type stubs live in the opt-in `typing` dependency group:
-- Run `uv run --group typing mypy sentry_sdk tests` before committing (must pass with zero errors)
+- Run `uv run --group typing mypy sentry_sdk tests` after every Python change, before reporting completion or committing, even when no commit was requested (must pass with zero errors)
 - Strict mode enabled (`check_untyped_defs`, `disallow_untyped_defs`)
 
 ## Linting & Formatting
@@ -25,6 +27,15 @@ Mypy and its type stubs live in the opt-in `typing` dependency group:
 Use **ruff** for linting and formatting:
 - `uv run ruff check --fix tests sentry_sdk`
 - `uv run ruff format tests sentry_sdk`
+
+## Verification Loop
+
+After every Python change, complete this loop before reporting completion or committing:
+
+1. Run both Ruff linting and formatting commands above.
+2. Run `uv run --group typing mypy sentry_sdk tests` against the full source and tests.
+3. Run only the relevant tox tests, using the version and test selection rules above.
+4. Fix failures, including pre-existing mypy errors, and restart the entire loop after any fix or formatting change. Repeat until all checks pass.
 
 ## Auto-Generated Files
 
@@ -40,6 +51,12 @@ Do NOT edit these directly — modify source scripts instead:
 3. Add to group in `scripts/split_tox_gh_actions/split_tox_gh_actions.py`
 4. Run `scripts/generate-test-files.sh`
 
+
+# Branch Naming
+
+- Use `<github-username>/<integration>/<description>` for integration-specific changes.
+- For other changes, omit the integration segment: `<github-username>/<description>`.
+- Use the authenticated GitHub username, available via `gh api user --jq .login`.
 
 # SDK Implementation Guidelines
 
