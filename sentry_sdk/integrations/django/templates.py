@@ -1,7 +1,6 @@
 import functools
 from typing import TYPE_CHECKING
 
-from django import VERSION as DJANGO_VERSION
 from django.template import TemplateSyntaxError
 from django.utils.safestring import mark_safe
 
@@ -85,8 +84,6 @@ def patch_templates() -> None:
 
     SimpleTemplateResponse.rendered_content = rendered_content
 
-    if DJANGO_VERSION < (1, 7):
-        return
     import django.shortcuts  # noqa: PLC0415
 
     real_render = django.shortcuts.render
