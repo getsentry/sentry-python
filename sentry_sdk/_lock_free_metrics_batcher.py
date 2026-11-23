@@ -120,31 +120,39 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         return True
 
     def add(self, item: "Metric") -> None:
-        if not self._ensure_thread():
+        # Bail out if the current thread is already executing batcher code.
+        if getattr(self._active, "flag", False):
             return None
 
-        window = self._window
-        if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
-            self._retire_window(window)
-            window = self._window
-
-        limit = self._limits.get(item["name"])
-        if limit is None:
-            if len(self._queue) >= self.MAX_UNSAMPLED_BEFORE_DROP:
-                self._record_lost(item)
+        self._active.flag = True
+        try:
+            if not self._ensure_thread():
                 return None
 
-            self._queue.append(item)
-            if (
-                len(self._queue) < self.MAX_UNSAMPLED_BEFORE_FLUSH
-                or self._flush_event.is_set()
-            ):
+            window = self._window
+            if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
+                self._retire_window(window)
+                window = self._window
+
+            limit = self._limits.get(item["name"])
+            if limit is None:
+                if len(self._queue) >= self.MAX_UNSAMPLED_BEFORE_DROP:
+                    self._record_lost(item)
+                    return None
+
+                self._queue.append(item)
+                if (
+                    len(self._queue) < self.MAX_UNSAMPLED_BEFORE_FLUSH
+                    or self._flush_event.is_set()
+                ):
+                    return
+
+                self._flush_event.set()
                 return
 
-            self._flush_event.set()
-            return
-
-        self._add_to_window(item, window, limit)
+            self._add_to_window(item, window, limit)
+        finally:
+            self._active.flag = False
 
     def _add_to_window(self, item: "Metric", window: "_Window", limit: int) -> None:
         state = window.threads[threading.get_ident()]
