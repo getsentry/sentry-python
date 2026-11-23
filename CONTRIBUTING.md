@@ -66,7 +66,7 @@ PRs that don't meet these criteria are automatically closed and labeled `violati
 
 ### Set up Python
 
-Make sure that you have Python 3 installed. Version 3.7 or higher is required to run style checkers on pre-commit.
+Make sure that you have Python 3 installed. Version 3.7 or higher is required to run style checkers on prek.
 
 On macOS, we recommend using `brew` to install Python. For Windows, we recommend an official [python.org](https://www.python.org/downloads/) release.
 
@@ -103,15 +103,15 @@ We use `mypy` for typing our codebase. Use the following command to typecheck th
 uv run --group typing mypy sentry_sdk tests
 ```
 
-##### Install Coding Style Pre-commit Hooks
+##### Install Coding Style Prek Hooks
 
-`pre-commit` is included in the project's dev dependencies (installed by `uv sync`). Register the git hooks with:
+`prek` is included in the project's dev dependencies (installed by `uv sync`). Register the git hooks with:
 
 ```bash
-uv run pre-commit install
+uv run prek install --prepare-hooks -f
 ```
 
-Now, pre-commit will automatically lint your changes with `ruff`.
+Now, prek will automatically lint your changes with `ruff`.
 
 
 ### Install `sentry-python` in Editable Mode
