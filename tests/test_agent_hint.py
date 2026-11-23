@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 import time
 
 import pytest
@@ -45,6 +46,9 @@ def run_app(tmp_path, monkeypatch, capsys):
     return run
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 @pytest.mark.parametrize(
     "env, init_args",
     [
@@ -59,6 +63,9 @@ def test_coding_agent_hint(run_app, env, init_args):
     assert SETUP_CHECKLIST_PATH in run_app(env, init_args)
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 @pytest.mark.parametrize(
     "env, init_args, hint",
     [
@@ -101,6 +108,9 @@ def test_coding_agent_hint_per_agent(run_app, env, init_args, hint):
     assert SETUP_CHECKLIST_PATH in printed
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 def test_coding_agent_hint_shown_once(run_app):
     printed = run_app({"AI_AGENT": "claude-code"}, "traces_sample_rate=0", inits=2)
 
@@ -142,6 +152,9 @@ def _committed_and_edited(app, minutes_ago=0):
     os.utime(app, (changed, changed))
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
 @pytest.mark.parametrize(
     "before_run",
