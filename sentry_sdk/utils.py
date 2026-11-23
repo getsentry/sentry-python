@@ -128,7 +128,7 @@ def json_dumps(data: "Any") -> bytes:
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
-def _git(*args: str, cwd: "Optional[str]" = None) -> "Optional[str]":
+def get_git_revision() -> "Optional[str]":
     try:
         with open(os.path.devnull, "w+") as null:
             # prevent command prompt windows from popping up on windows
@@ -137,10 +137,9 @@ def _git(*args: str, cwd: "Optional[str]" = None) -> "Optional[str]":
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-            output = (
+            revision = (
                 subprocess.Popen(
-                    ["git", *args],
-                    cwd=cwd,
+                    ["git", "rev-parse", "HEAD"],
                     startupinfo=startupinfo,
                     stdout=subprocess.PIPE,
                     stderr=null,
@@ -153,11 +152,7 @@ def _git(*args: str, cwd: "Optional[str]" = None) -> "Optional[str]":
     except (OSError, IOError, FileNotFoundError):
         return None
 
-    return output
-
-
-def get_git_revision() -> "Optional[str]":
-    return _git("rev-parse", "HEAD")
+    return revision
 
 
 def get_default_release() -> "Optional[str]":

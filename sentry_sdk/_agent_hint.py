@@ -1,11 +1,11 @@
 import atexit
 import os
+import subprocess
 import sys
 import time
 from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import (
-    _git,
     _is_external_source,
     capture_internal_exceptions,
     env_to_bool,
@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
 
@@ -55,17 +55,21 @@ def _setup_in_progress(init_file: str) -> bool:
     if changed < cutoff:
         return False
 
-    def git(*args: str) -> "Optional[str]":
-        return _git(
-            "--no-optional-locks",
-            "-c",
-            "core.fsmonitor=false",
-            *args,
-            cwd=os.path.dirname(init_file),
-        )
+    git = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false"]
+    cwd = os.path.dirname(init_file)
 
     # --branch adds a header line, so an empty answer means git has no answer.
-    status = git("status", "--porcelain", "--branch", "--", init_file)
+    try:
+        status = subprocess.run(
+            [*git, "status", "--porcelain", "--branch", "--", init_file],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+        ).stdout.strip()
+    except OSError:
+        status = ""
     if not status:
         return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
     if "\n" in status:
@@ -73,10 +77,34 @@ def _setup_in_progress(init_file: str) -> bool:
 
     # A checkout also gives a clean file a new mtime, so only count a commit
     # that was made here.
-    committer = git(
-        "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file
-    )
-    return bool(committer) and committer == git("config", "user.email")
+    try:
+        committer = subprocess.run(
+            [
+                *git,
+                "log",
+                "-1",
+                f"--since={int(cutoff)}",
+                "--format=%ce",
+                "--",
+                init_file,
+            ],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+        ).stdout.strip()
+        user_email = subprocess.run(
+            [*git, "config", "user.email"],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+        ).stdout.strip()
+    except OSError:
+        return False
+    return bool(committer) and committer == user_email
 
 
 def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) -> None:
