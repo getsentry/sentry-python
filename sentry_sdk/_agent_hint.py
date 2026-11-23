@@ -157,6 +157,7 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
     logs_on = bool(options["enable_logs"])
     if (
         _coding_agent_hint_shown
+        or sys.version_info < (3, 9)
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
         or options["agent_setup_complete"]
@@ -165,8 +166,7 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
     ):
         return
 
-    # A script's own path is relative on Python 3.8 and older.
-    init_file = os.path.abspath(caller.f_code.co_filename)
+    init_file = caller.f_code.co_filename
     # An installed tool that uses Sentry itself isn't the user's app.
     if _is_external_source(init_file):
         return
