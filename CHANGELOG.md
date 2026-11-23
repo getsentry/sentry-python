@@ -1,5 +1,59 @@
 # Changelog
 
+## 2.76.0
+
+### New Features ✨
+
+- (anthropic) Set gen_ai.usage.output_tokens.reasoning attributes for non-streaming responses by @srothh in [#8329](https://github.com/getsentry/sentry-python/pull/8329)
+
+### Bug Fixes 🐛
+
+- (gql) Scope the event processor to the query by @Mohil-Ahuja in [#8307](https://github.com/getsentry/sentry-python/pull/8307)
+- (scrubber) Match hyphenated header keys against the denylist by @ratomirjovanovic and @sentrivana in [#8305](https://github.com/getsentry/sentry-python/pull/8305)
+- (tracing) Strip whitespace around '=' in incoming baggage items by @arieleven in [#8302](https://github.com/getsentry/sentry-python/pull/8302)
+- Correct function names in deprecation warnings for start/stop_pr… by @AHS0003 in [#8268](https://github.com/getsentry/sentry-python/pull/8268)
+
+### Documentation 📚
+
+- (transport) Fix stale comment referencing `get_retry_after` by @sentry-junior in [#8333](https://github.com/getsentry/sentry-python/pull/8333)
+- Add note about regression tests to AGENTS.md by @sentrivana in [#8324](https://github.com/getsentry/sentry-python/pull/8324)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Update getsentry/craft action to v3.12.2 by @sentrivana with @renovate in [#8317](https://github.com/getsentry/sentry-python/pull/8317)
+- Update github workflows by @sentrivana with @renovate and @sentry-junior in [#8270](https://github.com/getsentry/sentry-python/pull/8270)
+- Lock file maintenance by @renovate in [#8273](https://github.com/getsentry/sentry-python/pull/8273)
+- Update github workflows by @sentrivana with @renovate and @sentry-junior in [#8060](https://github.com/getsentry/sentry-python/pull/8060)
+
+#### Mypy
+
+- Enable possibly-undefined error code by @sentrivana with @sentry-junior in [#8290](https://github.com/getsentry/sentry-python/pull/8290)
+- Enable unused-awaitable error code by @sentrivana with @sentry-junior in [#8281](https://github.com/getsentry/sentry-python/pull/8281)
+
+#### Ruff
+
+- Enable PLC0415 to flag inline imports in the SDK by @sentrivana with @sentry-junior in [#8285](https://github.com/getsentry/sentry-python/pull/8285)
+- Enable RUF100 for unused noqa directives by @sentrivana with @sentry-junior in [#8282](https://github.com/getsentry/sentry-python/pull/8282)
+- Enable PT011 for overly broad pytest.raises() by @sentrivana with @sentry-junior in [#8286](https://github.com/getsentry/sentry-python/pull/8286)
+- Enable T20 to flag print() in the SDK by @sentrivana with @sentry-junior in [#8283](https://github.com/getsentry/sentry-python/pull/8283)
+
+#### Other
+
+- (django) Strictly order cache spans to avoid flakes by @alexander-alderman-webb in [#8266](https://github.com/getsentry/sentry-python/pull/8266)
+- (fastmcp) Remove unused MCP request helpers by @sentry-junior in [#8275](https://github.com/getsentry/sentry-python/pull/8275)
+- (ray) Collect all client spans to avoid flake by @alexander-alderman-webb in [#8314](https://github.com/getsentry/sentry-python/pull/8314)
+- (renovate) Disable Java version updates in setup-java by @sentrivana with @sentry-junior in [#8276](https://github.com/getsentry/sentry-python/pull/8276)
+- (warden) Remove sdk-review skill by @dingsdax with @sentry-junior in [#8337](https://github.com/getsentry/sentry-python/pull/8337)
+- 🤖 Update test matrix with new releases (11/23) by @github-actions in [#8346](https://github.com/getsentry/sentry-python/pull/8346)
+- Run test steps in parallel by @alexander-alderman-webb in [#8313](https://github.com/getsentry/sentry-python/pull/8313)
+- Split Web 1 test group so Django runs on its own by @sentrivana with @sentry-junior in [#8312](https://github.com/getsentry/sentry-python/pull/8312)
+- Add typos spell check by @sentrivana with @sentry-junior in [#8279](https://github.com/getsentry/sentry-python/pull/8279)
+- Fix tests that could not fail by @sentrivana with @sentry-junior in [#8288](https://github.com/getsentry/sentry-python/pull/8288)
+- 🤖 Update test matrix with new releases (11/16) by @sentrivana with @github-actions in [#8274](https://github.com/getsentry/sentry-python/pull/8274)
+- Add file change detection to workflows by @safina57 and @alexander-alderman-webb in [#7524](https://github.com/getsentry/sentry-python/pull/7524)
+
 ## 2.75.0
 
 ### New Features ✨
