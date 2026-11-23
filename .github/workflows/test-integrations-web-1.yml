@@ -54,11 +54,10 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - parallel:
-          - name: Test django
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-django"
+      - name: Test django
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-django"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
