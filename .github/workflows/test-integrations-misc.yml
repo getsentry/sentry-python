@@ -37,31 +37,30 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - parallel:
-          - name: Test loguru
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru"
-          - name: Test otlp
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-otlp"
-          - name: Test pure_eval
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval"
-          - name: Test trytond_wsgi
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond_wsgi"
-          - name: Test typer
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-typer"
-          - name: Test shadowed_module
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-shadowed_module"
+      - name: Test loguru
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru"
+      - name: Test otlp
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-otlp"
+      - name: Test pure_eval
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval"
+      - name: Test trytond_wsgi
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond_wsgi"
+      - name: Test typer
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-typer"
+      - name: Test shadowed_module
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-shadowed_module"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true

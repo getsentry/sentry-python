@@ -37,11 +37,10 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - parallel:
-          - name: Test common
-            run: |
-              set -x # print commands that are executed
-              ./scripts/runtox.sh "py${{ matrix.python-version }}-common"
+      - name: Test common
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-common"
       - name: Upload coverage data
         if: ${{ !cancelled() }}
         continue-on-error: true
