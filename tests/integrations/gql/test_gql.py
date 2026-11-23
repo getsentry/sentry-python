@@ -6,6 +6,7 @@ from gql import Client, __version__, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
+import sentry_sdk
 from sentry_sdk.integrations.gql import GQLIntegration
 from sentry_sdk.utils import parse_version
 
@@ -183,6 +184,7 @@ def test_real_gql_request_with_error_data_collection(
         assert "data" in event["request"]
         assert "query" in event["request"]["data"]
         assert "response" in event["contexts"]
+        assert event["contexts"]["response"]["type"] == "response"
     else:
         assert "data" not in event["request"]
         assert "response" not in event["contexts"]
@@ -290,3 +292,19 @@ def test_transport_url_is_sanitized(
     assert event["request"].get("query_string") == expected_query_string
     assert "password" not in str(event["request"])
     assert "secret" not in str(event["request"])
+
+
+def test_event_processor_does_not_outlive_query(sentry_init, capture_events):
+    """
+    Events captured after a query has finished must not get the query's
+    request data.
+    """
+    sentry_init(integrations=[GQLIntegration()])
+    events = capture_events()
+
+    _execute_mock_query({"data": {"example": "This is the example"}})
+    sentry_sdk.capture_message("unrelated")
+
+    (event,) = events
+    assert "request" not in event
+    assert "response" not in event.get("contexts", {})

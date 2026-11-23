@@ -5082,6 +5082,101 @@ def test_cache_tokens_nonstreaming(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+def test_reasoning_tokens_nonstreaming(
+    sentry_init,
+    capture_items,
+):
+    """Test reasoning (thinking) tokens are tracked for non-streaming responses."""
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
+
+    client = Anthropic(api_key="z")
+
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-opus-4-8",
+            role="assistant",
+            content=[TextBlock(type="text", text="Response")],
+            type="message",
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+                output_tokens_details={"thinking_tokens": 15},
+            ),
+        )
+    )
+    items = capture_items("span")
+
+    client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Hello"}],
+        model="claude-opus-4-8",
+    )
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    # Reasoning tokens are part of output_tokens, so totals are unchanged.
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+@pytest.mark.asyncio
+async def test_reasoning_tokens_nonstreaming_async(
+    sentry_init,
+    capture_items,
+):
+    """Test reasoning (thinking) tokens are tracked for async non-streaming responses."""
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
+
+    client = AsyncAnthropic(api_key="z")
+
+    client.messages._post = AsyncMock(
+        return_value=Message(
+            id="id",
+            model="claude-opus-4-8",
+            role="assistant",
+            content=[TextBlock(type="text", text="Response")],
+            type="message",
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+                output_tokens_details={"thinking_tokens": 15},
+            ),
+        )
+    )
+    items = capture_items("span")
+
+    await client.messages.create(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Hello"}],
+        model="claude-opus-4-8",
+    )
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    # Reasoning tokens are part of output_tokens, so totals are unchanged.
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
+
+
 def test_input_tokens_include_cache_write_nonstreaming(
     sentry_init,
     capture_items,
@@ -5511,3 +5606,136 @@ def test_stream_messages_cache_tokens(
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+def test_reasoning_tokens_streaming(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """Test reasoning (thinking) tokens are tracked for streaming responses."""
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-opus-4-8",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(input_tokens=100, output_tokens=0),
+                    ),
+                ),
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(
+                        output_tokens=50,
+                        output_tokens_details={"thinking_tokens": 15},
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ):
+        for _ in client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-opus-4-8",
+            stream=True,
+        ):
+            pass
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    # Reasoning tokens are part of output_tokens, so totals are unchanged.
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 105),
+    reason="usage.output_tokens_details added in https://github.com/anthropics/anthropic-sdk-python/commit/f18b01414b21b49943a6ba2cdaa30ff7dd6a3025.",
+)
+def test_stream_messages_reasoning_tokens(
+    sentry_init,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """Test reasoning (thinking) tokens are tracked for messages.stream()."""
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-opus-4-8",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(input_tokens=100, output_tokens=0),
+                    ),
+                ),
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(
+                        output_tokens=50,
+                        output_tokens_details={"thinking_tokens": 15},
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+    )
+    items = capture_items("span")
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ), client.messages.stream(
+        max_tokens=1024,
+        messages=[{"role": "user", "content": "Hello"}],
+        model="claude-opus-4-8",
+    ) as stream:
+        for event in stream:
+            pass
+
+    sentry_sdk.flush()
+    (span,) = (item.payload for item in items)
+    # Reasoning tokens are part of output_tokens, so totals are unchanged.
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
