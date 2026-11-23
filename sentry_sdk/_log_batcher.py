@@ -9,6 +9,31 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Log
 
 
+def _without_lone_surrogates(value: str) -> str:
+    """Replace lone surrogates with U+FFFD and keep valid surrogate pairs.
+
+    json.dumps writes a lone surrogate as a hex escape. Relay rejects that
+    escape and drops the whole log container, healthy logs included. Strings
+    that are already valid UTF-8 are left untouched.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return value.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
+    return value
+
+
+def _clean_attribute_value(value: "Any") -> "Any":
+    if isinstance(value, str):
+        return _without_lone_surrogates(value)
+    if isinstance(value, list):
+        return [
+            _without_lone_surrogates(item) if isinstance(item, str) else item
+            for item in value
+        ]
+    return value
+
+
 class LogBatcher(Batcher["Log"]):
     MAX_BEFORE_FLUSH = 100
     MAX_BEFORE_DROP = 1_000
@@ -25,13 +50,19 @@ class LogBatcher(Batcher["Log"]):
         if "sentry.severity_text" not in item["attributes"]:
             item["attributes"]["sentry.severity_text"] = item["severity_text"]
 
+        attributes = {}
+        for key, value in item["attributes"].items():
+            if isinstance(key, str):
+                key = _without_lone_surrogates(key)
+            serialized = serialize_attribute(value)
+            serialized["value"] = _clean_attribute_value(serialized["value"])
+            attributes[key] = serialized
+
         res = {
             "timestamp": int(item["time_unix_nano"]) / 1.0e9,
             "level": str(item["severity_text"]),
-            "body": str(item["body"]),
-            "attributes": {
-                k: serialize_attribute(v) for (k, v) in item["attributes"].items()
-            },
+            "body": _without_lone_surrogates(str(item["body"])),
+            "attributes": attributes,
         }
 
         if item.get("trace_id") is not None:
