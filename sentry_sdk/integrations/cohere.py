@@ -180,6 +180,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             name="cohere.client.Chat",
             attributes={
                 "sentry.op": consts.OP.GEN_AI_CHAT,
+                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
                 "sentry.origin": CohereIntegration.origin,
             },
         )
@@ -274,6 +275,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
             name="Cohere Embedding Creation",
             attributes={
                 "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
+                SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
                 "sentry.origin": CohereIntegration.origin,
             },
         ) as span:
