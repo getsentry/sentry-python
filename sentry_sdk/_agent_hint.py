@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
 
-# Set by coding agents in the commands they run. AI_AGENT is the cross-tool
-# convention; the rest cover agents that don't set it.
 CODING_AGENT_ENV_VARS = (
     "CLAUDECODE",
     "CODEX_THREAD_ID",
@@ -27,7 +25,6 @@ CODING_AGENT_ENV_VARS = (
     "GEMINI_CLI",
 )
 
-# How long after a change to the file that calls init() the setup counts as in progress.
 # Without git we can't tell whose change it is, so the window is shorter.
 SETUP_IN_PROGRESS_SECONDS = 60 * 60
 SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT = 10 * 60
@@ -49,7 +46,6 @@ def _running_under_coding_agent() -> bool:
 
 
 def _setup_in_progress(init_file: str) -> bool:
-    """Whether this user changed the file that calls init() a short time ago."""
     now = time.time()
     cutoff = now - SETUP_IN_PROGRESS_SECONDS
     try:
@@ -60,8 +56,6 @@ def _setup_in_progress(init_file: str) -> bool:
         return False
 
     def git(*args: str) -> "Optional[str]":
-        # Read only: don't take the index lock (the user or an agent may be running
-        # git at the same time) and don't run a configured fsmonitor command.
         return _git(
             "--no-optional-locks",
             "-c",
@@ -149,7 +143,6 @@ def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) ->
 
 
 def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> None:
-    """Point a coding agent at the setup checklist while Sentry is being set up."""
     global _coding_agent_hint_shown
 
     rate = options["traces_sample_rate"]
@@ -167,7 +160,6 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
         return
 
     init_file = caller.f_code.co_filename
-    # An installed tool that uses Sentry itself isn't the user's app.
     if _is_external_source(init_file):
         return
     try:
