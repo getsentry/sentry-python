@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.0.0
+
+New major release of the Python SDK is out now!
+
+This release brings:
+- ✨ Span streaming by default with streamlined API.
+- 🕶️ Fine-grained data collection controls replace the single `send_default_pii` option. 
+- ☁️ Many improvements to our AWS Lambda instrumentation.
+- And more!
+
+**3.0 contains breaking changes.** Looking to migrate?
+- Check out our [migration guide](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x) for the most common migration patterns.
+- Check out the [full list of changes](https://github.com/getsentry/sentry-python/blob/master/MIGRATION_GUIDE.md#sentry-sdk-30-migration-guide).
+
+### Issues? Questions?
+
+Let us know:
+- [GitHub](https://github.com/getsentry/sentry-python/issues)
+- [Discord](https://discord.com/invite/Ww9hbqr)
+
 ## 3.0.0rc1
 
 This is a release candidate of the next Python SDK major, to be released in November 2026.
