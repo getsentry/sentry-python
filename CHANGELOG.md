@@ -1,5 +1,533 @@
 # Changelog
 
+## 3.0.0
+
+### Breaking Changes 🛠
+
+- (asgi) Drop `send_default_pii` support when setting user IP address by @ericapisani in [#7818](https://github.com/getsentry/sentry-python/pull/7818)
+- (client) Remove `EventScrubber` and the `event_scrubber` option by @ericapisani in [#7772](https://github.com/getsentry/sentry-python/pull/7772)
+- (crons) Add `before_send_check_in`, don't run `before_send` on check-ins by @sentrivana in [#8184](https://github.com/getsentry/sentry-python/pull/8184)
+- (data-collection) Drop `send_default_pii` mapping and `provided_by_user` by @ericapisani in [#7883](https://github.com/getsentry/sentry-python/pull/7883)
+- (db) Drop `record_sql_params` experiment and legacy `send_default_pii` fallback by @ericapisani in [#7821](https://github.com/getsentry/sentry-python/pull/7821)
+- (django) Drop `send_default_pii` support in user info collection by @ericapisani in [#7820](https://github.com/getsentry/sentry-python/pull/7820)
+- (gcp) Drop `send_default_pii` support in request data collection by @ericapisani in [#7822](https://github.com/getsentry/sentry-python/pull/7822)
+- (gql) Drop `send_default_pii` support in GraphQL data collection by @ericapisani in [#7823](https://github.com/getsentry/sentry-python/pull/7823)
+- (otlp) Don't set up a propagator by default by @sentrivana with @sentry-junior in [#8201](https://github.com/getsentry/sentry-python/pull/8201)
+- (redis) Drop `send_default_pii` support by @ericapisani in [#7824](https://github.com/getsentry/sentry-python/pull/7824)
+- (starlette,fastapi) Stop eagerly consuming request bodies by @alexander-alderman-webb in [#7487](https://github.com/getsentry/sentry-python/pull/7487)
+- (strawberry) Drop `send_default_pii` support in request data by @ericapisani in [#7869](https://github.com/getsentry/sentry-python/pull/7869)
+- Stop disabling client integrations when an agent integration is present by @alexander-alderman-webb in [#7493](https://github.com/getsentry/sentry-python/pull/7493)
+
+### New Features ✨
+
+#### Aws Lambda
+
+- Add queue.process spans for messaging triggers by @pabloDeputter, @dingsdax and @sentrivana with @sentry-junior in [#8223](https://github.com/getsentry/sentry-python/pull/8223)
+- Detect Lambda triggers by @pabloDeputter and @dingsdax with @sentry-junior in [#8222](https://github.com/getsentry/sentry-python/pull/8222)
+- Link SQS and SNS invocations to their producers by @alexander-alderman-webb and @sentrivana with @sentry-junior in [#8257](https://github.com/getsentry/sentry-python/pull/8257)
+- Continue the trace from Invoke ClientContext by @pabloDeputter and @dingsdax with @sentry-junior in [#8221](https://github.com/getsentry/sentry-python/pull/8221)
+- Add Lambda runtime resource attributes by @pabloDeputter in [#7941](https://github.com/getsentry/sentry-python/pull/7941)
+
+#### Boto3
+
+- Add SQS/SNS trace propagation by @pabloDeputter, @dingsdax and @sentrivana with @sentry-junior in [#8145](https://github.com/getsentry/sentry-python/pull/8145)
+- Add propagate_traces option by @sentrivana with @sentry-junior in [#8244](https://github.com/getsentry/sentry-python/pull/8244)
+- Add SNS extension by @pabloDeputter, @dingsdax and 2 others with @sentry-junior in [#8142](https://github.com/getsentry/sentry-python/pull/8142)
+- Add SQS extension by @pabloDeputter, @dingsdax and 2 others with @sentry-junior in [#8137](https://github.com/getsentry/sentry-python/pull/8137)
+- Add Lambda extension by @pabloDeputter, @sentrivana and @alexander-alderman-webb in [#8117](https://github.com/getsentry/sentry-python/pull/8117)
+- Use `object.*` ops for S3 Object operations by @pabloDeputter in [#8037](https://github.com/getsentry/sentry-python/pull/8037)
+- Add Kinesis extension by @pabloDeputter in [#8048](https://github.com/getsentry/sentry-python/pull/8048)
+- Add Secrets Manager extension by @pabloDeputter in [#8046](https://github.com/getsentry/sentry-python/pull/8046)
+- Add AWS resource identity attributes & service extensions by @pabloDeputter in [#7930](https://github.com/getsentry/sentry-python/pull/7930)
+- Add S3 extension by @pabloDeputter in [#7888](https://github.com/getsentry/sentry-python/pull/7888)
+- Add `cloud.provider` attribute to boto3 spans by @pabloDeputter in [#7884](https://github.com/getsentry/sentry-python/pull/7884)
+- Align span names with OTel conventions by @pabloDeputter in [#7800](https://github.com/getsentry/sentry-python/pull/7800)
+
+#### Other
+
+- (django) Enable cache spans by default by @ericapisani in [#7522](https://github.com/getsentry/sentry-python/pull/7522)
+- (logging) Make Logs the primary feature by @sentrivana in [#7248](https://github.com/getsentry/sentry-python/pull/7248)
+- (loguru) Make Logs the primary feature by @sentrivana in [#7255](https://github.com/getsentry/sentry-python/pull/7255)
+- (mcp) Separate data collection options from GenAI clients by @alexander-alderman-webb in [#7887](https://github.com/getsentry/sentry-python/pull/7887)
+- (tracing) Add span links by @pabloDeputter in [#8068](https://github.com/getsentry/sentry-python/pull/8068)
+
+### Bug Fixes 🐛
+
+#### Redis
+
+- Restore support for redis-py 3.4.1 and redis-py-cluster 2.1 by @sentrivana in [#8168](https://github.com/getsentry/sentry-python/pull/8168)
+- Close spans on exception in `execute_command` by @sentrivana in [#7409](https://github.com/getsentry/sentry-python/pull/7409)
+
+#### Other
+
+- (aws-lambda) Remove messaging.batch.message_count from the Lambda span by @dingsdax with @sentry-junior in [#8229](https://github.com/getsentry/sentry-python/pull/8229)
+- (bedrock) Use non-deprecated token attributes by @alexander-alderman-webb in [#8304](https://github.com/getsentry/sentry-python/pull/8304)
+- (boto3) Remove space from `service_id` and span names by @pabloDeputter in [#7955](https://github.com/getsentry/sentry-python/pull/7955)
+- (bottle) Set transaction name in event processor by @sentrivana in [#7551](https://github.com/getsentry/sentry-python/pull/7551)
+- (celery) Don't set span status to error on control flow exception by @sentrivana in [#7912](https://github.com/getsentry/sentry-python/pull/7912)
+- (client-reports) Emit `callback_error` when a processor raises by @sentrivana in [#8005](https://github.com/getsentry/sentry-python/pull/8005)
+- (dedupe) Track seen exceptions via attribute instead of ContextVar by @ericapisani in [#7533](https://github.com/getsentry/sentry-python/pull/7533)
+- (pymongo) Pop lsid from command by @sentrivana in [#7407](https://github.com/getsentry/sentry-python/pull/7407)
+- (sanic) Remove more non-span-streaming code by @sentrivana in [#7376](https://github.com/getsentry/sentry-python/pull/7376)
+- Align type hints of set_attribute(s) by @alexander-alderman-webb in [#8306](https://github.com/getsentry/sentry-python/pull/8306)
+- Random formatting, comment cleanup by @sentrivana in [#8256](https://github.com/getsentry/sentry-python/pull/8256)
+- Fix exception chains by @sentrivana and @claude in [#7552](https://github.com/getsentry/sentry-python/pull/7552)
+- Integration support fixes by @sentrivana in [#7055](https://github.com/getsentry/sentry-python/pull/7055)
+
+### Documentation 📚
+
+- (migration) Add `send_default_pii` to `data_collection` migration section by @ericapisani and @sentrivana in [#7893](https://github.com/getsentry/sentry-python/pull/7893)
+- Update migration guide with more details by @sentrivana in [#8029](https://github.com/getsentry/sentry-python/pull/8029)
+- Document removal of `include_prompts` and `max_spans` by @alexander-alderman-webb in [#7928](https://github.com/getsentry/sentry-python/pull/7928)
+- More structured migration guide by @sentrivana in [#7915](https://github.com/getsentry/sentry-python/pull/7915)
+- Document `transaction_style` removal by @alexander-alderman-webb in [#7816](https://github.com/getsentry/sentry-python/pull/7816)
+- Add changes to migration guide by @sentrivana in [#6914](https://github.com/getsentry/sentry-python/pull/6914)
+
+### Internal Changes 🔧
+
+#### Aiohttp
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7895](https://github.com/getsentry/sentry-python/pull/7895)
+- Always set route pattern as the segment name by @alexander-alderman-webb in [#7802](https://github.com/getsentry/sentry-python/pull/7802)
+- Drop `send_default_pii` support in tests by @pabloDeputter in [#7711](https://github.com/getsentry/sentry-python/pull/7711)
+- Remove support for `send_default_pii` by @sentrivana in [#7632](https://github.com/getsentry/sentry-python/pull/7632)
+- Remove transaction-based tracing by @sentrivana in [#7365](https://github.com/getsentry/sentry-python/pull/7365)
+
+#### Anthropic
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7904](https://github.com/getsentry/sentry-python/pull/7904)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7738](https://github.com/getsentry/sentry-python/pull/7738)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7635](https://github.com/getsentry/sentry-python/pull/7635)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7372](https://github.com/getsentry/sentry-python/pull/7372)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7350](https://github.com/getsentry/sentry-python/pull/7350)
+
+#### Ariadne
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7905](https://github.com/getsentry/sentry-python/pull/7905)
+- Drop support for `send_default_pii` by @sentrivana in [#7637](https://github.com/getsentry/sentry-python/pull/7637)
+
+#### Arq
+
+- Drop support for `send_default_pii` by @sentrivana in [#7627](https://github.com/getsentry/sentry-python/pull/7627)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7229](https://github.com/getsentry/sentry-python/pull/7229)
+
+#### Asgi
+
+- Drop `send_default_pii` support in `_get_request_attributes` by @ericapisani in [#7769](https://github.com/getsentry/sentry-python/pull/7769)
+- Drop send_default_pii support in \_get_request_data by @ericapisani in [#7768](https://github.com/getsentry/sentry-python/pull/7768)
+- Deduplicate by removing `_get_transaction_name_and_source()` by @alexander-alderman-webb in [#7813](https://github.com/getsentry/sentry-python/pull/7813)
+- Remove `transaction_style` parameter by @alexander-alderman-webb in [#7796](https://github.com/getsentry/sentry-python/pull/7796)
+- Remove transaction-based tracing by @sentrivana in [#7433](https://github.com/getsentry/sentry-python/pull/7433)
+- Remove transaction tests by @sentrivana in [#7316](https://github.com/getsentry/sentry-python/pull/7316)
+
+#### Asyncio
+
+- Close wrapped coroutines in task factory tests by @ericapisani in [#7924](https://github.com/getsentry/sentry-python/pull/7924)
+- Use `data_collection` in tests by @sentrivana in [#7690](https://github.com/getsentry/sentry-python/pull/7690)
+- Drop transactions by @sentrivana in [#7342](https://github.com/getsentry/sentry-python/pull/7342)
+
+#### Aws Lambda
+
+- Clean up aws-lambda by @pabloDeputter in [#7939](https://github.com/getsentry/sentry-python/pull/7939)
+- Refactor aws-lambda integration by @pabloDeputter in [#7938](https://github.com/getsentry/sentry-python/pull/7938)
+- Drop `send_default_pii` support by @pabloDeputter in [#7636](https://github.com/getsentry/sentry-python/pull/7636)
+- Remove transaction-based tracing by @sentrivana in [#7418](https://github.com/getsentry/sentry-python/pull/7418)
+
+#### Boto3
+
+- Remove unused service_id_hyphenized by @sentrivana with @sentry-junior in [#8159](https://github.com/getsentry/sentry-python/pull/8159)
+- Rename span origin to `auto.aws.boto3` by @pabloDeputter in [#8034](https://github.com/getsentry/sentry-python/pull/8034)
+- Use `rpc` as the default span op by @pabloDeputter in [#8035](https://github.com/getsentry/sentry-python/pull/8035)
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7902](https://github.com/getsentry/sentry-python/pull/7902)
+- Drop `send_default_pii` support by @pabloDeputter in [#7684](https://github.com/getsentry/sentry-python/pull/7684)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7315](https://github.com/getsentry/sentry-python/pull/7315)
+
+#### Bottle
+
+- Remove `transaction_style` parameter by @alexander-alderman-webb in [#7803](https://github.com/getsentry/sentry-python/pull/7803)
+- Remove transaction test by @sentrivana in [#7272](https://github.com/getsentry/sentry-python/pull/7272)
+- Remove transaction-based tracing by @sentrivana in [#7187](https://github.com/getsentry/sentry-python/pull/7187)
+
+#### Celery
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7901](https://github.com/getsentry/sentry-python/pull/7901)
+- Remove support for `send_default_pii` by @sentrivana in [#7639](https://github.com/getsentry/sentry-python/pull/7639)
+- Remove transaction-based tracing by @sentrivana in [#7382](https://github.com/getsentry/sentry-python/pull/7382)
+
+#### Cohere
+
+- Replace deprecated ops with `gen_ai.*` ops by @alexander-alderman-webb in [#7956](https://github.com/getsentry/sentry-python/pull/7956)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7748](https://github.com/getsentry/sentry-python/pull/7748)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7681](https://github.com/getsentry/sentry-python/pull/7681)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7423](https://github.com/getsentry/sentry-python/pull/7423)
+
+#### Compat
+
+- Remove always-true PY37 flag and nanosecond_time helper by @sentrivana with @sentry-junior in [#8154](https://github.com/getsentry/sentry-python/pull/8154)
+- Remove unused with_metaclass helper by @sentrivana with @sentry-junior in [#8153](https://github.com/getsentry/sentry-python/pull/8153)
+
+#### Django
+
+- Drop `send_default_pii` by @sentrivana in [#7833](https://github.com/getsentry/sentry-python/pull/7833)
+- Remove `transaction_style` parameter by @alexander-alderman-webb in [#7799](https://github.com/getsentry/sentry-python/pull/7799)
+- Remove transaction-based tracing by @sentrivana in [#7190](https://github.com/getsentry/sentry-python/pull/7190)
+
+#### Dramatiq
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7706](https://github.com/getsentry/sentry-python/pull/7706)
+- Remove transaction-based tracing by @sentrivana in [#7445](https://github.com/getsentry/sentry-python/pull/7445)
+
+#### Falcon
+
+- Remove `transaction_style` parameter by @alexander-alderman-webb in [#7804](https://github.com/getsentry/sentry-python/pull/7804)
+- Drop `send_default_pii` support by @pabloDeputter in [#7695](https://github.com/getsentry/sentry-python/pull/7695)
+- Remove transaction-based tracing by @sentrivana in [#7188](https://github.com/getsentry/sentry-python/pull/7188)
+
+#### Flask
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7896](https://github.com/getsentry/sentry-python/pull/7896)
+- Drop `send_default_pii` support by @pabloDeputter in [#7832](https://github.com/getsentry/sentry-python/pull/7832)
+- Remove `transaction_style` parameter by @alexander-alderman-webb in [#7812](https://github.com/getsentry/sentry-python/pull/7812)
+- Remove transactions by @sentrivana in [#7313](https://github.com/getsentry/sentry-python/pull/7313)
+
+#### Google Genai
+
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7739](https://github.com/getsentry/sentry-python/pull/7739)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7640](https://github.com/getsentry/sentry-python/pull/7640)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7375](https://github.com/getsentry/sentry-python/pull/7375)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7353](https://github.com/getsentry/sentry-python/pull/7353)
+
+#### Graphene
+
+- Drop support for `send_default_pii` by @sentrivana in [#7697](https://github.com/getsentry/sentry-python/pull/7697)
+- Drop transaction-based tracing by @pnagre05 and @sentrivana in [#7221](https://github.com/getsentry/sentry-python/pull/7221)
+
+#### Grpc
+
+- Remove transaction-based tracing by @sentrivana in [#7431](https://github.com/getsentry/sentry-python/pull/7431)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7234](https://github.com/getsentry/sentry-python/pull/7234)
+
+#### Httpx
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7898](https://github.com/getsentry/sentry-python/pull/7898)
+- Remove support for `send_default_pii` by @sentrivana in [#7819](https://github.com/getsentry/sentry-python/pull/7819)
+- Remove transaction-based tracing by @sentrivana in [#7356](https://github.com/getsentry/sentry-python/pull/7356)
+
+#### Httpx2
+
+- Drop `send_default_pii` support by @sentrivana in [#7830](https://github.com/getsentry/sentry-python/pull/7830)
+- Remove transaction-based tracing by @sentrivana in [#7357](https://github.com/getsentry/sentry-python/pull/7357)
+
+#### Huey
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7728](https://github.com/getsentry/sentry-python/pull/7728)
+- Drop transaction based tracing by @pnagre05 in [#7243](https://github.com/getsentry/sentry-python/pull/7243)
+
+#### Huggingface Hub
+
+- Drop support for < 2.0 by @alexander-alderman-webb in [#7874](https://github.com/getsentry/sentry-python/pull/7874)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7744](https://github.com/getsentry/sentry-python/pull/7744)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7682](https://github.com/getsentry/sentry-python/pull/7682)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7439](https://github.com/getsentry/sentry-python/pull/7439)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7358](https://github.com/getsentry/sentry-python/pull/7358)
+
+#### Langchain
+
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7741](https://github.com/getsentry/sentry-python/pull/7741)
+- Stop setting `gen_ai.response.streaming` on Invoke Agent spans by @alexander-alderman-webb in [#7521](https://github.com/getsentry/sentry-python/pull/7521)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7688](https://github.com/getsentry/sentry-python/pull/7688)
+- Stop setting `gen_ai.tool.definitions` on Invoke Agent spans by @alexander-alderman-webb in [#7517](https://github.com/getsentry/sentry-python/pull/7517)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7410](https://github.com/getsentry/sentry-python/pull/7410)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7359](https://github.com/getsentry/sentry-python/pull/7359)
+
+#### Langgraph
+
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7742](https://github.com/getsentry/sentry-python/pull/7742)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7689](https://github.com/getsentry/sentry-python/pull/7689)
+- Stop setting tokens on Invoke Agent spans by @alexander-alderman-webb in [#7514](https://github.com/getsentry/sentry-python/pull/7514)
+- Stop setting `gen_ai.response.model` on Invoke Agent spans by @alexander-alderman-webb in [#7512](https://github.com/getsentry/sentry-python/pull/7512)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7391](https://github.com/getsentry/sentry-python/pull/7391)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7360](https://github.com/getsentry/sentry-python/pull/7360)
+
+#### Litellm
+
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7740](https://github.com/getsentry/sentry-python/pull/7740)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7679](https://github.com/getsentry/sentry-python/pull/7679)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7379](https://github.com/getsentry/sentry-python/pull/7379)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7354](https://github.com/getsentry/sentry-python/pull/7354)
+
+#### Litestar
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7732](https://github.com/getsentry/sentry-python/pull/7732)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7310](https://github.com/getsentry/sentry-python/pull/7310)
+
+#### Mcp
+
+- Stop setting `mcp.tool.result.content_count` by @alexander-alderman-webb in [#7911](https://github.com/getsentry/sentry-python/pull/7911)
+- Replace deprecated `mcp.prompt.name` with `gen_ai.prompt.name` by @alexander-alderman-webb in [#7865](https://github.com/getsentry/sentry-python/pull/7865)
+- Replace deprecated `mcp.tool.result.content` with `gen_ai.tool.call.result` by @alexander-alderman-webb in [#7864](https://github.com/getsentry/sentry-python/pull/7864)
+- Replace deprecated `mcp.tool.name` with `gen_ai.tool.name` by @alexander-alderman-webb in [#7863](https://github.com/getsentry/sentry-python/pull/7863)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7747](https://github.com/getsentry/sentry-python/pull/7747)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7680](https://github.com/getsentry/sentry-python/pull/7680)
+- Drop support for < 2.0 by @alexander-alderman-webb in [#7508](https://github.com/getsentry/sentry-python/pull/7508)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7408](https://github.com/getsentry/sentry-python/pull/7408)
+
+#### Openai
+
+- Set chat instead of responses for `gen_ai.operation.name` by @alexander-alderman-webb in [#7927](https://github.com/getsentry/sentry-python/pull/7927)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7733](https://github.com/getsentry/sentry-python/pull/7733)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7626](https://github.com/getsentry/sentry-python/pull/7626)
+- Replace deprecated `gen_ai.response.time_to_first_token` with `gen_ai.response.time_to_first_chunk` by @alexander-alderman-webb in [#7472](https://github.com/getsentry/sentry-python/pull/7472)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7366](https://github.com/getsentry/sentry-python/pull/7366)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7352](https://github.com/getsentry/sentry-python/pull/7352)
+
+#### Openai Agents
+
+- Only set request parameters on AI Client spans by @alexander-alderman-webb in [#7858](https://github.com/getsentry/sentry-python/pull/7858)
+- Only set `gen_ai.request.model` on AI Client spans by @alexander-alderman-webb in [#7859](https://github.com/getsentry/sentry-python/pull/7859)
+- Only set `gen_ai.provider.name` on AI Client spans by @alexander-alderman-webb in [#7691](https://github.com/getsentry/sentry-python/pull/7691)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7743](https://github.com/getsentry/sentry-python/pull/7743)
+- Remove handoff spans by @alexander-alderman-webb in [#7564](https://github.com/getsentry/sentry-python/pull/7564)
+- Remove workflow spans by @alexander-alderman-webb in [#7563](https://github.com/getsentry/sentry-python/pull/7563)
+- Stop setting tokens on Invoke Agent spans by @alexander-alderman-webb in [#7515](https://github.com/getsentry/sentry-python/pull/7515)
+- Drop support for < 0.10.3 by @alexander-alderman-webb in [#7488](https://github.com/getsentry/sentry-python/pull/7488)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7425](https://github.com/getsentry/sentry-python/pull/7425)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7362](https://github.com/getsentry/sentry-python/pull/7362)
+
+#### Pydantic Ai
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7899](https://github.com/getsentry/sentry-python/pull/7899)
+- Stop setting request parameters on Invoke Agent spans by @alexander-alderman-webb in [#7855](https://github.com/getsentry/sentry-python/pull/7855)
+- Stop setting `gen_ai.request.model` on Invoke Agent spans by @alexander-alderman-webb in [#7856](https://github.com/getsentry/sentry-python/pull/7856)
+- Step setting `gen_ai.provider.name` on Invoke Agent spans by @alexander-alderman-webb in [#7854](https://github.com/getsentry/sentry-python/pull/7854)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7746](https://github.com/getsentry/sentry-python/pull/7746)
+- Remove `include_prompts` parameter by @alexander-alderman-webb in [#7685](https://github.com/getsentry/sentry-python/pull/7685)
+- Stop setting `gen_ai.request.available_tools` on Invoke Agent spans by @alexander-alderman-webb in [#7520](https://github.com/getsentry/sentry-python/pull/7520)
+- Stop setting `gen_ai.response.model` on Invoke Agent spans by @alexander-alderman-webb in [#7513](https://github.com/getsentry/sentry-python/pull/7513)
+- Use `hooks.on.run()` by @alexander-alderman-webb in [#7451](https://github.com/getsentry/sentry-python/pull/7451)
+- Use tool hooks by @alexander-alderman-webb in [#7447](https://github.com/getsentry/sentry-python/pull/7447)
+- Drop support for < 1.76 by @alexander-alderman-webb in [#7446](https://github.com/getsentry/sentry-python/pull/7446)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7390](https://github.com/getsentry/sentry-python/pull/7390)
+- Drop support for `stream_gen_ai_spans` by @alexander-alderman-webb in [#7361](https://github.com/getsentry/sentry-python/pull/7361)
+
+#### Pymongo
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7714](https://github.com/getsentry/sentry-python/pull/7714)
+- Remove transaction-based tracing by @sentrivana in [#7378](https://github.com/getsentry/sentry-python/pull/7378)
+
+#### Pyramid
+
+- Remove `transaction_style` parameter by @alexander-alderman-webb in [#7807](https://github.com/getsentry/sentry-python/pull/7807)
+- Drop `send_default_pii` support by @pabloDeputter in [#7693](https://github.com/getsentry/sentry-python/pull/7693)
+- Remove transaction test by @sentrivana in [#7312](https://github.com/getsentry/sentry-python/pull/7312)
+- Remove transaction-based tracing by @sentrivana in [#7189](https://github.com/getsentry/sentry-python/pull/7189)
+- Drop < 2.0 by @sentrivana in [#7049](https://github.com/getsentry/sentry-python/pull/7049)
+
+#### Pyreqwest
+
+- Drop `send_default_pii` support in tests by @pabloDeputter in [#7712](https://github.com/getsentry/sentry-python/pull/7712)
+- Drop support for `send_default_pii` by @sentrivana in [#7698](https://github.com/getsentry/sentry-python/pull/7698)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7309](https://github.com/getsentry/sentry-python/pull/7309)
+
+#### Quart
+
+- Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7900](https://github.com/getsentry/sentry-python/pull/7900)
+- Remove `transaction_style` parameter by @alexander-alderman-webb in [#7805](https://github.com/getsentry/sentry-python/pull/7805)
+- Drop `send_default_pii` support by @ericapisani in [#7736](https://github.com/getsentry/sentry-python/pull/7736)
+- Remove transaction-based tracing by @sentrivana in [#7370](https://github.com/getsentry/sentry-python/pull/7370)
+- Drop support for <0.19 by @sentrivana in [#7048](https://github.com/getsentry/sentry-python/pull/7048)
+
+#### Redis
+
+- Remove send_default_pii by @sentrivana in [#7879](https://github.com/getsentry/sentry-python/pull/7879)
+- Remove transaction-based tracing by @sentrivana in [#7368](https://github.com/getsentry/sentry-python/pull/7368)
+- Drop support for < 4.2 by @sentrivana in [#7058](https://github.com/getsentry/sentry-python/pull/7058)
+
+#### Rq
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7729](https://github.com/getsentry/sentry-python/pull/7729)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7230](https://github.com/getsentry/sentry-python/pull/7230)
+- Drop support for < 1.0 by @sentrivana in [#7047](https://github.com/getsentry/sentry-python/pull/7047)
+
+#### Rust Tracing
+
+- Drop `send_default_pii` support by @sentrivana in [#7835](https://github.com/getsentry/sentry-python/pull/7835)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7307](https://github.com/getsentry/sentry-python/pull/7307)
+
+#### Sanic
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7703](https://github.com/getsentry/sentry-python/pull/7703)
+- Remove transaction-based tracing by @sentrivana in [#7369](https://github.com/getsentry/sentry-python/pull/7369)
+- Drop < 22 by @sentrivana in [#7045](https://github.com/getsentry/sentry-python/pull/7045)
+
+#### Starlette
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7713](https://github.com/getsentry/sentry-python/pull/7713)
+- Drop transactions by @sentrivana in [#7339](https://github.com/getsentry/sentry-python/pull/7339)
+
+#### Starlite
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7731](https://github.com/getsentry/sentry-python/pull/7731)
+- Remove transaction-based tracing by @sentrivana in [#7367](https://github.com/getsentry/sentry-python/pull/7367)
+
+#### Stdlib
+
+- Drop support for `send_default_pii` by @sentrivana in [#7699](https://github.com/getsentry/sentry-python/pull/7699)
+- Remove transaction-based tracing by @alexander-alderman-webb in [#7231](https://github.com/getsentry/sentry-python/pull/7231)
+
+#### Strawberry
+
+- Remove more send_default_pii by @sentrivana and @alexander-alderman-webb in [#7886](https://github.com/getsentry/sentry-python/pull/7886)
+- Remove transaction-based tracing by @sentrivana in [#7166](https://github.com/getsentry/sentry-python/pull/7166)
+- Remove guard by @sentrivana in [#7057](https://github.com/getsentry/sentry-python/pull/7057)
+- Take out of auto-enabling integrations by @sentrivana in [#6928](https://github.com/getsentry/sentry-python/pull/6928)
+
+#### Tests
+
+- Drop legacy test cases from `tests/integrations/utils.py` by @pabloDeputter in [#7831](https://github.com/getsentry/sentry-python/pull/7831)
+- Drop `send_default_pii` parametrization. by @pabloDeputter in [#7696](https://github.com/getsentry/sentry-python/pull/7696)
+
+#### Tornado
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7705](https://github.com/getsentry/sentry-python/pull/7705)
+- Remove transaction-based tracing by @sentrivana in [#7171](https://github.com/getsentry/sentry-python/pull/7171)
+- Remove unused compat code by @sentrivana in [#7043](https://github.com/getsentry/sentry-python/pull/7043)
+
+#### Tracing
+
+- Remove unused get_url_attributes_legacy by @sentrivana with @sentry-junior in [#8156](https://github.com/getsentry/sentry-python/pull/8156)
+- Remove unused \_get_usage_attributes by @sentrivana with @sentry-junior in [#8157](https://github.com/getsentry/sentry-python/pull/8157)
+
+#### Typesafe
+
+- Use `decide` in place of `evaluate` by @alexander-alderman-webb in [#7968](https://github.com/getsentry/sentry-python/pull/7968)
+- Drop `send_default_pii` support by @alexander-alderman-webb in [#7754](https://github.com/getsentry/sentry-python/pull/7754)
+
+#### Wsgi
+
+- Drop `send_default_pii` support by @pabloDeputter in [#7834](https://github.com/getsentry/sentry-python/pull/7834)
+- Drop `send_default_pii` support in `RequestExtractor` by @ericapisani in [#7766](https://github.com/getsentry/sentry-python/pull/7766)
+- Drop transaction-based tracing from WSGI by @sentrivana in [#7269](https://github.com/getsentry/sentry-python/pull/7269)
+
+#### Other
+
+- (aiomysql) Remove transaction-based tracing by @sentrivana in [#7191](https://github.com/getsentry/sentry-python/pull/7191)
+- (asgi, asyncio, aws_lambda) Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7906](https://github.com/getsentry/sentry-python/pull/7906)
+- (asyncpg) Remove transaction-based tracing by @sentrivana in [#7192](https://github.com/getsentry/sentry-python/pull/7192)
+- (aws,gcp) Change timeout message by @sentrivana in [#7256](https://github.com/getsentry/sentry-python/pull/7256)
+- (chalice) Remove transaction-based tracing by @sentrivana in [#7411](https://github.com/getsentry/sentry-python/pull/7411)
+- (clickhouse) Drop support for `send_default_pii` by @sentrivana in [#7683](https://github.com/getsentry/sentry-python/pull/7683)
+- (clickhouse_driver) Remove transaction-based tracing by @alexander-alderman-webb in [#7440](https://github.com/getsentry/sentry-python/pull/7440)
+- (clickhouse-driver, cohere, falcon, fastapi, fastmcp) Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7907](https://github.com/getsentry/sentry-python/pull/7907)
+- (data-collection) Remove redundant empty `data_collection` from sentry_init by @ericapisani in [#7903](https://github.com/getsentry/sentry-python/pull/7903)
+- (fastapi) Drop transactions by @sentrivana in [#7337](https://github.com/getsentry/sentry-python/pull/7337)
+- (flags) Remove transaction-based tracing from feature flags by @sentrivana in [#7435](https://github.com/getsentry/sentry-python/pull/7435)
+- (gcp) Remove transaction-based tracing by @sentrivana in [#7414](https://github.com/getsentry/sentry-python/pull/7414)
+- (integrations) Drop legacy send_default_pii header filtering in \_filter_headers by @ericapisani in [#7737](https://github.com/getsentry/sentry-python/pull/7737)
+- (langgraph, litellm, litestar, mcp, openai, openai_agents, pyramid, requests, rq, starlette, starlite, stdlib, strawberry, wsgi) Remove redundant empty `data_collection` from sentry_init by @ericapisani and @pabloDeputter in [#7908](https://github.com/getsentry/sentry-python/pull/7908)
+- (launchdarkly) Remove \__init__ from integration by @sentrivana in [#7041](https://github.com/getsentry/sentry-python/pull/7041)
+- (mistral) Drop `send_default_pii` support by @alexander-alderman-webb in [#7749](https://github.com/getsentry/sentry-python/pull/7749)
+- (pure_eval) Use data_collection in test by @sentrivana in [#7687](https://github.com/getsentry/sentry-python/pull/7687)
+- (ray) Remove transaction-based tracing by @alexander-alderman-webb in [#7308](https://github.com/getsentry/sentry-python/pull/7308)
+- (rq,arq,pyreqwest) Run blocks gated by `has_span_streaming_enabled()` unconditionally by @alexander-alderman-webb in [#7443](https://github.com/getsentry/sentry-python/pull/7443)
+- (scope) Remove unused \_ScopeManager by @sentrivana with @sentry-junior in [#8155](https://github.com/getsentry/sentry-python/pull/8155)
+- (socket) Remove transaction-based tracing by @sentrivana in [#7377](https://github.com/getsentry/sentry-python/pull/7377)
+- (sqlalchemy) Drop transaction-based tracing by @sentrivana in [#7199](https://github.com/getsentry/sentry-python/pull/7199)
+- (trytond) Adapt test to span streaming by @sentrivana in [#7270](https://github.com/getsentry/sentry-python/pull/7270)
+- Run lenient mypy on tests by @sentrivana in [#8316](https://github.com/getsentry/sentry-python/pull/8316)
+- Remove helpers left over from EventScrubber removal by @sentry-junior in [#8158](https://github.com/getsentry/sentry-python/pull/8158)
+- Allow trace_lifecycle as init option by @sentrivana in [#8111](https://github.com/getsentry/sentry-python/pull/8111)
+- Replace deprecated `db.redis` op with `db.query` by @alexander-alderman-webb in [#7967](https://github.com/getsentry/sentry-python/pull/7967)
+- Replace deprecated `gen_ai.responses` op with `gen_ai.chat` by @alexander-alderman-webb in [#7963](https://github.com/getsentry/sentry-python/pull/7963)
+- Replace framework-specific queue ops by @alexander-alderman-webb in [#7959](https://github.com/getsentry/sentry-python/pull/7959)
+- Replace framework-specific middleware ops by @alexander-alderman-webb in [#7958](https://github.com/getsentry/sentry-python/pull/7958)
+- Replace deprecated `event.django` op with `function` by @alexander-alderman-webb in [#7960](https://github.com/getsentry/sentry-python/pull/7960)
+- Replace deprecated `view.response.render` op with `view.render` by @alexander-alderman-webb in [#7962](https://github.com/getsentry/sentry-python/pull/7962)
+- Replace deprecated `view.authenticate` op with `view` by @alexander-alderman-webb in [#7961](https://github.com/getsentry/sentry-python/pull/7961)
+- Remove `pytest.mark.forked` from some tests in tests_basics by @ericapisani in [#7917](https://github.com/getsentry/sentry-python/pull/7917)
+- Remove `ai.monitoring.record_token_usage()` by @alexander-alderman-webb in [#7553](https://github.com/getsentry/sentry-python/pull/7553)
+- Remove `send_default_pii` option by @sentrivana in [#7909](https://github.com/getsentry/sentry-python/pull/7909)
+- Remove `send_default_pii` from non-integration tests by @sentrivana in [#7885](https://github.com/getsentry/sentry-python/pull/7885)
+- Remove unused fixtures by @sentrivana in [#7881](https://github.com/getsentry/sentry-python/pull/7881)
+- Drop `client_options` arg from `event_from_exception` by @sentrivana in [#7877](https://github.com/getsentry/sentry-python/pull/7877)
+- Remove `include_local_variables`, `include_source_context` by @sentrivana in [#7867](https://github.com/getsentry/sentry-python/pull/7867)
+- Remove `data_collection` from `_experiments` by @sentrivana in [#7866](https://github.com/getsentry/sentry-python/pull/7866)
+- Replace deprecated `gen_ai.tool.output` with `gen_ai.tool.call.result` by @alexander-alderman-webb in [#7861](https://github.com/getsentry/sentry-python/pull/7861)
+- Replace deprecated `gen_ai.tool.input` with `gen_ai.tool.call.arguments` by @alexander-alderman-webb in [#7860](https://github.com/getsentry/sentry-python/pull/7860)
+- Remove send_default_pii from requests tests by @sentrivana in [#7837](https://github.com/getsentry/sentry-python/pull/7837)
+- Remove `SOURCE_FOR_STYLE` dictionary by @alexander-alderman-webb in [#7817](https://github.com/getsentry/sentry-python/pull/7817)
+- Simplify by @sentrivana in [#7809](https://github.com/getsentry/sentry-python/pull/7809)
+- Store headers as lists by @sentrivana in [#7808](https://github.com/getsentry/sentry-python/pull/7808)
+- Use top-level API throughout the SDK by @sentrivana in [#7578](https://github.com/getsentry/sentry-python/pull/7578)
+- Use `SegmentSourceName` instead of `TransactionSource` by @sentrivana in [#7516](https://github.com/getsentry/sentry-python/pull/7516)
+- More transaction cleanup, drop "streamed" from names by @sentrivana in [#7509](https://github.com/getsentry/sentry-python/pull/7509)
+- Remove more old transaction stuff by @sentrivana in [#7492](https://github.com/getsentry/sentry-python/pull/7492)
+- Set the default of `attach_stacktrace` to `True` by @sentrivana in [#7491](https://github.com/getsentry/sentry-python/pull/7491)
+- Drop set_data by @sentrivana in [#7501](https://github.com/getsentry/sentry-python/pull/7501)
+- Remove `Scope._gen_ai_original_message_count` by @alexander-alderman-webb in [#7489](https://github.com/getsentry/sentry-python/pull/7489)
+- Remove `trace_lifecycle` by @sentrivana in [#7496](https://github.com/getsentry/sentry-python/pull/7496)
+- Remove transaction-based tracing by @sentrivana in [#7468](https://github.com/getsentry/sentry-python/pull/7468)
+- Replace deprecated token attributes by @alexander-alderman-webb in [#7471](https://github.com/getsentry/sentry-python/pull/7471)
+- Migrate even more tests by @sentrivana in [#7482](https://github.com/getsentry/sentry-python/pull/7482)
+- Drop more dual tracing helpers by @sentrivana in [#7480](https://github.com/getsentry/sentry-python/pull/7480)
+- Drop dual tracing helpers by @sentrivana in [#7479](https://github.com/getsentry/sentry-python/pull/7479)
+- Replace deprecated `gen_ai.system` with `gen_ai.provider.name` by @alexander-alderman-webb in [#7464](https://github.com/getsentry/sentry-python/pull/7464)
+- Make all tests use span streaming by @sentrivana in [#7466](https://github.com/getsentry/sentry-python/pull/7466)
+- Adapt `conversation_id` tests by @sentrivana in [#7465](https://github.com/getsentry/sentry-python/pull/7465)
+- Adapt even more tests by @sentrivana in [#7462](https://github.com/getsentry/sentry-python/pull/7462)
+- Remove `_ai_pipeline_name` context variable by @alexander-alderman-webb in [#7458](https://github.com/getsentry/sentry-python/pull/7458)
+- Adapt more tests by @sentrivana in [#7459](https://github.com/getsentry/sentry-python/pull/7459)
+- Remove trace template, trace_ignore_status_codes by @sentrivana in [#7457](https://github.com/getsentry/sentry-python/pull/7457)
+- Adapt more tests (3) by @sentrivana in [#7456](https://github.com/getsentry/sentry-python/pull/7456)
+- Adapt more tests (2) by @sentrivana in [#7455](https://github.com/getsentry/sentry-python/pull/7455)
+- Adapt more tests by @sentrivana in [#7454](https://github.com/getsentry/sentry-python/pull/7454)
+- Remove unnecessary `None` checks by @sentrivana and @alexander-alderman-webb in [#7449](https://github.com/getsentry/sentry-python/pull/7449)
+- Remove GenAI input truncation functions by @alexander-alderman-webb in [#7442](https://github.com/getsentry/sentry-python/pull/7442)
+- Remove `get_start_span_function()` by @alexander-alderman-webb in [#7441](https://github.com/getsentry/sentry-python/pull/7441)
+- Run tracing tests in stream mode by @sentrivana in [#7345](https://github.com/getsentry/sentry-python/pull/7345)
+- Adapt threading tests to span streaming by @sentrivana in [#7349](https://github.com/getsentry/sentry-python/pull/7349)
+- Remove more transaction tests by @sentrivana in [#7314](https://github.com/getsentry/sentry-python/pull/7314)
+- Remove outdated experimental options by @sentrivana in [#7257](https://github.com/getsentry/sentry-python/pull/7257)
+- Unify warnings (`warnings.warn` for deprecations, `logging.warning` for everything else) by @sentrivana in [#7268](https://github.com/getsentry/sentry-python/pull/7268)
+- Drop more deprecated stuff by @sentrivana in [#7263](https://github.com/getsentry/sentry-python/pull/7263)
+- Drop tags auto-set by the SDK by @sentrivana in [#7261](https://github.com/getsentry/sentry-python/pull/7261)
+- Remove `update_current_span` by @sentrivana in [#7262](https://github.com/getsentry/sentry-python/pull/7262)
+- Drop `enable_logs`, `enable_metrics` options in new major by @sentrivana in [#7178](https://github.com/getsentry/sentry-python/pull/7178)
+- Clean up tests by @sentrivana in [#7063](https://github.com/getsentry/sentry-python/pull/7063)
+- Clean up profiler interface by @sentrivana in [#7062](https://github.com/getsentry/sentry-python/pull/7062)
+- Remove `ai_track` decorator by @sentrivana in [#7061](https://github.com/getsentry/sentry-python/pull/7061)
+- Drop Starlette < 0.20, fastapi < 0.85 by @sentrivana in [#7044](https://github.com/getsentry/sentry-python/pull/7044)
+- Drop trytond < 5.4 by @sentrivana in [#7042](https://github.com/getsentry/sentry-python/pull/7042)
+- Drop Chalice < 1.22 by @sentrivana in [#7009](https://github.com/getsentry/sentry-python/pull/7009)
+- Drop aiohttp < 3.7 by @sentrivana in [#7007](https://github.com/getsentry/sentry-python/pull/7007)
+- Drop Falcon < 3.0 by @sentrivana in [#7004](https://github.com/getsentry/sentry-python/pull/7004)
+- Drop Flask < 2 by @sentrivana in [#7002](https://github.com/getsentry/sentry-python/pull/7002)
+- Drop SQLAlchemy < 1.4 by @sentrivana in [#7003](https://github.com/getsentry/sentry-python/pull/7003)
+- Enforce minimum version in integrations by @sentrivana in [#7015](https://github.com/getsentry/sentry-python/pull/7015)
+- Drop Celery < 5.0 by @sentrivana in [#7001](https://github.com/getsentry/sentry-python/pull/7001)
+- Drop support for Django <2.0 in new major by @sentrivana in [#6969](https://github.com/getsentry/sentry-python/pull/6969)
+- Remove contextvars compatibility code in new major by @sentrivana in [#6918](https://github.com/getsentry/sentry-python/pull/6918)
+- Drop 3.6 in new major by @sentrivana in [#6904](https://github.com/getsentry/sentry-python/pull/6904)
+- Remove Spotlight Django integration in new major by @sentrivana in [#6968](https://github.com/getsentry/sentry-python/pull/6968)
+- Slim down extras in new major by @sentrivana in [#6942](https://github.com/getsentry/sentry-python/pull/6942)
+- Drop support for legacy `failed_request_status_codes` format in new major by @sentrivana in [#6948](https://github.com/getsentry/sentry-python/pull/6948)
+- Remove `propagate_traces` in new major by @sentrivana in [#6945](https://github.com/getsentry/sentry-python/pull/6945)
+- Remove `enable_tracing` in new major by @sentrivana in [#6943](https://github.com/getsentry/sentry-python/pull/6943)
+- Remove `push_scope`, `configure_scope` in new major by @sentrivana in [#6944](https://github.com/getsentry/sentry-python/pull/6944)
+- Remove deprecated `set_measurement` in new major by @sentrivana in [#6941](https://github.com/getsentry/sentry-python/pull/6941)
+- Remove old OTel support code by @sentrivana in [#6935](https://github.com/getsentry/sentry-python/pull/6935)
+- Remove experimental potel integration by @sentrivana in [#6931](https://github.com/getsentry/sentry-python/pull/6931)
+- Remove transaction profiler in new major by @sentrivana in [#6921](https://github.com/getsentry/sentry-python/pull/6921)
+- Drop hub related code in new major by @sentrivana in [#6919](https://github.com/getsentry/sentry-python/pull/6919)
+
+### Other
+
+- Revert "ci: Run test steps in parallel (#8313)" by @alexander-alderman-webb in [#8338](https://github.com/getsentry/sentry-python/pull/8338)
+- Next Python SDK major by @sentrivana, @alexander-alderman-webb and 3 others in [#5005](https://github.com/getsentry/sentry-python/pull/5005)
+- # feat(boto3): Add Step Functions extension by @pabloDeputter in [#8047](https://github.com/getsentry/sentry-python/pull/8047)
+- Drop events, breadcrumbs after faulty callbacks by @sentrivana in [#7707](https://github.com/getsentry/sentry-python/pull/7707)
+- Fix CI on `major/3.0` by @sentrivana in [#7169](https://github.com/getsentry/sentry-python/pull/7169)
+
 ## 3.0.0rc1
 
 This is a release candidate of the next Python SDK major, to be released in November 2026.
