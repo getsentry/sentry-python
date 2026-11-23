@@ -72,19 +72,27 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         return True
 
     def add(self, item: "Metric") -> None:
-        if not self._ensure_thread():
+        # Bail out if the current thread is already executing batcher code.
+        if getattr(self._active, "flag", False):
             return None
 
-        queue = self._queue
-        if len(queue) >= self.MAX_BEFORE_DROP:
-            self._record_lost(item)
-            return None
+        self._active.flag = True
+        try:
+            if not self._ensure_thread():
+                return None
 
-        queue.append(item)
-        if len(queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
-            return
+            queue = self._queue
+            if len(queue) >= self.MAX_BEFORE_DROP:
+                self._record_lost(item)
+                return None
 
-        self._flush_event.set()
+            queue.append(item)
+            if len(queue) < self.MAX_BEFORE_FLUSH or self._flush_event.is_set():
+                return
+
+            self._flush_event.set()
+        finally:
+            self._active.flag = False
 
     def _flush(self) -> "Optional[Envelope]":
         queue = self._queue
