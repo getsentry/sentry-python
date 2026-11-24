@@ -96,6 +96,12 @@ def _setup_in_progress(init_file: str) -> bool:
             encoding="utf-8",
             timeout=0.25,
         ).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if not committer:
+        return False
+
+    try:
         user_email = subprocess.run(
             [*git, "config", "user.email"],
             cwd=cwd,
@@ -107,7 +113,7 @@ def _setup_in_progress(init_file: str) -> bool:
         ).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         return False
-    return bool(committer) and committer == user_email
+    return committer == user_email
 
 
 def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) -> None:
