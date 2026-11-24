@@ -137,8 +137,6 @@ def _write_coding_agent_hint(
                 f"in the sentry-sdk package you installed: {SETUP_CHECKLIST_PATH}"
             )
         else:
-            # Say what Sentry won't show, not which settings are off. An agent that
-            # sees the setting names doesn't open the checklist.
             hint = (
                 f"{not_shown} The checklist shows what to change. If you're setting up "
                 "Sentry, it is strongly recommended to check your setup against Sentry's "
