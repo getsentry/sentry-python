@@ -19,13 +19,10 @@ def run_app(tmp_path, monkeypatch, capsys):
     """Run a script that calls sentry_sdk.init() and return what the SDK prints at exit."""
     for name in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(sentry_sdk._agent_hint, "_coding_agent_hint_shown", False)
+    monkeypatch.setattr(sentry_sdk._agent_hint, "_hint_at_exit", None)
+    monkeypatch.setattr(sentry_sdk._agent_hint, "_exit_hook_registered", False)
     at_exit = []
-    monkeypatch.setattr(
-        sentry_sdk._agent_hint.atexit,
-        "register",
-        lambda hook, *args: at_exit.append((hook, args)),
-    )
+    monkeypatch.setattr(sentry_sdk._agent_hint.atexit, "register", at_exit.append)
     app = tmp_path / "app.py"
 
     def run(
@@ -40,9 +37,8 @@ def run_app(tmp_path, monkeypatch, capsys):
 
         try:
             exec(compile(app.read_text(), filename or str(app), "exec"), {})
-            for hook, args in at_exit:
-                if hook is sentry_sdk._agent_hint._write_coding_agent_hint:
-                    hook(*args)
+            for hook in at_exit:
+                hook()
         finally:
             sentry_sdk.get_client().close()
         return capsys.readouterr().err
@@ -251,6 +247,24 @@ def test_coding_agent_hint_when_git_does_not_answer_in_time(run_app, monkeypatch
 
     # The file counts as changed without git: it was written a moment ago.
     assert SETUP_CHECKLIST_PATH in run_app({"CLAUDECODE": "1"})
+
+
+def test_coding_agent_hint_exit_hook_is_registered_before_the_client(
+    run_app, monkeypatch
+):
+    registered_first = []
+    real_client = sentry_sdk.Client
+
+    def client(*args, **kwargs):
+        registered_first.append(sentry_sdk._agent_hint._exit_hook_registered)
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr(sentry_sdk, "Client", client)
+    run_app({"CLAUDECODE": "1"})
+
+    # The client's own exit hook is registered when the client is made, and exit hooks
+    # run last-in first-out, so the hint prints after the client's exit output.
+    assert registered_first == [True]
 
 
 def test_setup_checklist_ships_with_the_package():
