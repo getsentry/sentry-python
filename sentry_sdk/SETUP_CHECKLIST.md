@@ -46,4 +46,4 @@ Do the Required and Recommended items first. Then look at the ones below. Set th
 
 Tell the user what you set up, the trace sample rate you chose for each environment, whether logs are on, and which situational items you included and why.
 
-Then set `agent_setup_complete=True` in `sentry_sdk.init`. That tells the SDK the setup has been checked, so it stops pointing coding agents to this file.
+Then pass `_experiments={"agent_setup_complete": True}` to `sentry_sdk.init`, or add the key if the call already has `_experiments`. It tells the SDK the setup has been checked, so it stops pointing coding agents to this file.

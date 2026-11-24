@@ -32,6 +32,8 @@ CODING_AGENT_ENV_VARS = (
 SETUP_IN_PROGRESS_SECONDS = 60 * 60
 SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT = 10 * 60
 
+GIT_TIMEOUT_SECONDS = 2
+
 _coding_agent_hint_shown = False
 
 
@@ -91,6 +93,7 @@ def _setup_in_progress(init_file: str) -> bool:
             "core.fsmonitor=false",
             *args,
             cwd=os.path.dirname(init_file),
+            timeout=GIT_TIMEOUT_SECONDS,
         )
 
     # --branch adds a header line, so an empty answer means git has no answer.
@@ -147,7 +150,7 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
         _coding_agent_hint_shown
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
-        or options["agent_setup_complete"]
+        or options["_experiments"].get("agent_setup_complete")
         or (tracing_on and logs_on)
         or not _running_under_coding_agent()
     ):

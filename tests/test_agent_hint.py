@@ -74,7 +74,7 @@ def test_coding_agent_hint(run_app, env, init_args):
             "traces_sample_rate=0.1, _experiments={'enable_logs': True}",
         ),
         ({"AI_AGENT": "claude-code"}, "traces_sampler=lambda _: 1.0, enable_logs=True"),
-        ({"AI_AGENT": "claude-code"}, "agent_setup_complete=True"),
+        ({"AI_AGENT": "claude-code"}, "_experiments={'agent_setup_complete': True}"),
         ({"AI_AGENT": "0"}, "traces_sample_rate=0"),
         ({"AI_AGENT": "claude-code", "CI": "true"}, "traces_sample_rate=0"),
         ({"CLAUDECODE": "1", "SENTRY_AGENT_HINTS": "0"}, "traces_sample_rate=0"),
@@ -239,9 +239,23 @@ def test_coding_agent_hint_only_during_setup(run_app, before_run, shown):
     assert (SETUP_CHECKLIST_PATH in printed) is shown
 
 
+def test_coding_agent_hint_when_git_does_not_answer_in_time(run_app, monkeypatch):
+    real_communicate = subprocess.Popen.communicate
+
+    def communicate(self, *args, timeout=None, **kwargs):
+        if timeout is not None:
+            raise subprocess.TimeoutExpired("git", timeout)
+        return real_communicate(self, *args, **kwargs)
+
+    monkeypatch.setattr(subprocess.Popen, "communicate", communicate)
+
+    # The file counts as changed without git: it was written a moment ago.
+    assert SETUP_CHECKLIST_PATH in run_app({"CLAUDECODE": "1"})
+
+
 def test_setup_checklist_ships_with_the_package():
     with open(SETUP_CHECKLIST_PATH) as f:
-        assert "agent_setup_complete=True" in f.read()
+        assert '_experiments={"agent_setup_complete": True}' in f.read()
 
 
 def test_setup_checklist_example_runs(monkeypatch):

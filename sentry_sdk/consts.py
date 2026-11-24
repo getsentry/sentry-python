@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
+            "agent_setup_complete": Optional[bool],
             "max_spans": Optional[int],
             "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
@@ -1457,7 +1458,6 @@ class ClientConstructor:
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
         stream_gen_ai_spans: bool = True,
-        agent_setup_complete: bool = False,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1868,10 +1868,6 @@ class ClientConstructor:
             before they're sent to Sentry. Any modifications to the log in this
             function will be retained. If the function returns None, the log will
             not be sent to Sentry.
-
-        :param agent_setup_complete: Set to True once the setup has been checked against
-            `SETUP_CHECKLIST.md` in this package. Coding agents running the app are then no
-            longer pointed at the checklist. Defaults to False.
 
         :param trace_ignore_status_codes: An optional property that disables tracing for
             HTTP requests with certain status codes.

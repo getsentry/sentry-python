@@ -128,7 +128,9 @@ def json_dumps(data: "Any") -> bytes:
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
-def _git(*args: str, cwd: "Optional[str]" = None) -> "Optional[str]":
+def _git(
+    *args: str, cwd: "Optional[str]" = None, timeout: "Optional[float]" = None
+) -> "Optional[str]":
     try:
         with open(os.path.devnull, "w+") as null:
             # prevent command prompt windows from popping up on windows
@@ -137,19 +139,20 @@ def _git(*args: str, cwd: "Optional[str]" = None) -> "Optional[str]":
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-            output = (
-                subprocess.Popen(
-                    ["git", *args],
-                    cwd=cwd,
-                    startupinfo=startupinfo,
-                    stdout=subprocess.PIPE,
-                    stderr=null,
-                    stdin=null,
-                )
-                .communicate()[0]
-                .strip()
-                .decode("utf-8")
+            process = subprocess.Popen(
+                ["git", *args],
+                cwd=cwd,
+                startupinfo=startupinfo,
+                stdout=subprocess.PIPE,
+                stderr=null,
+                stdin=null,
             )
+            try:
+                output = process.communicate(timeout=timeout)[0].strip().decode("utf-8")
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate()
+                return None
     except (OSError, IOError, FileNotFoundError):
         return None
 
