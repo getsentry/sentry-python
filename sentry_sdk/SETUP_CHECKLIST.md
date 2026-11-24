@@ -8,7 +8,7 @@ This is Sentry's official setup guidance, shipped in the `sentry-sdk` package an
 
 ## Recommended
 
-Turn these on unless the user asked you not to. Sentry links errors, traces and logs, so an error shows the request that caused it and the logs around it.
+Turn these on unless the user asked you not to. Sentry links errors, traces and logs, so an error shows the request that caused it and the logs around it. Traces and logs count against the project's quota, and logs can hold user data, so tell the user what you turned on.
 
 - **Tracing.** Shows which request caused an error and where the time went. Set `traces_sample_rate` by environment: `1.0` locally, so you can see a trace when you verify, and a low rate in production (`0.1` is a common start) unless the project already has one. Don't default it to `0`: a rate of `0` sends no traces at all.
 - **Logs.** Set `enable_logs=True`. The app's logs show up next to the errors they belong to.
