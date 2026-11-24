@@ -1,7 +1,9 @@
 import os
 import shutil
 import subprocess
+import sys
 import time
+import types
 
 import pytest
 
@@ -67,6 +69,10 @@ def test_coding_agent_hint(run_app, env, init_args):
     [
         ({}, "traces_sample_rate=0"),
         ({"AI_AGENT": "claude-code"}, "traces_sample_rate=0.1, enable_logs=True"),
+        (
+            {"AI_AGENT": "claude-code"},
+            "traces_sample_rate=0.1, _experiments={'enable_logs': True}",
+        ),
         ({"AI_AGENT": "claude-code"}, "traces_sampler=lambda _: 1.0, enable_logs=True"),
         ({"AI_AGENT": "claude-code"}, "agent_setup_complete=True"),
         ({"AI_AGENT": "0"}, "traces_sample_rate=0"),
@@ -115,7 +121,7 @@ def test_coding_agent_hint_not_shown_without_dsn(run_app):
         (
             {"AI_AGENT": "codex"},
             "traces_sample_rate=0.1",
-            "Logs are off, so Sentry gets errors and traces but no logs. If you leave it off, tell the user it's off",
+            "Logs are off, so Sentry gets errors and traces but no logs. If you leave them off, tell the user they're off",
         ),
     ],
 )
@@ -236,3 +242,17 @@ def test_coding_agent_hint_only_during_setup(run_app, before_run, shown):
 def test_setup_checklist_ships_with_the_package():
     with open(SETUP_CHECKLIST_PATH) as f:
         assert "agent_setup_complete=True" in f.read()
+
+
+def test_setup_checklist_example_runs(monkeypatch):
+    with open(SETUP_CHECKLIST_PATH) as f:
+        example = f.read().split("```python\n")[1].split("```")[0]
+    myapp = types.ModuleType("myapp")
+    myapp.settings = types.SimpleNamespace(DEBUG=True)
+    monkeypatch.setitem(sys.modules, "myapp", myapp)
+    monkeypatch.delenv("SENTRY_DSN", raising=False)
+
+    try:
+        exec(example, {})
+    finally:
+        sentry_sdk.get_client().close()
