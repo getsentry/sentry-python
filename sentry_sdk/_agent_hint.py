@@ -17,8 +17,7 @@ if TYPE_CHECKING:
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
 
-# Set by coding agents in the commands they run. AI_AGENT is the cross-tool
-# convention; the rest cover agents that don't set it.
+# Set by coding agents in the commands they run, for the agents that don't set AI_AGENT.
 CODING_AGENT_ENV_VARS = (
     "CLAUDECODE",
     "CODEX_THREAD_ID",
@@ -40,7 +39,7 @@ _hint_at_exit: "Optional[Tuple[str, str, str, str, str]]" = None
 
 
 def _running_under_coding_agent() -> bool:
-    if os.environ.get("CI"):
+    if env_to_bool(os.environ.get("CI")):
         return False
     if env_to_bool(os.environ.get("SENTRY_AGENT_HINTS"), strict=True) is False:
         return False
@@ -162,11 +161,11 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
     if (
         _hint_at_exit is not None
         or not _exit_hook_registered
+        # Only tested on macOS and Linux.
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
         or options["_experiments"].get("agent_setup_complete")
         or (tracing_on and logs_on)
-        or not _running_under_coding_agent()
     ):
         return
 
@@ -174,11 +173,6 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
     init_file = os.path.abspath(caller.f_code.co_filename)
     # An installed tool that uses Sentry itself isn't the user's app.
     if _is_external_source(init_file):
-        return
-    try:
-        if os.stat(init_file).st_mtime < time.time() - SETUP_IN_PROGRESS_SECONDS:
-            return
-    except OSError:
         return
 
     # Agents often cut a command's output with `| tail`, so the hint goes last, at exit.

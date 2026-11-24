@@ -80,6 +80,12 @@ def test_coding_agent_hint_not_shown(run_app, env, init_args):
     assert "[sentry]" not in run_app(env, init_args)
 
 
+def test_coding_agent_hint_shown_when_ci_is_set_to_false(run_app):
+    env = {"AI_AGENT": "claude-code", "CI": "false"}
+
+    assert SETUP_CHECKLIST_PATH in run_app(env, "traces_sample_rate=0")
+
+
 def test_coding_agent_hint_not_shown_without_dsn(run_app):
     env = {"AI_AGENT": "claude-code", "SENTRY_DSN": ""}
 
