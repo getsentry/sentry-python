@@ -28,11 +28,14 @@ docs = [
     "sphinx",
     "sphinx-autodoc-typehints[type_comments]>=2.3.0",
     "typing-extensions",
+    # TODO: remove redundant sentry-conventions after proper migration from setup.py
+    "sentry-conventions>=0.36.0",
 ]
 
 aws = [
     "certifi",
     "urllib3",
+    "sentry-conventions>=0.36.0",
     # In Lambda functions botocore is used, and botocore has
     # restrictions on urllib3
     # https://github.com/boto/botocore/blob/develop/setup.cfg
@@ -44,9 +47,10 @@ aws = [
 typing = [
     "mypy",
     # =================
-    # TODO: remove redundant urllib3 and certifi after proper migration from setup.py
+    # TODO: remove redundant urllib3, certifi and sentry-conventions after proper migration from setup.py
     "urllib3>=1.26.11",
     "certifi",
+    "sentry-conventions>=0.36.0",
     # =================
     "types-protobuf",
     "types-gevent",
