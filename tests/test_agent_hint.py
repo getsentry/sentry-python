@@ -33,7 +33,6 @@ def run_app(tmp_path, monkeypatch, capsys):
         inits=1,
         dsn=AGENT_HINT_DSN,
         filename=None,
-        after_init="",
     ):
         for name, value in env.items():
             monkeypatch.setenv(name, value)
@@ -42,7 +41,7 @@ def run_app(tmp_path, monkeypatch, capsys):
             "import sentry_sdk\n"
             "from sentry_sdk.integrations.logging import LoggingIntegration\n"
         )
-        app.write_text(imports + init * inits + after_init)
+        app.write_text(imports + init * inits)
         if before_run:
             before_run(app)
 
@@ -149,17 +148,6 @@ def test_coding_agent_hint_when_the_logging_integration_sends_no_logs(run_app):
     )
 
     assert "but none of its logs." in printed
-
-
-def test_coding_agent_hint_not_shown_when_the_app_sends_a_log(run_app):
-    printed = run_app(
-        {"CLAUDECODE": "1"},
-        # Drop the log so the test sends nothing.
-        "traces_sample_rate=0.1, before_send_log=lambda log, hint: None, send_client_reports=False",
-        after_init="sentry_sdk.logger.info('started')\n",
-    )
-
-    assert "[sentry]" not in printed
 
 
 def test_coding_agent_hint_not_shown_for_an_installed_tool(run_app, tmp_path):

@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, List, Optional
+    from typing import Optional
 
     from sentry_sdk.client import BaseClient
 
@@ -110,7 +110,7 @@ def _setup_in_progress(init_file: str) -> bool:
     return bool(committer) and committer == git("config", "user.email")
 
 
-def _log_integration_on(client: "BaseClient") -> bool:
+def _logs_on(client: "BaseClient") -> bool:
     integrations = client.integrations
     return (
         getattr(integrations.get("logging"), "_logs_handler", None) is not None
@@ -118,28 +118,12 @@ def _log_integration_on(client: "BaseClient") -> bool:
     )
 
 
-def _note_first_log(client: "BaseClient") -> "List[bool]":
-    """Returns a list that gets an item when the client captures its first log."""
-    seen: "List[bool]" = []
-    capture_log = client._capture_log
-
-    def _capture_log(*args: "Any", **kwargs: "Any") -> None:
-        seen.append(True)
-        client.__dict__.pop("_capture_log", None)
-        capture_log(*args, **kwargs)
-
-    client._capture_log = _capture_log  # type: ignore[method-assign]
-    return seen
-
-
 def _write_coding_agent_hint(
-    init_file: str, tracing_on: bool, log_integration_on: bool, log_seen: "List[bool]"
+    init_file: str, not_shown: str, off: str, its: str, it: str
 ) -> None:
     with capture_internal_exceptions():
-        logs_on = log_integration_on or bool(log_seen)
-        if (tracing_on and logs_on) or not _setup_in_progress(init_file):
+        if not _setup_in_progress(init_file):
             return
-        not_shown, off, its, it = _MISSING_PRODUCTS[(tracing_on, logs_on)]
 
         codex = "codex" in (os.environ.get("AI_AGENT") or "").lower() or any(
             os.environ.get(name) for name in ("CODEX_THREAD_ID", "CODEX_SANDBOX")
@@ -173,13 +157,13 @@ def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     options = client.options
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
-    log_integration_on = _log_integration_on(client)
+    logs_on = _logs_on(client)
     if (
         _coding_agent_hint_shown
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
         or options["agent_setup_complete"]
-        or (tracing_on and log_integration_on)
+        or (tracing_on and logs_on)
         or not _running_under_coding_agent()
     ):
         return
@@ -196,9 +180,7 @@ def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
         return
 
     _coding_agent_hint_shown = True
-    # The app can also send logs without an integration, so look again at exit.
-    log_seen = [True] if log_integration_on else _note_first_log(client)
     # Agents often cut a command's output with `| tail`, so the hint goes last.
     atexit.register(
-        _write_coding_agent_hint, init_file, tracing_on, log_integration_on, log_seen
+        _write_coding_agent_hint, init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)]
     )
