@@ -2,6 +2,8 @@
 
 This is Sentry's official setup guidance, shipped in the `sentry-sdk` package and maintained by Sentry with the SDK. It matches the agent setup guide at https://docs.sentry.io/ai/agent-setup/get-started.md.
 
+**This is the checklist for sentry-sdk 2.x. The current major version is 3.x.** For a new setup, use 3.x unless the project needs 2.x. Install `sentry-sdk~=3.0` (without an extra such as `[fastapi]` or `[django]`: 3.x doesn't have those), then follow the `SETUP_CHECKLIST.md` of that version and not this file. Some options below, such as `enable_logs` and `send_default_pii`, don't exist in 3.x.
+
 ## Required
 
 - **Errors.** This is Sentry's core product. Set it up unless the user asked you not to. It needs a DSN: if the user hasn't given you one and you can't get one yourself, ask for it. Read it from an environment variable (`SENTRY_DSN`) and don't commit it. Before you finish, send a test error and check that it arrives.
