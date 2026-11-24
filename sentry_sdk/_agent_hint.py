@@ -13,7 +13,9 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, Dict, Optional
+    from typing import Any, List, Optional
+
+    from sentry_sdk.client import BaseClient
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
 
@@ -51,7 +53,7 @@ def _running_under_coding_agent() -> bool:
 _MISSING_PRODUCTS = {
     (False, False): (
         "Sentry will get errors from this app but not the request trace around them, "
-        "and its logs only as breadcrumbs.",
+        "and none of its logs.",
         "Tracing and logs are off, so Sentry only gets errors.",
         "they're",
         "them",
@@ -63,7 +65,7 @@ _MISSING_PRODUCTS = {
         "it",
     ),
     (True, False): (
-        "Sentry will get errors from this app but its logs only as breadcrumbs.",
+        "Sentry will get errors from this app but none of its logs.",
         "Logs are off, so Sentry gets errors and traces but no logs.",
         "it's",
         "it",
@@ -108,12 +110,36 @@ def _setup_in_progress(init_file: str) -> bool:
     return bool(committer) and committer == git("config", "user.email")
 
 
+def _log_integration_on(client: "BaseClient") -> bool:
+    integrations = client.integrations
+    return (
+        getattr(integrations.get("logging"), "_logs_handler", None) is not None
+        or getattr(integrations.get("loguru"), "level", None) is not None
+    )
+
+
+def _note_first_log(client: "BaseClient") -> "List[bool]":
+    """Returns a list that gets an item when the client captures its first log."""
+    seen: "List[bool]" = []
+    capture_log = client._capture_log
+
+    def _capture_log(*args: "Any", **kwargs: "Any") -> None:
+        seen.append(True)
+        client.__dict__.pop("_capture_log", None)
+        capture_log(*args, **kwargs)
+
+    client._capture_log = _capture_log  # type: ignore[method-assign]
+    return seen
+
+
 def _write_coding_agent_hint(
-    init_file: str, not_shown: str, off: str, its: str, it: str
+    init_file: str, tracing_on: bool, log_integration_on: bool, log_seen: "List[bool]"
 ) -> None:
     with capture_internal_exceptions():
-        if not _setup_in_progress(init_file):
+        logs_on = log_integration_on or bool(log_seen)
+        if (tracing_on and logs_on) or not _setup_in_progress(init_file):
             return
+        not_shown, off, its, it = _MISSING_PRODUCTS[(tracing_on, logs_on)]
 
         codex = "codex" in (os.environ.get("AI_AGENT") or "").lower() or any(
             os.environ.get(name) for name in ("CODEX_THREAD_ID", "CODEX_SANDBOX")
@@ -140,19 +166,20 @@ def _write_coding_agent_hint(
         sys.stderr.flush()
 
 
-def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> None:
+def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     """Point a coding agent at the setup checklist while Sentry is being set up."""
     global _coding_agent_hint_shown
 
+    options = client.options
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
-    logs_on = bool(options["enable_logs"])
+    log_integration_on = _log_integration_on(client)
     if (
         _coding_agent_hint_shown
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
         or options["agent_setup_complete"]
-        or (tracing_on and logs_on)
+        or (tracing_on and log_integration_on)
         or not _running_under_coding_agent()
     ):
         return
@@ -169,7 +196,9 @@ def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> No
         return
 
     _coding_agent_hint_shown = True
+    # The app can also send logs without an integration, so look again at exit.
+    log_seen = [True] if log_integration_on else _note_first_log(client)
     # Agents often cut a command's output with `| tail`, so the hint goes last.
     atexit.register(
-        _write_coding_agent_hint, init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)]
+        _write_coding_agent_hint, init_file, tracing_on, log_integration_on, log_seen
     )

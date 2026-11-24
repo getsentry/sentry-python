@@ -27,12 +27,22 @@ def run_app(tmp_path, monkeypatch, capsys):
     app = tmp_path / "app.py"
 
     def run(
-        env, init_args="", before_run=None, inits=1, dsn=AGENT_HINT_DSN, filename=None
+        env,
+        init_args="",
+        before_run=None,
+        inits=1,
+        dsn=AGENT_HINT_DSN,
+        filename=None,
+        after_init="",
     ):
         for name, value in env.items():
             monkeypatch.setenv(name, value)
         init = f"sentry_sdk.init(dsn={dsn!r}, {init_args})\n"
-        app.write_text("import sentry_sdk\n" + init * inits)
+        imports = (
+            "import sentry_sdk\n"
+            "from sentry_sdk.integrations.logging import LoggingIntegration\n"
+        )
+        app.write_text(imports + init * inits + after_init)
         if before_run:
             before_run(app)
 
@@ -55,7 +65,7 @@ def run_app(tmp_path, monkeypatch, capsys):
         ({"CLAUDECODE": "1"}, ""),
         ({"CODEX_THREAD_ID": "abc"}, "traces_sample_rate=0.0"),
         ({"CODEX_SANDBOX": "seatbelt"}, "traces_sample_rate=0.1"),
-        ({"CLAUDECODE": "1"}, "enable_logs=True"),
+        ({"CLAUDECODE": "1"}, "integrations=[LoggingIntegration()]"),
     ],
 )
 def test_coding_agent_hint(run_app, env, init_args):
@@ -66,8 +76,14 @@ def test_coding_agent_hint(run_app, env, init_args):
     "env, init_args",
     [
         ({}, "traces_sample_rate=0"),
-        ({"AI_AGENT": "claude-code"}, "traces_sample_rate=0.1, enable_logs=True"),
-        ({"AI_AGENT": "claude-code"}, "traces_sampler=lambda _: 1.0, enable_logs=True"),
+        (
+            {"AI_AGENT": "claude-code"},
+            "traces_sample_rate=0.1, integrations=[LoggingIntegration()]",
+        ),
+        (
+            {"AI_AGENT": "claude-code"},
+            "traces_sampler=lambda _: 1.0, integrations=[LoggingIntegration()]",
+        ),
         ({"AI_AGENT": "claude-code"}, "agent_setup_complete=True"),
         ({"AI_AGENT": "0"}, "traces_sample_rate=0"),
         ({"AI_AGENT": "claude-code", "CI": "true"}, "traces_sample_rate=0"),
@@ -90,17 +106,17 @@ def test_coding_agent_hint_not_shown_without_dsn(run_app):
         (
             {"CLAUDECODE": "1"},
             "",
-            "Sentry will get errors from this app but not the request trace around them, and its logs only as breadcrumbs. The checklist shows what to change. If you're setting up Sentry, it is strongly recommended",
+            "Sentry will get errors from this app but not the request trace around them, and none of its logs. The checklist shows what to change. If you're setting up Sentry, it is strongly recommended",
         ),
         (
             {"CLAUDECODE": "1"},
-            "enable_logs=True",
+            "integrations=[LoggingIntegration()]",
             "Sentry will get errors from this app but not the request trace around them. The checklist shows what to change.",
         ),
         (
             {"CLAUDECODE": "1"},
             "traces_sample_rate=0.1",
-            "Sentry will get errors from this app but its logs only as breadcrumbs. The checklist shows what to change.",
+            "Sentry will get errors from this app but none of its logs. The checklist shows what to change.",
         ),
         (
             {"CODEX_THREAD_ID": "1"},
@@ -109,7 +125,7 @@ def test_coding_agent_hint_not_shown_without_dsn(run_app):
         ),
         (
             {"AI_AGENT": "codex"},
-            "enable_logs=True",
+            "integrations=[LoggingIntegration()]",
             "Tracing is off, so Sentry gets errors and logs but no traces. If you leave it off, tell the user it's off and that you can turn it on if they want.",
         ),
         (
@@ -124,6 +140,26 @@ def test_coding_agent_hint_per_agent(run_app, env, init_args, hint):
 
     assert f"[sentry] {hint}" in printed
     assert SETUP_CHECKLIST_PATH in printed
+
+
+def test_coding_agent_hint_when_the_logging_integration_sends_no_logs(run_app):
+    printed = run_app(
+        {"CLAUDECODE": "1"},
+        "traces_sample_rate=0.1, integrations=[LoggingIntegration(level=None)]",
+    )
+
+    assert "but none of its logs." in printed
+
+
+def test_coding_agent_hint_not_shown_when_the_app_sends_a_log(run_app):
+    printed = run_app(
+        {"CLAUDECODE": "1"},
+        # Drop the log so the test sends nothing.
+        "traces_sample_rate=0.1, before_send_log=lambda log, hint: None, send_client_reports=False",
+        after_init="sentry_sdk.logger.info('started')\n",
+    )
+
+    assert "[sentry]" not in printed
 
 
 def test_coding_agent_hint_not_shown_for_an_installed_tool(run_app, tmp_path):
