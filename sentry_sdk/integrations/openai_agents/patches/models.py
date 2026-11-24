@@ -6,20 +6,18 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
+from sentry_sdk.traces import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     add_sentry_baggage_to_headers,
     should_propagate_trace,
 )
 from sentry_sdk.utils import logger
 
-from ..spans import ai_client_span, update_ai_client_span
+from ..spans import ai_client_context, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union
+    from typing import Any, Callable
 
-    from sentry_sdk.tracing import Span
 
 try:
     import agents
@@ -29,7 +27,7 @@ except ImportError:
 
 
 def _inject_trace_propagation_headers(
-    hosted_tool: "HostedMCPTool", span: "Union[Span, StreamedSpan]"
+    hosted_tool: "HostedMCPTool", span: "Span"
 ) -> None:
     headers = hosted_tool.tool_config.get("headers")
     if headers is None:
@@ -99,9 +97,9 @@ def _get_model(
                 tool for tool in mcp_tools if isinstance(tool, HostedMCPTool)
             ]
 
-        with ai_client_span(agent, kwargs) as span:
+        with ai_client_context(agent, kwargs) as context:
             for hosted_tool in hosted_tools:
-                _inject_trace_propagation_headers(hosted_tool, span=span)
+                _inject_trace_propagation_headers(hosted_tool, span=context.span)
 
             result = await original_get_response(*args, **kwargs)
 
@@ -110,7 +108,7 @@ def _get_model(
             if response_model:
                 delattr(agent, "_sentry_response_model")
 
-            update_ai_client_span(span, result, response_model, agent)
+            update_ai_client_span(context.span, result, response_model, agent)
 
         return result
 
@@ -137,16 +135,11 @@ def _get_model(
                         tool for tool in mcp_tools if isinstance(tool, HostedMCPTool)
                     ]
 
-            with ai_client_span(agent, span_kwargs) as span:
+            with ai_client_context(agent, span_kwargs) as context:
                 for hosted_tool in hosted_tools:
-                    _inject_trace_propagation_headers(hosted_tool, span=span)
+                    _inject_trace_propagation_headers(hosted_tool, span=context.span)
 
-                set_on_span = (
-                    span.set_attribute
-                    if isinstance(span, StreamedSpan)
-                    else span.set_data
-                )
-                set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+                context.span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
                 streaming_response = None
                 ttft_recorded = False
@@ -157,7 +150,9 @@ def _get_model(
                     # Detect first content token (text delta event)
                     if not ttft_recorded and hasattr(event, "delta"):
                         ttft = time.perf_counter() - start_time
-                        set_on_span(SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft)
+                        context.span.set_attribute(
+                            SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
+                        )
                         ttft_recorded = True
 
                     # Capture the full response from ResponseCompletedEvent
@@ -174,7 +169,7 @@ def _get_model(
                         else None
                     )
                     update_ai_client_span(
-                        span, streaming_response, response_model, agent
+                        context.span, streaming_response, response_model, agent
                     )
 
         model.stream_response = wrapped_stream_response  # type: ignore[method-assign]

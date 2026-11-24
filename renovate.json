@@ -26,6 +26,12 @@
       "enabled": false
     },
     {
+      "description": "Disable Java version updates in setup-java.",
+      "matchManagers": ["github-actions"],
+      "matchDatasources": ["java-version"],
+      "enabled": false
+    },
+    {
       "description": "Group GitHub workflow updates.",
       "matchManagers": ["custom.regex", "github-actions"],
       "groupName": "GitHub Workflows",

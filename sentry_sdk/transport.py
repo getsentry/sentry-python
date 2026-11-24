@@ -7,7 +7,6 @@ import os
 import socket
 import ssl
 import time
-import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -37,13 +36,12 @@ try:
 except ImportError:
     ASYNC_TRANSPORT_AVAILABLE = False
 
-from typing import TYPE_CHECKING, Dict, List, cast
+from typing import TYPE_CHECKING, Dict, List
 
 import certifi
 import urllib3
 
-import sentry_sdk
-from sentry_sdk.consts import EndpointType
+from sentry_sdk.consts import VERSION, EndpointType
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     Dsn,
@@ -69,14 +67,14 @@ if TYPE_CHECKING:
 
     from urllib3.poolmanager import PoolManager, ProxyManager
 
-    from sentry_sdk._types import Event, EventDataCategory
+    from sentry_sdk._types import EventDataCategory
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
-    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),  # noqa: B009
-    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),  # noqa: B009
+    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),
 ]:
     try:
         KEEP_ALIVE_SOCKET_OPTIONS.append((option[0], option[1](), option[2]))
@@ -113,24 +111,6 @@ class Transport(ABC):
             self.parsed_dsn = Dsn(options["dsn"], options.get("org_id"))
         else:
             self.parsed_dsn = None
-
-    def capture_event(self: "Self", event: "Event") -> None:
-        """
-        DEPRECATED: Please use capture_envelope instead.
-
-        This gets invoked with the event dictionary when an event should
-        be sent to sentry.
-        """
-
-        warnings.warn(
-            "capture_event is deprecated, please use capture_envelope instead!",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        envelope = Envelope()
-        envelope.add_event(event)
-        self.capture_envelope(envelope)
 
     @abstractmethod
     def capture_envelope(self: "Self", envelope: "Envelope") -> None:
@@ -179,13 +159,6 @@ class Transport(ABC):
         If an item is provided, the data category and quantity are
         extracted from the item, and the values passed for
         data_category and quantity are ignored.
-
-        When recording a lost transaction via data_category="transaction",
-        the calling code should also record the lost spans via this method.
-        When recording lost spans, `quantity` should be set to the number
-        of contained spans, plus one for the transaction itself. When
-        passing an Item containing a transaction via the `item` parameter,
-        this method automatically records the lost spans.
         """
         return None
 
@@ -217,15 +190,13 @@ class HttpTransportCore(Transport):
     TIMEOUT = 30  # seconds
 
     def __init__(self: "Self", options: "Dict[str, Any]") -> None:
-        from sentry_sdk.consts import VERSION
-
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self.options: "Dict[str, Any]" = options
         self._worker = self._create_worker(options)
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until: "Dict[Optional[EventDataCategory], datetime]" = {}
-        # We only use this Retry() class for the `get_retry_after` method it exposes
+        # We only use this Retry() class for the `parse_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
         self._discarded_events: "DefaultDict[Tuple[EventDataCategory, str], int]" = (
             defaultdict(int)
@@ -233,9 +204,6 @@ class HttpTransportCore(Transport):
         self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool()
-
-        # Backwards compatibility for deprecated `self.hub_class` attribute
-        self._hub_cls = sentry_sdk.Hub
 
         experiments = options.get("_experiments", {})
         compression_level = experiments.get(
@@ -294,17 +262,7 @@ class HttpTransportCore(Transport):
             data_category = item.data_category
             quantity = 1  # If an item is provided, we count it as 1 unless it's a batched item or an attachment (handled below).
 
-            if data_category == "transaction":
-                # Also record the lost spans
-                event = item.get_transaction_event() or {}
-
-                # +1 for the transaction itself
-                span_count = (
-                    len(cast(List[Dict[str, object]], event.get("spans") or [])) + 1
-                )
-                self.record_lost_event(reason, "span", quantity=span_count)
-
-            elif data_category in ("span", "log_item", "trace_metric"):
+            if data_category in ("span", "log_item", "trace_metric"):
                 # Batched items can contain multiple spans, logs or metrics
                 item_count = item.headers.get("item_count")
                 if isinstance(item_count, int) and item_count > 0:
@@ -487,7 +445,7 @@ class HttpTransportCore(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default", "statsd"):
+                if item.data_category in ("error", "default", "statsd"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:
@@ -726,27 +684,6 @@ class BaseHttpTransport(HttpTransportCore):
             self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
 
-    @staticmethod
-    def _warn_hub_cls() -> None:
-        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
-        warnings.warn(
-            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-    @property
-    def hub_cls(self: "Self") -> "type[sentry_sdk.Hub]":
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        return self._hub_cls
-
-    @hub_cls.setter
-    def hub_cls(self: "Self", value: "type[sentry_sdk.Hub]") -> None:
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        self._hub_cls = value
-
 
 class HttpTransport(BaseHttpTransport):
     if TYPE_CHECKING:
@@ -818,21 +755,17 @@ class HttpTransport(BaseHttpTransport):
                 opts["proxy_headers"] = proxy_headers
 
             if proxy.startswith("socks"):
-                use_socks_proxy = True
                 try:
                     # Check if PySocks dependency is available
-                    from urllib3.contrib.socks import SOCKSProxyManager
+                    from urllib3.contrib.socks import SOCKSProxyManager  # noqa: PLC0415
                 except ImportError:
-                    use_socks_proxy = False
                     logger.warning(
                         "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
                         proxy,
                     )
-
-                if use_socks_proxy:
-                    return SOCKSProxyManager(proxy, **opts)
-                else:
                     return urllib3.PoolManager(**opts)
+
+                return SOCKSProxyManager(proxy, **opts)
             else:
                 return urllib3.ProxyManager(proxy, **opts)
         else:
@@ -1172,35 +1105,6 @@ class _EnvelopePrinterTransport(Transport):
         return getattr(self._inner, name)
 
 
-class _FunctionTransport(Transport):
-    """
-    DEPRECATED: Users wishing to provide a custom transport should subclass
-    the Transport class, rather than providing a function.
-    """
-
-    def __init__(
-        self,
-        func: "Callable[[Event], None]",
-    ) -> None:
-        Transport.__init__(self)
-        self._func = func
-
-    def capture_event(
-        self,
-        event: "Event",
-    ) -> None:
-        self._func(event)
-        return None
-
-    def capture_envelope(self, envelope: "Envelope") -> None:
-        # Since function transports expect to be called with an event, we need
-        # to iterate over the envelope and call the function for each event, via
-        # the deprecated capture_event method.
-        event = envelope.get_event()
-        if event is not None:
-            self.capture_event(event)
-
-
 def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
     ref_transport = options["transport"]
 
@@ -1244,14 +1148,6 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
         transport = ref_transport
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
-    elif callable(ref_transport):
-        warnings.warn(
-            "Function transports are deprecated and will be removed in a future release."
-            "Please provide a Transport instance or subclass, instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        transport = _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None

@@ -56,25 +56,25 @@
       {% endif %}
     {% endif %}
     env:
-      # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
-      TOX_UV_PYTHON_PREFERENCE: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}{% endraw %}
+      # 3.7 runs in the python:X.Y container; tell uv to use that system Python.
+      TOX_UV_PYTHON_PREFERENCE: {% raw %}${{ (matrix.python-version == '3.7') && 'only-system' || 'managed' }}{% endraw %}
       {% if needs_postgres %}
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}{% endraw %}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ (matrix.python-version == '3.7') && 'postgres' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       {% endif %}
       {% if needs_redis %}
-      SENTRY_PYTHON_TEST_REDIS_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'redis' || 'localhost' }}{% endraw %}
+      SENTRY_PYTHON_TEST_REDIS_HOST: {% raw %}${{ (matrix.python-version == '3.7') && 'redis' || 'localhost' }}{% endraw %}
       {% endif %}
       {% if needs_mysql %}
       SENTRY_PYTHON_TEST_MYSQL_USER: root
       SENTRY_PYTHON_TEST_MYSQL_PASSWORD: sentry
       {% endif %}
-    container: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}{% endraw %}
+    container: {% raw %}${{ (matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}{% endraw %}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           enable-cache: false
 
@@ -85,16 +85,16 @@
 
       {% if needs_java %}
       - name: Install Java
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: 'temurin'
           java-version: '21'
       {% endif %}
 
-      - name: Mark workspace safe for git (3.6/3.7 container)
+      - name: Mark workspace safe for git (3.7 container)
         # needed to make git rev-parse work in the containers
         # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.
-        if: {% raw %}${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}{% endraw %}
+        if: {% raw %}${{ matrix.python-version == '3.7' }}{% endraw %}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Setup Test Env

@@ -18,6 +18,7 @@ from sentry_sdk.integrations.django import DjangoIntegration
 sentry_sdk.init(integrations=[DjangoIntegration()])
 
 import os
+from typing import Any
 
 from django.utils.deprecation import MiddlewareMixin
 
@@ -63,7 +64,7 @@ class TestMiddleware(MiddlewareMixin):
         return response
 
 
-def TestFunctionMiddleware(get_response):  # noqa: N802
+def TestFunctionMiddleware(get_response):
     def middleware(request):
         return get_response(request)
 
@@ -108,7 +109,9 @@ WSGI_APPLICATION = "tests.integrations.django.myapp.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
+DATABASES: "dict[str, dict[str, Any]]" = {
+    "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
+}
 
 try:
     import psycopg2  # noqa

@@ -3,12 +3,10 @@ from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    has_data_collection_enabled,
     parse_url,
     parse_version,
 )
@@ -36,7 +34,7 @@ try:
         GraphQLRequest = None
 
 except ImportError:
-    raise DidNotEnable("gql is not installed")
+    raise DidNotEnable("gql is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
@@ -68,10 +66,7 @@ def _data_from_document(document: "DocumentNode") -> "EventDataType":
         data: "EventDataType" = {"query": print_ast(document)}
 
         if operation_ast is not None:
-            if has_data_collection_enabled(client_options):
-                if client_options["data_collection"]["graphql"]["variables"]:
-                    data["variables"] = operation_ast.variable_definitions
-            elif should_send_default_pii():
+            if client_options["data_collection"]["graphql"]["variables"]:
                 data["variables"] = operation_ast.variable_definitions
 
             if operation_ast.name is not None:
@@ -110,17 +105,16 @@ def _request_info_from_transport(
 
     with capture_internal_exceptions():
         client_options = sentry_sdk.get_client().options
-        use_data_collection = has_data_collection_enabled(client_options)
 
         # Some transports accept a URL object as well as a string.
         # Credentials are always removed from the URL. Query values are
         # filtered here only when data_collection is not configured, since
         # its url_query_params setting does its own filtering.
-        parsed_url = parse_url(str(url), sanitize=not use_data_collection)
+        parsed_url = parse_url(str(url), sanitize=False)
         request_info["url"] = parsed_url.url
 
         query_string: "Optional[str]" = parsed_url.query
-        if use_data_collection and query_string:
+        if query_string:
             query_string = _apply_data_collection_filtering_to_query_string(
                 query_string=query_string,
                 behaviour=client_options["data_collection"]["url_query_params"],
@@ -144,22 +138,24 @@ def _patch_execute() -> None:
         *args: "Any",
         **kwargs: "Any",
     ) -> "Any":
-        scope = sentry_sdk.get_isolation_scope()
-        # document is a gql.GraphQLRequest with gql v4.0.0.
-        scope.add_event_processor(_make_gql_event_processor(self, document))
-
-        try:
+        # Add the processor to a scope that lives only as long as this
+        # query, so that it doesn't apply to unrelated events captured
+        # later on the same isolation scope.
+        with sentry_sdk.new_scope() as scope:
             # document is a gql.GraphQLRequest with gql v4.0.0.
-            return real_execute(self, document, *args, **kwargs)
-        except TransportQueryError as e:
-            event, hint = event_from_exception(
-                e,
-                client_options=sentry_sdk.get_client().options,
-                mechanism={"type": "gql", "handled": False},
-            )
+            scope.add_event_processor(_make_gql_event_processor(self, document))
 
-            sentry_sdk.capture_event(event, hint)
-            raise e
+            try:
+                # document is a gql.GraphQLRequest with gql v4.0.0.
+                return real_execute(self, document, *args, **kwargs)
+            except TransportQueryError as e:
+                event, hint = event_from_exception(
+                    e,
+                    mechanism={"type": "gql", "handled": False},
+                )
+
+                sentry_sdk.capture_event(event, hint)
+                raise e
 
     gql.Client.execute = sentry_patched_execute
 
@@ -182,29 +178,7 @@ def _make_gql_event_processor(
         )
 
         client_options = sentry_sdk.get_client().options
-        if has_data_collection_enabled(client_options):
-            if client_options["data_collection"]["graphql"]["document"]:
-                if GraphQLRequest is not None and isinstance(
-                    document_or_request, GraphQLRequest
-                ):
-                    # In v4.0.0, gql moved to using GraphQLRequest instead of
-                    # DocumentNode in execute
-                    # https://github.com/graphql-python/gql/pull/556
-                    document = document_or_request.document
-                else:
-                    document = document_or_request
-
-                request["data"] = _data_from_document(document)
-                contexts = event.setdefault("contexts", {})
-                response = contexts.setdefault("response", {})
-                response.update(
-                    {
-                        "data": {"errors": errors},
-                        "type": response,
-                    }
-                )
-
-        elif should_send_default_pii():
+        if client_options["data_collection"]["graphql"]["document"]:
             if GraphQLRequest is not None and isinstance(
                 document_or_request, GraphQLRequest
             ):
@@ -221,7 +195,7 @@ def _make_gql_event_processor(
             response.update(
                 {
                     "data": {"errors": errors},
-                    "type": response,
+                    "type": "response",
                 }
             )
 

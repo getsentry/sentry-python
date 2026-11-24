@@ -57,7 +57,6 @@ def _capture_and_reraise() -> None:
     if client.is_active():
         event, hint = event_from_exception(
             exc_info,
-            client_options=client.options,
             mechanism={"type": "serverless", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)

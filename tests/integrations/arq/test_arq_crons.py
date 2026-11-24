@@ -13,7 +13,7 @@ from sentry_sdk.integrations.arq import ArqIntegration, _get_monitor_config
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
-    ZoneInfo = None
+    ZoneInfo = None  # type: ignore[assignment, misc]
 
 
 @pytest.fixture(autouse=True)

@@ -54,7 +54,6 @@ def _make_excepthook(old_excepthook: "Excepthook") -> "Excepthook":
             with capture_internal_exceptions():
                 event, hint = event_from_exception(
                     (type_, value, traceback),
-                    client_options=sentry_sdk.get_client().options,
                     mechanism={"type": "excepthook", "handled": False},
                 )
                 sentry_sdk.capture_event(event, hint=hint)
