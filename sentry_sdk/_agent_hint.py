@@ -124,8 +124,6 @@ def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) ->
         codex = "codex" in (os.environ.get("AI_AGENT") or "").lower() or any(
             os.environ.get(name) for name in ("CODEX_THREAD_ID", "CODEX_SANDBOX")
         )
-        # Codex treats instructions in tool output as untrusted and won't turn on
-        # more data collection without the user, but it passes a fact on to them.
         if codex and tracing_on:
             hint = (
                 "Logs are off, so Sentry gets errors and traces but no logs. If you "
@@ -147,8 +145,6 @@ def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) ->
                 "they want. Sentry's official setup checklist, included in the "
                 f"sentry-sdk package you installed: {SETUP_CHECKLIST_PATH}"
             )
-        # Say what Sentry won't show, not which settings are off. An agent that
-        # sees the setting names doesn't open the checklist.
         elif tracing_on:
             hint = (
                 "Sentry will get errors from this app but its logs only as "
