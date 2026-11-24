@@ -67,8 +67,9 @@ def _setup_in_progress(init_file: str) -> bool:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
+            timeout=0.25,
         ).stdout.strip()
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         status = ""
     if not status:
         return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
@@ -93,6 +94,7 @@ def _setup_in_progress(init_file: str) -> bool:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
+            timeout=0.25,
         ).stdout.strip()
         user_email = subprocess.run(
             [*git, "config", "user.email"],
@@ -101,8 +103,9 @@ def _setup_in_progress(init_file: str) -> bool:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
+            timeout=0.25,
         ).stdout.strip()
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return False
     return bool(committer) and committer == user_email
 
