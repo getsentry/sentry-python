@@ -8,7 +8,7 @@ This is Sentry's official setup guidance, shipped in the `sentry-sdk` package an
 
 ## Recommended
 
-Turn these on unless the user asked you not to. Sentry links errors, traces and logs, so an error shows the request that caused it and the logs around it.
+Turn these on unless the user asked you not to. Sentry links errors, traces and logs, so an error shows the request that caused it and the logs around it. Traces and logs count against the project's quota, and logs can hold user data, so tell the user what you turned on.
 
 - **Tracing.** Shows which request caused an error and where the time went. Set `traces_sample_rate` by environment: `1.0` locally, so you can see a trace when you verify, and a low rate in production (`0.1` is a common start) unless the project already has one. Don't default it to `0`: a rate of `0` sends no traces at all.
 - **Logs.** There is no `enable_logs` option in this version. Logs reach Sentry when something sends them. Add `LoggingIntegration()` from `sentry_sdk.integrations.logging` to `integrations` to send what the app logs with the standard `logging` module, at `INFO` and above. If the app logs a lot, or its info logs can hold user data, send only warnings and errors with `LoggingIntegration(level=logging.WARNING)`. If the app logs with Loguru, add `LoguruIntegration()` from `sentry_sdk.integrations.loguru` instead. To change or drop a log before it is sent, set `before_send_log` in `sentry_sdk.init`: it gets each log and a hint, and returns the log, or `None` to drop it. You can also call `sentry_sdk.logger.info(...)` directly. The app's logs then show up next to the errors they belong to.
