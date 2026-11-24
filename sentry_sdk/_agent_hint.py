@@ -55,13 +55,22 @@ def _setup_in_progress(init_file: str) -> bool:
     if changed < cutoff:
         return False
 
-    git = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false"]
     cwd = os.path.dirname(init_file)
 
     # --branch adds a header line, so an empty answer means git has no answer.
     try:
         status = subprocess.run(
-            [*git, "status", "--porcelain", "--branch", "--", init_file],
+            [
+                "git",
+                "--no-optional-locks",
+                "-c",
+                "core.fsmonitor=false",
+                "status",
+                "--porcelain",
+                "--branch",
+                "--",
+                init_file,
+            ],
             cwd=cwd,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -81,7 +90,10 @@ def _setup_in_progress(init_file: str) -> bool:
     try:
         committer = subprocess.run(
             [
-                *git,
+                "git",
+                "--no-optional-locks",
+                "-c",
+                "core.fsmonitor=false",
                 "log",
                 "-1",
                 f"--since={int(cutoff)}",
@@ -103,7 +115,14 @@ def _setup_in_progress(init_file: str) -> bool:
 
     try:
         user_email = subprocess.run(
-            [*git, "config", "user.email"],
+            [
+                "git",
+                "--no-optional-locks",
+                "-c",
+                "core.fsmonitor=false",
+                "config",
+                "user.email",
+            ],
             cwd=cwd,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
