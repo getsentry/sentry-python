@@ -3,7 +3,10 @@ import re
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk._agent_hint import show_coding_agent_hint
+from sentry_sdk._agent_hint import (
+    register_coding_agent_hint_exit_hook,
+    show_coding_agent_hint,
+)
 from sentry_sdk.utils import capture_internal_exceptions, logger, parse_version
 
 if TYPE_CHECKING:
@@ -45,6 +48,8 @@ def _init(*args: "Optional[str]", **kwargs: "Any") -> None:
 
     This takes the same arguments as the client constructor.
     """
+    with capture_internal_exceptions():
+        register_coding_agent_hint_exit_hook()
     client = sentry_sdk.Client(*args, **kwargs)
     sentry_sdk.get_global_scope().set_client(client)
     with capture_internal_exceptions():

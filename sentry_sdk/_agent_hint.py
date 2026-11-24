@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Optional
+    from typing import Optional, Tuple
 
     from sentry_sdk.client import BaseClient
 
@@ -36,7 +36,9 @@ SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT = 10 * 60
 
 GIT_TIMEOUT_SECONDS = 2
 
-_coding_agent_hint_shown = False
+_exit_hook_registered = False
+# What _write_coding_agent_hint prints at exit, set by the first init() that qualifies.
+_hint_at_exit: "Optional[Tuple[str, str, str, str, str]]" = None
 
 
 def _running_under_coding_agent() -> bool:
@@ -121,10 +123,21 @@ def _logs_on(client: "BaseClient") -> bool:
     )
 
 
-def _write_coding_agent_hint(
-    init_file: str, not_shown: str, off: str, its: str, it: str
-) -> None:
+def register_coding_agent_hint_exit_hook() -> None:
+    """Call before the client is made. Exit hooks run last-in first-out, so the hint then
+    prints after the client's own exit output."""
+    global _exit_hook_registered
+
+    if not _exit_hook_registered and _running_under_coding_agent():
+        _exit_hook_registered = True
+        atexit.register(_write_coding_agent_hint)
+
+
+def _write_coding_agent_hint() -> None:
     with capture_internal_exceptions():
+        if _hint_at_exit is None:
+            return
+        init_file, not_shown, off, its, it = _hint_at_exit
         if not _setup_in_progress(init_file):
             return
 
@@ -151,14 +164,15 @@ def _write_coding_agent_hint(
 
 def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     """Point a coding agent at the setup checklist while Sentry is being set up."""
-    global _coding_agent_hint_shown
+    global _hint_at_exit
 
     options = client.options
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
     logs_on = _logs_on(client)
     if (
-        _coding_agent_hint_shown
+        _hint_at_exit is not None
+        or not _exit_hook_registered
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
         or options["_experiments"].get("agent_setup_complete")
@@ -178,8 +192,5 @@ def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     except OSError:
         return
 
-    _coding_agent_hint_shown = True
-    # Agents often cut a command's output with `| tail`, so the hint goes last.
-    atexit.register(
-        _write_coding_agent_hint, init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)]
-    )
+    # Agents often cut a command's output with `| tail`, so the hint goes last, at exit.
+    _hint_at_exit = (init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)])
