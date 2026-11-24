@@ -137,20 +137,23 @@ def _git(
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-            process = subprocess.Popen(
+            with subprocess.Popen(
                 ["git", *args],
                 cwd=cwd,
                 startupinfo=startupinfo,
                 stdout=subprocess.PIPE,
                 stderr=null,
                 stdin=null,
-            )
-            try:
-                output = process.communicate(timeout=timeout)[0].strip().decode("utf-8")
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.communicate()
-                return None
+            ) as process:
+                try:
+                    output = (
+                        process.communicate(timeout=timeout)[0].strip().decode("utf-8")
+                    )
+                except subprocess.TimeoutExpired:
+                    # Don't read the rest of the output: a child process of git can
+                    # keep the pipe open after git is killed.
+                    process.kill()
+                    return None
     except (OSError, IOError, FileNotFoundError):
         return None
 
