@@ -1,0 +1,39 @@
+# getsentry/sentry-python e9c62e532e9a7fcd5702583908ff600bdc02480e
+
+rubric = "sdk"
+
+[[area]]
+paths = ["sentry_sdk/**", "scripts/init_serverless_sdk.py"]
+families = ["server"]
+
+# setup.py and pyproject.toml declare the Python versions and dependencies every customer inherits.
+[[area]]
+paths = [
+  "sentry_sdk/*", "sentry_sdk/ai/**", "sentry_sdk/crons/**", "sentry_sdk/profiler/**",
+  "setup.py", "pyproject.toml", "uv.lock",
+]
+families = ["server"]
+shared_core = true
+
+[[kind]]
+paths = ["tests/**", "tox.ini"]
+kind = "tests"
+
+[[kind]]
+paths = ["scripts/**", "pyproject.toml", "setup.py", "MANIFEST.in", "renovate.json", ".python-version"]
+kind = "build-release"
+
+[[kind]]
+paths = ["checkouts/**"]
+kind = "dependencies"
+
+[[kind]]
+paths = ["docs/**"]
+kind = "docs"
+
+[[kind]]
+paths = [
+  ".coveragerc*", "codecov.yml", "_typos.toml", ".git-blame-ignore-revs",
+  "agents.toml",
+]
+kind = "dev-tooling"
