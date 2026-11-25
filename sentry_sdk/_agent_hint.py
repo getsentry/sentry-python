@@ -1,11 +1,11 @@
 import atexit
 import os
+import subprocess
 import sys
 import time
 from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import (
-    _git,
     _is_external_source,
     capture_internal_exceptions,
     env_to_bool,
@@ -13,13 +13,12 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import List, Optional, Tuple
+    from typing import List, Tuple
 
     from sentry_sdk.client import BaseClient
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
 
-# Set by coding agents in the commands they run, for the agents that don't set AI_AGENT.
 CODING_AGENT_ENV_VARS = (
     "CLAUDECODE",
     "CODEX_THREAD_ID",
@@ -28,7 +27,6 @@ CODING_AGENT_ENV_VARS = (
     "GEMINI_CLI",
 )
 
-# How long after a change to the file that calls init() the setup counts as in progress.
 # Without git we can't tell whose change it is, so the window is shorter.
 SETUP_IN_PROGRESS_SECONDS = 60 * 60
 SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT = 10 * 60
@@ -38,7 +36,7 @@ GIT_TIMEOUT_SECONDS = 2
 _exit_hook_registered = False
 # What _write_coding_agent_hint can print at exit: one entry for each file that called
 # init() with tracing or logs off.
-_hints_at_exit: "List[Tuple[str, str, str, str, str]]" = []
+_hints_at_exit: "List[Tuple[str, bool, bool]]" = []
 
 
 def _running_under_coding_agent() -> bool:
@@ -54,31 +52,7 @@ def _running_under_coding_agent() -> bool:
     return any(os.environ.get(name) for name in CODING_AGENT_ENV_VARS)
 
 
-_MISSING_PRODUCTS = {
-    (False, False): (
-        "Sentry will get errors from this app but not the request trace around them, "
-        "and its logs only as breadcrumbs.",
-        "Tracing and logs are off, so Sentry only gets errors.",
-        "they're",
-        "them",
-    ),
-    (False, True): (
-        "Sentry will get errors from this app but not the request trace around them.",
-        "Tracing is off, so Sentry gets errors and logs but no traces.",
-        "it's",
-        "it",
-    ),
-    (True, False): (
-        "Sentry will get errors from this app but its logs only as breadcrumbs.",
-        "Logs are off, so Sentry gets errors and traces but no logs.",
-        "they're",
-        "them",
-    ),
-}
-
-
 def _setup_in_progress(init_file: str) -> bool:
-    """Whether this user changed the file that calls init() a short time ago."""
     now = time.time()
     cutoff = now - SETUP_IN_PROGRESS_SECONDS
     try:
@@ -88,20 +62,31 @@ def _setup_in_progress(init_file: str) -> bool:
     if changed < cutoff:
         return False
 
-    def git(*args: str) -> "Optional[str]":
-        # Read only: don't take the index lock (the user or an agent may be running
-        # git at the same time) and don't run a configured fsmonitor command.
-        return _git(
-            "--no-optional-locks",
-            "-c",
-            "core.fsmonitor=false",
-            *args,
-            cwd=os.path.dirname(init_file),
-            timeout=GIT_TIMEOUT_SECONDS,
-        )
+    cwd = os.path.dirname(init_file)
 
     # --branch adds a header line, so an empty answer means git has no answer.
-    status = git("status", "--porcelain", "--branch", "--", init_file)
+    try:
+        status = subprocess.run(
+            [
+                "git",
+                "--no-optional-locks",
+                "-c",
+                "core.fsmonitor=false",
+                "status",
+                "--porcelain",
+                "--branch",
+                "--",
+                init_file,
+            ],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+            timeout=GIT_TIMEOUT_SECONDS,
+        ).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        status = ""
     if not status:
         return changed >= now - SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT
     if "\n" in status:
@@ -109,10 +94,52 @@ def _setup_in_progress(init_file: str) -> bool:
 
     # A checkout also gives a clean file a new mtime, so only count a commit
     # that was made here.
-    committer = git(
-        "log", "-1", f"--since={int(cutoff)}", "--format=%ce", "--", init_file
-    )
-    return bool(committer) and committer == git("config", "user.email")
+    try:
+        committer = subprocess.run(
+            [
+                "git",
+                "--no-optional-locks",
+                "-c",
+                "core.fsmonitor=false",
+                "log",
+                "-1",
+                f"--since={int(cutoff)}",
+                "--format=%ce",
+                "--",
+                init_file,
+            ],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+            timeout=GIT_TIMEOUT_SECONDS,
+        ).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if not committer:
+        return False
+
+    try:
+        user_email = subprocess.run(
+            [
+                "git",
+                "--no-optional-locks",
+                "-c",
+                "core.fsmonitor=false",
+                "config",
+                "user.email",
+            ],
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+            timeout=GIT_TIMEOUT_SECONDS,
+        ).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return committer == user_email
 
 
 def _logs_on(client: "BaseClient") -> bool:
@@ -133,7 +160,7 @@ def register_coding_agent_hint_exit_hook() -> None:
 def _write_coding_agent_hint() -> None:
     with capture_internal_exceptions():
         # One hint, for the first init() from a file that this user changed.
-        for init_file, not_shown, off, its, it in _hints_at_exit:
+        for init_file, tracing_on, logs_on in _hints_at_exit:
             if _setup_in_progress(init_file):
                 break
         else:
@@ -142,18 +169,51 @@ def _write_coding_agent_hint() -> None:
         codex = "codex" in (os.environ.get("AI_AGENT") or "").lower() or any(
             os.environ.get(name) for name in ("CODEX_THREAD_ID", "CODEX_SANDBOX")
         )
-        if codex:
+        if codex and tracing_on:
             hint = (
-                f"{off} If you leave {it} off, tell the user {its} off and that you can "
-                f"turn {it} on if they want. Sentry's official setup checklist, included "
-                f"in the sentry-sdk package you installed: {SETUP_CHECKLIST_PATH}"
+                "Logs are off, so Sentry gets errors and traces but no logs. If you "
+                "leave them off, tell the user they're off and that you can turn them "
+                "on if they want. Sentry's official setup checklist, included in the "
+                f"sentry-sdk package you installed: {SETUP_CHECKLIST_PATH}"
+            )
+        elif codex and logs_on:
+            hint = (
+                "Tracing is off, so Sentry gets errors and logs but no traces. If you "
+                "leave it off, tell the user it's off and that you can turn it on if "
+                "they want. Sentry's official setup checklist, included in the "
+                f"sentry-sdk package you installed: {SETUP_CHECKLIST_PATH}"
+            )
+        elif codex:
+            hint = (
+                "Tracing and logs are off, so Sentry only gets errors. If you leave "
+                "them off, tell the user they're off and that you can turn them on if "
+                "they want. Sentry's official setup checklist, included in the "
+                f"sentry-sdk package you installed: {SETUP_CHECKLIST_PATH}"
+            )
+        elif tracing_on:
+            hint = (
+                "Sentry will get errors from this app but its logs only as "
+                "breadcrumbs. The checklist shows what to change. If you're setting "
+                "up Sentry, it is strongly recommended to check your setup against "
+                "Sentry's official setup checklist, included in the sentry-sdk "
+                f"package you installed: {SETUP_CHECKLIST_PATH}"
+            )
+        elif logs_on:
+            hint = (
+                "Sentry will get errors from this app but not the request trace "
+                "around them. The checklist shows what to change. If you're setting "
+                "up Sentry, it is strongly recommended to check your setup against "
+                "Sentry's official setup checklist, included in the sentry-sdk "
+                f"package you installed: {SETUP_CHECKLIST_PATH}"
             )
         else:
             hint = (
-                f"{not_shown} The checklist shows what to change. If you're setting up "
-                "Sentry, it is strongly recommended to check your setup against Sentry's "
-                "official setup checklist, included in the sentry-sdk package you "
-                f"installed: {SETUP_CHECKLIST_PATH}"
+                "Sentry will get errors from this app but not the request trace "
+                "around them, and its logs only as breadcrumbs. The checklist shows "
+                "what to change. If you're setting up Sentry, it is strongly "
+                "recommended to check your setup against Sentry's official setup "
+                "checklist, included in the sentry-sdk package you installed: "
+                f"{SETUP_CHECKLIST_PATH}"
             )
         sys.stdout.flush()
         sys.stderr.write(f"[sentry] {hint} (hide with SENTRY_AGENT_HINTS=0)\n")
@@ -161,14 +221,13 @@ def _write_coding_agent_hint() -> None:
 
 
 def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
-    """Point a coding agent at the setup checklist while Sentry is being set up."""
     options = client.options
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
     logs_on = _logs_on(client)
     if (
         not _exit_hook_registered
-        # Only tested on macOS and Linux.
+        or sys.version_info < (3, 9)
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
         or options["_experiments"].get("agent_setup_complete")
@@ -176,11 +235,9 @@ def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     ):
         return
 
-    # A script's own path is relative on Python 3.8 and older.
-    init_file = os.path.abspath(caller.f_code.co_filename)
-    # An installed tool that uses Sentry itself isn't the user's app.
+    init_file = caller.f_code.co_filename
     if _is_external_source(init_file):
         return
-    # Agents often cut a command's output with `| tail`, so the hint goes last, at exit.
+    # Agents often cut a command's output with `| tail`, so the hint goes last.
     if all(init_file != seen[0] for seen in _hints_at_exit):
-        _hints_at_exit.append((init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)]))
+        _hints_at_exit.append((init_file, tracing_on, logs_on))
