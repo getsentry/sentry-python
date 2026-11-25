@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 
@@ -38,9 +40,9 @@ class ClientInterceptor(
         with sentry_sdk.start_span(
             name="unary unary call to %s" % method,
             attributes={
-                "sentry.op": OP.GRPC_CLIENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.RPC_METHOD: method,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRPC_CLIENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+                ATTRIBUTE_NAMES.RPC_METHOD: method,
             },
         ) as span:
             client_call_details = self._update_client_call_details_metadata_from_scope(
@@ -48,7 +50,9 @@ class ClientInterceptor(
             )
 
             response = continuation(client_call_details, request)
-            span.set_attribute(SPANDATA.RPC_RESPONSE_STATUS_CODE, response.code().name)
+            span.set_attribute(
+                ATTRIBUTE_NAMES.RPC_RESPONSE_STATUS_CODE, response.code().name
+            )
 
             return response
 
@@ -69,9 +73,9 @@ class ClientInterceptor(
         with sentry_sdk.start_span(
             name="unary stream call to %s" % method,
             attributes={
-                "sentry.op": OP.GRPC_CLIENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.RPC_METHOD: method,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRPC_CLIENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+                ATTRIBUTE_NAMES.RPC_METHOD: method,
             },
         ):
             client_call_details = self._update_client_call_details_metadata_from_scope(

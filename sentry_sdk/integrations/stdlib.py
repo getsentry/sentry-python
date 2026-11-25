@@ -5,6 +5,8 @@ import sys
 from http.client import HTTPConnection, HTTPResponse
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import _SENTRY_HEADER_NAMES, OP, SPANDATA
 from sentry_sdk.integrations import Integration
@@ -297,7 +299,7 @@ def _install_httplib() -> None:
         if parent_span is not None:
             is_inactive_boto3_span = (
                 client.get_integration("boto3") is not None
-                and parent_span.get_attributes().get(SPANDATA.SENTRY_ORIGIN)
+                and parent_span.get_attributes().get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
                 == getattr(client.get_integration("boto3"), "origin", None)
                 and not getattr(parent_span, "active", True)
             )
@@ -309,9 +311,9 @@ def _install_httplib() -> None:
                     parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
                 ),
                 attributes={
-                    "sentry.origin": "auto.http.stdlib.httplib",
-                    "sentry.op": OP.HTTP_CLIENT,
-                    SPANDATA.HTTP_REQUEST_METHOD: method,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.http.stdlib.httplib",
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_CLIENT,
+                    ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD: method,
                 },
                 # boto3 integration owns span's lifecycle; keep child inactive so it
                 # can't restore boto3 span later on.
@@ -325,8 +327,8 @@ def _install_httplib() -> None:
         # for proxies, these point to the proxy host/port
         if tunnel_host:
             if span:
-                span.set_attribute(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
-                span.set_attribute(SPANDATA.NETWORK_PEER_PORT, self.port)
+                span.set_attribute(ATTRIBUTE_NAMES.NETWORK_PEER_ADDRESS, self.host)
+                span.set_attribute(ATTRIBUTE_NAMES.NETWORK_PEER_PORT, self.port)
 
             breadcrumb.update(
                 {
@@ -391,7 +393,7 @@ def _install_httplib() -> None:
             return rv
 
         span.status = "error" if status_code >= 400 else "ok"
-        span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_code)
+        span.set_attribute(ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE, status_code)
 
         # getresponse doesn't include actually reading the response body. This
         # is done in read(). So if the metadata/headers suggest there's a body to
@@ -520,8 +522,8 @@ def _install_subprocess() -> None:
         with sentry_sdk.start_span(
             name=description,
             attributes={
-                "sentry.op": OP.SUBPROCESS,
-                "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.SUBPROCESS,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.subprocess.stdlib.subprocess",
             },
         ) as span:
             for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
@@ -539,7 +541,7 @@ def _install_subprocess() -> None:
 
             rv = old_popen_init(self, *a, **kw)
 
-            span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            span.set_attribute(ATTRIBUTE_NAMES.PROCESS_PID, self.pid)
 
             return rv
 
@@ -556,11 +558,11 @@ def _install_subprocess() -> None:
         with sentry_sdk.start_span(
             name=OP.SUBPROCESS_WAIT,
             attributes={
-                "sentry.op": OP.SUBPROCESS_WAIT,
-                "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.SUBPROCESS_WAIT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.subprocess.stdlib.subprocess",
             },
         ) as span:
-            span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            span.set_attribute(ATTRIBUTE_NAMES.PROCESS_PID, self.pid)
             return old_popen_wait(self, *a, **kw)
 
     subprocess.Popen.wait = sentry_patched_popen_wait  # type: ignore
@@ -576,11 +578,11 @@ def _install_subprocess() -> None:
         with sentry_sdk.start_span(
             name=OP.SUBPROCESS_COMMUNICATE,
             attributes={
-                "sentry.op": OP.SUBPROCESS_COMMUNICATE,
-                "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.SUBPROCESS_COMMUNICATE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.subprocess.stdlib.subprocess",
             },
         ) as span:
-            span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            span.set_attribute(ATTRIBUTE_NAMES.PROCESS_PID, self.pid)
             return old_popen_communicate(self, *a, **kw)
 
     subprocess.Popen.communicate = sentry_patched_popen_communicate  # type: ignore

@@ -1,6 +1,8 @@
 from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -71,9 +73,9 @@ def _install_httpx_client() -> None:
                     parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
                 ),
                 attributes={
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": HttpxIntegration.origin,
-                    "http.request.method": request.method,
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_CLIENT,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: HttpxIntegration.origin,
+                    ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD: request.method,
                 },
             )
 
@@ -85,7 +87,9 @@ def _install_httpx_client() -> None:
 
                 if span is not None:
                     span.status = "error" if rv.status_code >= 400 else "ok"
-                    span.set_attribute("http.response.status_code", rv.status_code)
+                    span.set_attribute(
+                        ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE, rv.status_code
+                    )
             finally:
                 if span is not None:
                     span.set_attributes(url_attributes)
@@ -142,9 +146,9 @@ def _install_httpx_async_client() -> None:
                     parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
                 ),
                 attributes={
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": HttpxIntegration.origin,
-                    "http.request.method": request.method,
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_CLIENT,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: HttpxIntegration.origin,
+                    ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD: request.method,
                 },
             )
 
@@ -158,7 +162,9 @@ def _install_httpx_async_client() -> None:
 
                 if span is not None:
                     span.status = "error" if rv.status_code >= 400 else "ok"
-                    span.set_attribute("http.response.status_code", rv.status_code)
+                    span.set_attribute(
+                        ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE, rv.status_code
+                    )
             finally:
                 if span is not None:
                     span.set_attributes(url_attributes)
