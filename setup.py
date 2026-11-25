@@ -35,7 +35,7 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=("tests", "tests.*")),
     # PEP 561
-    package_data={"sentry_sdk": ["py.typed"]},
+    package_data={"sentry_sdk": ["py.typed", "SETUP_CHECKLIST.md"]},
     zip_safe=False,
     license_expression="MIT",
     python_requires=">=3.6",

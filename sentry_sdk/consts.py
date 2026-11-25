@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
+            "agent_setup_complete": Optional[bool],
             "max_spans": Optional[int],
             "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
