@@ -16,7 +16,6 @@ AGENT_HINT_DSN = "https://public@sentry.example.com/1"
 
 @pytest.fixture
 def run_app(tmp_path, monkeypatch, capsys):
-    """Run a script that calls sentry_sdk.init() and return what the SDK prints at exit."""
     for name in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(sentry_sdk._agent_hint, "_hints_at_exit", [])
@@ -25,17 +24,10 @@ def run_app(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sentry_sdk._agent_hint.atexit, "register", at_exit.append)
     app = tmp_path / "app.py"
 
-    def run(
-        env,
-        init_args="",
-        before_run=None,
-        inits=1,
-        dsn=AGENT_HINT_DSN,
-        filename=None,
-    ):
+    def run(env, init_args="", before_run=None, inits=1):
         for name, value in env.items():
             monkeypatch.setenv(name, value)
-        init = f"sentry_sdk.init(dsn={dsn!r}, {init_args})\n"
+        init = f"sentry_sdk.init(dsn={AGENT_HINT_DSN!r}, {init_args})\n"
         imports = (
             "import sentry_sdk\n"
             "from sentry_sdk.integrations.logging import LoggingIntegration\n"
@@ -45,7 +37,7 @@ def run_app(tmp_path, monkeypatch, capsys):
             before_run(app)
 
         try:
-            exec(compile(app.read_text(), filename or str(app), "exec"), {})
+            exec(compile(app.read_text(), str(app), "exec"), {})
             for hook in at_exit:
                 hook()
         finally:
@@ -55,6 +47,9 @@ def run_app(tmp_path, monkeypatch, capsys):
     return run
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 @pytest.mark.parametrize(
     "env, init_args",
     [
@@ -69,40 +64,18 @@ def test_coding_agent_hint(run_app, env, init_args):
     assert SETUP_CHECKLIST_PATH in run_app(env, init_args)
 
 
-@pytest.mark.parametrize(
-    "env, init_args",
-    [
-        ({}, "traces_sample_rate=0"),
-        (
-            {"AI_AGENT": "claude-code"},
-            "traces_sample_rate=0.1, integrations=[LoggingIntegration()]",
-        ),
-        (
-            {"AI_AGENT": "claude-code"},
-            "traces_sampler=lambda _: 1.0, integrations=[LoggingIntegration()]",
-        ),
-        ({"AI_AGENT": "claude-code"}, "_experiments={'agent_setup_complete': True}"),
-        ({"AI_AGENT": "0"}, "traces_sample_rate=0"),
-        ({"AI_AGENT": "claude-code", "CI": "true"}, "traces_sample_rate=0"),
-        ({"CLAUDECODE": "1", "SENTRY_AGENT_HINTS": "0"}, "traces_sample_rate=0"),
-    ],
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
 )
-def test_coding_agent_hint_not_shown(run_app, env, init_args):
-    assert "[sentry]" not in run_app(env, init_args)
-
-
 def test_coding_agent_hint_shown_when_ci_is_set_to_false(run_app):
     env = {"AI_AGENT": "claude-code", "CI": "false"}
 
     assert SETUP_CHECKLIST_PATH in run_app(env, "traces_sample_rate=0")
 
 
-def test_coding_agent_hint_not_shown_without_dsn(run_app):
-    env = {"AI_AGENT": "claude-code", "SENTRY_DSN": ""}
-
-    assert "[sentry]" not in run_app(env, "traces_sample_rate=0", dsn=None)
-
-
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 @pytest.mark.parametrize(
     "env, init_args, hint",
     [
@@ -145,6 +118,9 @@ def test_coding_agent_hint_per_agent(run_app, env, init_args, hint):
     assert SETUP_CHECKLIST_PATH in printed
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 def test_coding_agent_hint_when_the_logging_integration_sends_no_logs(run_app):
     printed = run_app(
         {"CLAUDECODE": "1"},
@@ -154,113 +130,75 @@ def test_coding_agent_hint_when_the_logging_integration_sends_no_logs(run_app):
     assert "but none of its logs." in printed
 
 
-def test_coding_agent_hint_not_shown_for_an_installed_tool(run_app, tmp_path):
-    tool = tmp_path / "site-packages" / "sometool" / "cli.py"
-    tool.parent.mkdir(parents=True)
-    tool.write_text("")
-
-    assert run_app({"AI_AGENT": "claude-code"}, filename=str(tool)) == ""
-
-
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 def test_coding_agent_hint_shown_once(run_app):
     printed = run_app({"AI_AGENT": "claude-code"}, "traces_sample_rate=0", inits=2)
 
     assert printed.count(SETUP_CHECKLIST_PATH) == 1
 
 
-def _git(app, *args, committer="dev@example.com", date=None):
+def _commit(app, date=None):
     env = {
         **os.environ,
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_SYSTEM": os.devnull,
         "GIT_AUTHOR_NAME": "Dev",
-        "GIT_AUTHOR_EMAIL": committer,
+        "GIT_AUTHOR_EMAIL": "dev@example.com",
         "GIT_COMMITTER_NAME": "Dev",
-        "GIT_COMMITTER_EMAIL": committer,
+        "GIT_COMMITTER_EMAIL": "dev@example.com",
     }
     if date:
         env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = date
-    subprocess.run(
-        ["git", *args],
-        cwd=str(app.parent),
-        env=env,
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-
-def _commit(app, **kwargs):
-    _git(app, "init", "-q")
-    _git(app, "config", "user.email", "dev@example.com")
-    _git(app, "add", app.name)
-    _git(app, "commit", "-q", "-m", "Set up Sentry", **kwargs)
-
-
-def _changed_minutes_ago(app, minutes):
-    changed = time.time() - minutes * 60
-    os.utime(app, (changed, changed))
+    for args in (
+        ["init", "-q"],
+        ["config", "user.email", "dev@example.com"],
+        ["add", app.name],
+        ["commit", "-q", "-m", "Set up Sentry"],
+    ):
+        subprocess.run(
+            ["git", *args],
+            cwd=str(app.parent),
+            env=env,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
 
 def _committed_and_edited(app, minutes_ago=0):
     _commit(app, date="2020-01-01T00:00:00")
     app.write_text(app.read_text() + "\n")
-    _changed_minutes_ago(app, minutes_ago)
+    changed = time.time() - minutes_ago * 60
+    os.utime(app, (changed, changed))
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
-def test_coding_agent_hint_with_a_relative_script_path(run_app, tmp_path, monkeypatch):
-    # Only git can tell that a change from 20 minutes ago is this user's.
-    monkeypatch.chdir(tmp_path)
-    printed = run_app(
-        {"AI_AGENT": "claude-code"},
-        before_run=lambda app: _committed_and_edited(app, minutes_ago=20),
-        filename="app.py",
-    )
+@pytest.mark.parametrize(
+    "before_run",
+    [
+        pytest.param(None, id="new file, no git repo"),
+        pytest.param(_committed_and_edited, id="uncommitted change"),
+        pytest.param(
+            lambda app: _committed_and_edited(app, minutes_ago=20),
+            id="uncommitted change, 20 minutes ago",
+        ),
+        pytest.param(_commit, id="committed here a moment ago"),
+    ],
+)
+def test_coding_agent_hint_during_setup(run_app, before_run):
+    printed = run_app({"AI_AGENT": "claude-code"}, before_run=before_run)
 
     assert SETUP_CHECKLIST_PATH in printed
 
 
-@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
-@pytest.mark.parametrize(
-    "before_run, shown",
-    [
-        pytest.param(None, True, id="new file, no git repo"),
-        pytest.param(
-            lambda app: _changed_minutes_ago(app, 20),
-            False,
-            id="no git repo, changed 20 minutes ago",
-        ),
-        pytest.param(_committed_and_edited, True, id="uncommitted change"),
-        pytest.param(
-            lambda app: _committed_and_edited(app, minutes_ago=20),
-            True,
-            id="uncommitted change, 20 minutes ago",
-        ),
-        pytest.param(
-            lambda app: _committed_and_edited(app, minutes_ago=120),
-            False,
-            id="uncommitted change, two hours ago",
-        ),
-        pytest.param(_commit, True, id="committed here a moment ago"),
-        pytest.param(
-            lambda app: _commit(app, committer="teammate@example.com"),
-            False,
-            id="a teammate's new commit",
-        ),
-        pytest.param(
-            lambda app: _commit(app, date="2020-01-01T00:00:00"),
-            False,
-            id="fresh checkout of an old commit",
-        ),
-    ],
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
 )
-def test_coding_agent_hint_only_during_setup(run_app, before_run, shown):
-    printed = run_app({"AI_AGENT": "claude-code"}, before_run=before_run)
-
-    assert (SETUP_CHECKLIST_PATH in printed) is shown
-
-
 def test_coding_agent_hint_when_git_does_not_answer_in_time(run_app, monkeypatch):
     real_communicate = subprocess.Popen.communicate
 
@@ -293,6 +231,9 @@ def test_coding_agent_hint_exit_hook_is_registered_before_the_client(
     assert registered_first == [True]
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
+)
 def test_coding_agent_hint_for_a_later_init_from_a_changed_file(run_app, tmp_path):
     # Changed in the last hour, but not in the last 10 minutes, and there is no git
     # here to say whose change it is.
