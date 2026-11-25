@@ -1,8 +1,9 @@
 import sys
 from functools import wraps
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -57,7 +58,9 @@ class _SentryRunHooks(RunHooks[TContext]):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
 
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, context.tool_arguments)
+        span.set_attribute(
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS, context.tool_arguments
+        )
 
     async def on_tool_end(
         self,

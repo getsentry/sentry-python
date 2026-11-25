@@ -1,8 +1,10 @@
 import json
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import Span, _AgentFrameworkChatGenerationContext
 
@@ -210,14 +212,14 @@ def ai_client_context(
     context = _AgentFrameworkChatGenerationContext(
         name=f"chat {model_name}",
         attributes={
-            "sentry.op": OP.GEN_AI_CHAT,
-            "sentry.origin": SPAN_ORIGIN,
-            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+            ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
         },
     )
 
-    context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
-    context.span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
+    context.span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME, "openai")
+    context.span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME, agent.name)
 
     request_model_name: "Optional[str]" = None
     if isinstance(agent.model, Model) and hasattr(agent.model, "model"):
@@ -228,38 +230,40 @@ def ai_client_context(
         request_model_name = agent._sentry_request_model
 
     if request_model_name:
-        context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, request_model_name)
+        context.span.set_attribute(
+            ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, request_model_name
+        )
 
     if agent.model_settings.max_tokens:
         context.span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
+            ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
         )
 
     if agent.model_settings.presence_penalty:
         context.span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY,
             agent.model_settings.presence_penalty,
         )
 
     if agent.model_settings.temperature:
         context.span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
+            ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
         )
 
     if agent.model_settings.top_p:
         context.span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p
+            ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p
         )
 
     if agent.model_settings.frequency_penalty:
         context.span.set_attribute(
-            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY,
             agent.model_settings.frequency_penalty,
         )
 
     if client_options["data_collection"]["gen_ai"]["inputs"]:
         context.span.set_attribute(
-            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS,
             json.dumps(_transform_tool_definitions(agent.tools)),
         )
 
@@ -282,12 +286,12 @@ def update_ai_client_span(
         _set_output_data(span, response)
 
     if response_model is not None:
-        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response_model)
     elif hasattr(response, "model") and response.model:
-        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, str(response.model))
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, str(response.model))
 
     # Set conversation ID from agent if available
     if agent:
         conv_id = getattr(agent, "_sentry_conversation_id", None)
         if conv_id:
-            span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID, conv_id)

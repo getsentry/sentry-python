@@ -1,6 +1,8 @@
 import json
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.ai._openai_responses_api import (
     _get_system_instructions,
@@ -37,17 +39,17 @@ def _capture_exception(exc: "Any") -> None:
 
 
 def _set_usage_data(span: "Span", usage: "Usage") -> None:
-    span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
     span.set_attribute(
-        SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
         usage.input_tokens_details.cached_tokens,
     )
-    span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
     span.set_attribute(
-        SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
         usage.output_tokens_details.reasoning_tokens,
     )
-    span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
 
 
 def _set_input_data(
@@ -78,7 +80,7 @@ def _set_input_data(
 
     if len(instructions_text_parts) > 0:
         span.set_attribute(
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             json.dumps(instructions_text_parts),
         )
 

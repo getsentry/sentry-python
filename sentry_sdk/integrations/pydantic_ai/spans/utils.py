@@ -2,10 +2,11 @@
 
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.consts import DATA_URL_BASE64_REGEX
 from sentry_sdk.ai.utils import get_modality_from_mime_type
-from sentry_sdk.consts import SPANDATA
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Union
@@ -63,23 +64,30 @@ def _set_usage_data(
         return
 
     if hasattr(usage, "input_tokens") and usage.input_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
+        span.set_attribute(
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens
+        )
 
     # Pydantic AI uses cache_read_tokens (not input_tokens_cached)
     if hasattr(usage, "cache_read_tokens") and usage.cache_read_tokens is not None:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, usage.cache_read_tokens
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+            usage.cache_read_tokens,
         )
 
     # Pydantic AI uses cache_write_tokens (not input_tokens_cache_write)
     if hasattr(usage, "cache_write_tokens") and usage.cache_write_tokens is not None:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
             usage.cache_write_tokens,
         )
 
     if hasattr(usage, "output_tokens") and usage.output_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
+        span.set_attribute(
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens
+        )
 
     if hasattr(usage, "total_tokens") and usage.total_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+        span.set_attribute(
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
+        )

@@ -3,8 +3,9 @@ import time
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
@@ -139,7 +140,9 @@ def _get_model(
                 for hosted_tool in hosted_tools:
                     _inject_trace_propagation_headers(hosted_tool, span=context.span)
 
-                context.span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+                context.span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING, True
+                )
 
                 streaming_response = None
                 ttft_recorded = False
@@ -151,7 +154,7 @@ def _get_model(
                     if not ttft_recorded and hasattr(event, "delta"):
                         ttft = time.perf_counter() - start_time
                         context.span.set_attribute(
-                            SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
+                            ATTRIBUTE_NAMES.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK, ttft
                         )
                         ttft_recorded = True
 

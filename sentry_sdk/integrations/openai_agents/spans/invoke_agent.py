@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
@@ -25,9 +27,9 @@ def invoke_agent_span(
     span = sentry_sdk.start_span(
         name=f"invoke_agent {agent.name}",
         attributes={
-            "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-            "sentry.origin": SPAN_ORIGIN,
-            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_INVOKE_AGENT,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+            ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "invoke_agent",
         },
     )
 
@@ -69,7 +71,7 @@ def invoke_agent_span(
                 unpack=False,
             )
 
-    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME, agent.name)
 
     return span
 
@@ -86,4 +88,4 @@ def update_invoke_agent_span(
     # Add conversation ID from agent
     conv_id = getattr(agent, "_sentry_conversation_id", None)
     if conv_id:
-        span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID, conv_id)

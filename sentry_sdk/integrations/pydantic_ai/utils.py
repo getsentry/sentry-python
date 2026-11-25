@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import Span
@@ -23,7 +25,7 @@ def _set_agent_data(span: "Span", agent: "Optional[Agent]") -> None:
         agent: Agent object
     """
     if agent and hasattr(agent, "name") and agent.name:
-        span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME, agent.name)
 
 
 def _get_model_name(
