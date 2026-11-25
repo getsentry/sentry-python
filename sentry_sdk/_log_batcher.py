@@ -20,7 +20,6 @@ class LogBatcher(Batcher["Log"]):
 
     @staticmethod
     def _to_transport_format(item: "Log") -> "Any":
-        # TODO: sentry.severity_number and sentry.severity_text are missing from sentry-conventions.
         if "sentry.severity_number" not in item["attributes"]:
             item["attributes"]["sentry.severity_number"] = item["severity_number"]
         if "sentry.severity_text" not in item["attributes"]:

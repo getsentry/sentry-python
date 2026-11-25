@@ -125,7 +125,6 @@ def record_sql_queries(
 
     query = _format_sql(cursor, query)
 
-    # TODO: db.params is deprecated in sentry-conventions, and db.paramstyle, db.executemany and db.cursor are missing.
     data = {}
     if params_list is not None:
         data["db.params"] = params_list
