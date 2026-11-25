@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Optional, Tuple
+    from typing import List, Optional, Tuple
 
     from sentry_sdk.client import BaseClient
 
@@ -36,8 +36,9 @@ SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT = 10 * 60
 GIT_TIMEOUT_SECONDS = 2
 
 _exit_hook_registered = False
-# What _write_coding_agent_hint prints at exit, set by the first init() that qualifies.
-_hint_at_exit: "Optional[Tuple[str, str, str, str, str]]" = None
+# What _write_coding_agent_hint can print at exit: one entry for each file that called
+# init() with tracing or logs off.
+_hints_at_exit: "List[Tuple[str, str, str, str, str]]" = []
 
 
 def _running_under_coding_agent() -> bool:
@@ -134,10 +135,11 @@ def register_coding_agent_hint_exit_hook() -> None:
 
 def _write_coding_agent_hint() -> None:
     with capture_internal_exceptions():
-        if _hint_at_exit is None:
-            return
-        init_file, not_shown, off, its, it = _hint_at_exit
-        if not _setup_in_progress(init_file):
+        # One hint, for the first init() from a file that this user changed.
+        for init_file, not_shown, off, its, it in _hints_at_exit:
+            if _setup_in_progress(init_file):
+                break
+        else:
             return
 
         codex = "codex" in (os.environ.get("AI_AGENT") or "").lower() or any(
@@ -163,15 +165,12 @@ def _write_coding_agent_hint() -> None:
 
 def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     """Point a coding agent at the setup checklist while Sentry is being set up."""
-    global _hint_at_exit
-
     options = client.options
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
     logs_on = _logs_on(client)
     if (
-        _hint_at_exit is not None
-        or not _exit_hook_registered
+        not _exit_hook_registered
         # Only tested on macOS and Linux.
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
@@ -185,13 +184,6 @@ def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     # An installed tool that uses Sentry itself isn't the user's app.
     if _is_external_source(init_file):
         return
-    # A process prints one hint. Don't use it up on a file that wasn't changed: another
-    # init() call, from a file that was, may come later.
-    try:
-        if os.stat(init_file).st_mtime < time.time() - SETUP_IN_PROGRESS_SECONDS:
-            return
-    except OSError:
-        return
-
     # Agents often cut a command's output with `| tail`, so the hint goes last, at exit.
-    _hint_at_exit = (init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)])
+    if all(init_file != seen[0] for seen in _hints_at_exit):
+        _hints_at_exit.append((init_file, *_MISSING_PRODUCTS[(tracing_on, logs_on)]))
