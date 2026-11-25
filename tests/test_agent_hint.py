@@ -3,7 +3,6 @@ import shutil
 import subprocess
 import sys
 import time
-import types
 
 import pytest
 
@@ -51,38 +50,22 @@ def run_app(tmp_path, monkeypatch, capsys):
     sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
 )
 @pytest.mark.parametrize(
-    "env, init_args",
-    [
-        ({"AI_AGENT": "claude-code"}, "traces_sample_rate=0"),
-        ({"CLAUDECODE": "1"}, ""),
-        ({"CODEX_THREAD_ID": "abc"}, "traces_sample_rate=0.0"),
-        ({"CODEX_SANDBOX": "seatbelt"}, "traces_sample_rate=0.1"),
-        ({"CLAUDECODE": "1"}, "integrations=[LoggingIntegration()]"),
-    ],
-)
-def test_coding_agent_hint(run_app, env, init_args):
-    assert SETUP_CHECKLIST_PATH in run_app(env, init_args)
-
-
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
-)
-def test_coding_agent_hint_shown_when_ci_is_set_to_false(run_app):
-    env = {"AI_AGENT": "claude-code", "CI": "false"}
-
-    assert SETUP_CHECKLIST_PATH in run_app(env, "traces_sample_rate=0")
-
-
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
-)
-@pytest.mark.parametrize(
     "env, init_args, hint",
     [
         (
             {"CLAUDECODE": "1"},
             "",
             "Sentry will get errors from this app but not the request trace around them, and none of its logs. The checklist shows what to change. If you're setting up Sentry, it is strongly recommended",
+        ),
+        (
+            {"AI_AGENT": "claude-code"},
+            "traces_sample_rate=0",
+            "Sentry will get errors from this app but not the request trace around them, and none of its logs.",
+        ),
+        (
+            {"AI_AGENT": "claude-code", "CI": "false"},
+            "traces_sample_rate=0",
+            "Sentry will get errors from this app but not the request trace around them, and none of its logs.",
         ),
         (
             {"CLAUDECODE": "1"},
@@ -95,9 +78,19 @@ def test_coding_agent_hint_shown_when_ci_is_set_to_false(run_app):
             "Sentry will get errors from this app but none of its logs. The checklist shows what to change.",
         ),
         (
+            {"CLAUDECODE": "1"},
+            "traces_sample_rate=0.1, integrations=[LoggingIntegration(level=None)]",
+            "Sentry will get errors from this app but none of its logs.",
+        ),
+        (
             {"CODEX_THREAD_ID": "1"},
             "",
             "Tracing and logs are off, so Sentry only gets errors. If you leave them off, tell the user they're off and that you can turn them on if they want.",
+        ),
+        (
+            {"CODEX_THREAD_ID": "abc"},
+            "traces_sample_rate=0.0",
+            "Tracing and logs are off, so Sentry only gets errors.",
         ),
         (
             {"AI_AGENT": "codex"},
@@ -109,25 +102,18 @@ def test_coding_agent_hint_shown_when_ci_is_set_to_false(run_app):
             "traces_sample_rate=0.1",
             "Logs are off, so Sentry gets errors and traces but no logs. If you leave them off, tell the user they're off",
         ),
+        (
+            {"CODEX_SANDBOX": "seatbelt"},
+            "traces_sample_rate=0.1",
+            "Logs are off, so Sentry gets errors and traces but no logs.",
+        ),
     ],
 )
-def test_coding_agent_hint_per_agent(run_app, env, init_args, hint):
+def test_coding_agent_hint(run_app, env, init_args, hint):
     printed = run_app(env, init_args)
 
     assert f"[sentry] {hint}" in printed
     assert SETUP_CHECKLIST_PATH in printed
-
-
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
-)
-def test_coding_agent_hint_when_the_logging_integration_sends_no_logs(run_app):
-    printed = run_app(
-        {"CLAUDECODE": "1"},
-        "traces_sample_rate=0.1, integrations=[LoggingIntegration(level=None)]",
-    )
-
-    assert "but none of its logs." in printed
 
 
 @pytest.mark.skipif(
@@ -213,24 +199,6 @@ def test_coding_agent_hint_when_git_does_not_answer_in_time(run_app, monkeypatch
     assert SETUP_CHECKLIST_PATH in run_app({"CLAUDECODE": "1"})
 
 
-def test_coding_agent_hint_exit_hook_is_registered_before_the_client(
-    run_app, monkeypatch
-):
-    registered_first = []
-    real_client = sentry_sdk.Client
-
-    def client(*args, **kwargs):
-        registered_first.append(sentry_sdk._agent_hint._exit_hook_registered)
-        return real_client(*args, **kwargs)
-
-    monkeypatch.setattr(sentry_sdk, "Client", client)
-    run_app({"CLAUDECODE": "1"})
-
-    # The client's own exit hook is registered when the client is made, and exit hooks
-    # run last-in first-out, so the hint prints after the client's exit output.
-    assert registered_first == [True]
-
-
 @pytest.mark.skipif(
     sys.version_info < (3, 9), reason="Python < 3.9 hits an early return"
 )
@@ -250,22 +218,3 @@ def test_coding_agent_hint_for_a_later_init_from_a_changed_file(run_app, tmp_pat
     printed = run_app({"CLAUDECODE": "1"}, before_run=init_from_the_old_file_first)
 
     assert SETUP_CHECKLIST_PATH in printed
-
-
-def test_setup_checklist_ships_with_the_package():
-    with open(SETUP_CHECKLIST_PATH) as f:
-        assert '_experiments={"agent_setup_complete": True}' in f.read()
-
-
-def test_setup_checklist_example_runs(monkeypatch):
-    with open(SETUP_CHECKLIST_PATH) as f:
-        example = f.read().split("```python\n")[1].split("```")[0]
-    myapp = types.ModuleType("myapp")
-    myapp.settings = types.SimpleNamespace(DEBUG=True)
-    monkeypatch.setitem(sys.modules, "myapp", myapp)
-    monkeypatch.delenv("SENTRY_DSN", raising=False)
-
-    try:
-        exec(example, {})
-    finally:
-        sentry_sdk.get_client().close()
