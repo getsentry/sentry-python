@@ -131,6 +131,9 @@ except ImportError:
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
 
+# The suite may itself run under a coding agent. The hint tests turn hints back on.
+os.environ["SENTRY_AGENT_HINTS"] = "0"
+
 if not os.path.isfile(SENTRY_EVENT_SCHEMA):
     SENTRY_EVENT_SCHEMA = None
 else:

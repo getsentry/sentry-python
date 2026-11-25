@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.0.1
+
+### New Features ✨
+
+- Coding agents that set up Sentry now get a one-line note when tracing is off or the app sends no logs. The note points to `SETUP_CHECKLIST.md`, a short setup checklist that ships in the package. It only prints while the setup is in progress, for an agent, and never in CI. Turn it off with `SENTRY_AGENT_HINTS=0` or with `_experiments={"agent_setup_complete": True}` in `sentry_sdk.init()`. by @wedamija, @claude and @alexander-alderman-webb in [#8269](https://github.com/getsentry/sentry-python/pull/8269)
+
+### Bug Fixes 🐛
+
+- Avoid double span exit with agents by @alexander-alderman-webb in [#8394](https://github.com/getsentry/sentry-python/pull/8394)
+
+### Internal Changes 🔧
+
+#### Deps
+
+- Update github workflows by @renovate in [#8332](https://github.com/getsentry/sentry-python/pull/8332)
+- Lock file maintenance by @renovate in [#8345](https://github.com/getsentry/sentry-python/pull/8345)
+
 ## 3.0.0
 
 New major release of the Python SDK is out now!
