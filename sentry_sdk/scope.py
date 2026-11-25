@@ -11,13 +11,14 @@ from functools import wraps
 from itertools import chain
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import (
     DEFAULT_MAX_BREADCRUMBS,
     FALSE_VALUES,
-    SPANDATA,
 )
 from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
 from sentry_sdk.session import Session
@@ -343,15 +344,15 @@ class Scope:
         return _global_scope
 
     def set_global_attributes(self) -> None:
-        self.set_attribute(SPANDATA.SENTRY_SDK_NAME, SDK_INFO["name"])
-        self.set_attribute(SPANDATA.SENTRY_SDK_VERSION, SDK_INFO["version"])
+        self.set_attribute(ATTRIBUTE_NAMES.SENTRY_SDK_NAME, SDK_INFO["name"])
+        self.set_attribute(ATTRIBUTE_NAMES.SENTRY_SDK_VERSION, SDK_INFO["version"])
 
         self.set_attribute(
-            "process.runtime.name",
+            ATTRIBUTE_NAMES.PROCESS_RUNTIME_NAME,
             platform.python_implementation(),
         )
         self.set_attribute(
-            "process.runtime.version",
+            ATTRIBUTE_NAMES.PROCESS_RUNTIME_VERSION,
             f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         )
 
@@ -359,15 +360,15 @@ class Scope:
 
         server_name = options.get("server_name")
         if server_name:
-            self.set_attribute(SPANDATA.SERVER_ADDRESS, server_name)
+            self.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, server_name)
 
         environment = options.get("environment")
         if environment:
-            self.set_attribute(SPANDATA.SENTRY_ENVIRONMENT, environment)
+            self.set_attribute(ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT, environment)
 
         release = options.get("release")
         if release:
-            self.set_attribute(SPANDATA.SENTRY_RELEASE, release)
+            self.set_attribute(ATTRIBUTE_NAMES.SENTRY_RELEASE, release)
 
     @classmethod
     def last_event_id(cls) -> "Optional[str]":
@@ -704,7 +705,8 @@ class Scope:
             self._span._segment.name = name
             if source:
                 self._span._segment.set_attribute(
-                    "sentry.segment.name.source", getattr(source, "value", source)
+                    ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE,
+                    getattr(source, "value", source),
                 )
 
         if source:
@@ -734,18 +736,18 @@ class Scope:
 
         if type(span) is Span:
             self._transaction = span.name
-            if span._attributes.get("sentry.segment.name.source"):
+            if span._attributes.get(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE):
                 self._transaction_info["source"] = str(
-                    span._attributes["sentry.segment.name.source"]
+                    span._attributes[ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
                 )
             return
 
         if type(span) is NoOpSpan:
             if span._name is not None:
                 self._transaction = span.name
-            if span._attributes.get("sentry.segment.name.source"):
+            if span._attributes.get(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE):
                 self._transaction_info["source"] = str(
-                    span._attributes["sentry.segment.name.source"]
+                    span._attributes[ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
                 )
 
     def set_tag(self, key: str, value: "Any") -> None:
@@ -1439,10 +1441,10 @@ class Scope:
             return
 
         for attribute_name, user_attribute in (
-            ("user.id", "id"),
-            ("user.name", "username"),
-            ("user.email", "email"),
-            ("user.ip_address", "ip_address"),
+            (ATTRIBUTE_NAMES.USER_ID, "id"),
+            (ATTRIBUTE_NAMES.USER_NAME, "username"),
+            (ATTRIBUTE_NAMES.USER_EMAIL, "email"),
+            (ATTRIBUTE_NAMES.USER_IP_ADDRESS, "ip_address"),
         ):
             if (
                 user_attribute in self._user

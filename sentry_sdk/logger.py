@@ -3,6 +3,8 @@ import functools
 import time
 from typing import TYPE_CHECKING, Any
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.utils import capture_internal_exceptions, format_attribute
 
@@ -46,7 +48,7 @@ def _capture_log(
 
     if kwargs:
         # only attach template if there are parameters
-        attributes["sentry.message.template"] = format_attribute(template)
+        attributes[ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE] = format_attribute(template)
 
         with capture_internal_exceptions():
             body = template.format_map(_dict_default_key(kwargs))

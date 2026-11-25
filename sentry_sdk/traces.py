@@ -6,8 +6,9 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
     try_autostart_continuous_profiler,
@@ -211,8 +212,8 @@ class Span:
         self._name: str = name
         self._active: bool = active
         self._attributes: "Attributes" = {
-            "sentry.origin": "manual",
-            "sentry.trace_lifecycle": "stream",
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: "manual",
+            ATTRIBUTE_NAMES.SENTRY_TRACE_LIFECYCLE: "stream",
         }
 
         if attributes:
@@ -322,19 +323,23 @@ class Span:
         # Set attributes from the segment. These are set on span end on purpose
         # so that we have the best chance to capture the segment's final name
         # (since it might change during its lifetime)
-        self.set_attribute("sentry.segment.id", self._segment.span_id)
-        self.set_attribute("sentry.segment.name", self._segment.name)
+        self.set_attribute(ATTRIBUTE_NAMES.SENTRY_SEGMENT_ID, self._segment.span_id)
+        self.set_attribute(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME, self._segment.name)
 
         # Set conversation ID if one is set and this is a correct kind of span
         conversation_id = self._scope.get_conversation_id()
         if conversation_id:
-            has_ai_operation_name = SPANDATA.GEN_AI_OPERATION_NAME in self._attributes
-            op = self._attributes.get("sentry.op")
+            has_ai_operation_name = (
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME in self._attributes
+            )
+            op = self._attributes.get(ATTRIBUTE_NAMES.SENTRY_OP)
             has_gen_ai_op = isinstance(op, str) and (
                 op.startswith("ai.") or op.startswith("gen_ai.")
             )
             if has_ai_operation_name or has_gen_ai_op:
-                self.set_attribute("gen_ai.conversation.id", conversation_id)
+                self.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID, conversation_id
+                )
 
         # Set the end timestamp
         if end_timestamp is not None:
@@ -457,10 +462,10 @@ class Span:
         thread_id, thread_name = get_current_thread_meta()
 
         if thread_id is not None:
-            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
+            self.set_attribute(ATTRIBUTE_NAMES.THREAD_ID, str(thread_id))
 
             if thread_name is not None:
-                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
+                self.set_attribute(ATTRIBUTE_NAMES.THREAD_NAME, thread_name)
 
     def _dynamic_sampling_context(self) -> "dict[str, str]":
         return self._segment._get_baggage().dynamic_sampling_context()
@@ -516,16 +521,16 @@ class Span:
             "dynamic_sampling_context": self._dynamic_sampling_context(),
         }
 
-        if "sentry.op" in self._attributes:
-            context["op"] = self._attributes["sentry.op"]
-        if "sentry.origin" in self._attributes:
-            context["origin"] = self._attributes["sentry.origin"]
+        if ATTRIBUTE_NAMES.SENTRY_OP in self._attributes:
+            context["op"] = self._attributes[ATTRIBUTE_NAMES.SENTRY_OP]
+        if ATTRIBUTE_NAMES.SENTRY_ORIGIN in self._attributes:
+            context["origin"] = self._attributes[ATTRIBUTE_NAMES.SENTRY_ORIGIN]
 
         return context
 
     def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
         if profiler_id is not None:
-            self.set_attribute("sentry.profiler_id", profiler_id)
+            self.set_attribute(ATTRIBUTE_NAMES.SENTRY_PROFILER_ID, profiler_id)
 
     def _start_profile(self) -> None:
         if not self._is_segment():
@@ -541,19 +546,23 @@ class Span:
 
         client = sentry_sdk.get_client()
 
-        self.set_attribute(SPANDATA.SENTRY_PLATFORM, "python")
-        self.set_attribute(SPANDATA.PROCESS_COMMAND_ARGS, sys.argv)
+        self.set_attribute(ATTRIBUTE_NAMES.SENTRY_PLATFORM, "python")
+        self.set_attribute(ATTRIBUTE_NAMES.PROCESS_COMMAND_ARGS, sys.argv)
         self.set_attribute(
-            SPANDATA.SENTRY_SDK_INTEGRATIONS, sorted(client.integrations.keys())
+            ATTRIBUTE_NAMES.SENTRY_SDK_INTEGRATIONS, sorted(client.integrations.keys())
         )
-        if not self.get_attributes().get("sentry.segment.name.source"):
+        if not self.get_attributes().get(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE):
             self.set_attribute(
-                "sentry.segment.name.source", SegmentNameSource.CUSTOM.value
+                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE,
+                SegmentNameSource.CUSTOM.value,
             )
 
-        if client.options.get("dist") and SPANDATA.SENTRY_DIST not in self._attributes:
+        if (
+            client.options.get("dist")
+            and ATTRIBUTE_NAMES.SENTRY_DIST not in self._attributes
+        ):
             self.set_attribute(
-                SPANDATA.SENTRY_DIST, str(client.options["dist"]).strip()
+                ATTRIBUTE_NAMES.SENTRY_DIST, str(client.options["dist"]).strip()
             )
 
     def _to_json(self) -> "SpanJSON":
@@ -604,9 +613,13 @@ class NoOpSpan(Span):
     ) -> None:
         self._name = name  # type: ignore[assignment]
         self._attributes = {}
-        if attributes is not None and "sentry.segment.name.source" in attributes:
+        if (
+            attributes is not None
+            and ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE in attributes
+        ):
             self.set_attribute(
-                "sentry.segment.name.source", attributes["sentry.segment.name.source"]
+                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE,
+                attributes[ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE],
             )
 
         self._span_id: "Optional[str]" = None
@@ -685,17 +698,17 @@ class NoOpSpan(Span):
         return {}
 
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
-        if key != "sentry.segment.name.source":
+        if key != ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE:
             return
 
-        super().set_attribute("sentry.segment.name.source", value)
+        super().set_attribute(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE, value)
 
     def set_attributes(self, attributes: "Attributes") -> None:
         for key, value in attributes.items():
-            if key != "sentry.segment.name.source":
+            if key != ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE:
                 continue
 
-            self.set_attribute("sentry.segment.name.source", value)
+            self.set_attribute(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE, value)
 
     def remove_attribute(self, key: str) -> None:
         pass
