@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.consts import (
     SPAN_ORIGIN,
 )
@@ -58,8 +60,8 @@ def patch_redis_async_pipeline(
         span = sentry_sdk.start_span(
             name="redis.pipeline.execute",
             attributes={
-                "sentry.origin": SPAN_ORIGIN,
-                "sentry.op": OP.DB_QUERY,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.DB_QUERY,
             },
         )
 
@@ -119,7 +121,7 @@ def patch_redis_async_client(
 
         additional_cache_span_attributes = {}
         with capture_internal_exceptions():
-            additional_cache_span_attributes[SPANDATA.DB_QUERY_TEXT] = (
+            additional_cache_span_attributes[ATTRIBUTE_NAMES.DB_QUERY_TEXT] = (
                 _get_safe_command(name, args)
             )
 
@@ -128,23 +130,23 @@ def patch_redis_async_client(
             cache_span = sentry_sdk.start_span(
                 name=cache_properties["description"],
                 attributes={
-                    "sentry.op": cache_properties["op"],
-                    "sentry.origin": SPAN_ORIGIN,
+                    ATTRIBUTE_NAMES.SENTRY_OP: cache_properties["op"],
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
                     **additional_cache_span_attributes,
                 },
             )
 
         additional_db_span_attributes = {}
         with capture_internal_exceptions():
-            additional_db_span_attributes[SPANDATA.DB_QUERY_TEXT] = _get_safe_command(
-                name, args
+            additional_db_span_attributes[ATTRIBUTE_NAMES.DB_QUERY_TEXT] = (
+                _get_safe_command(name, args)
             )
 
         db_span = sentry_sdk.start_span(
             name=db_properties["description"],
             attributes={
-                "sentry.op": db_properties["op"],
-                "sentry.origin": SPAN_ORIGIN,
+                ATTRIBUTE_NAMES.SENTRY_OP: db_properties["op"],
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
                 **additional_db_span_attributes,
             },
         )

@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
     _MAX_NUM_ARGS,
@@ -105,11 +106,11 @@ def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
 
 def _set_client_data(span: "Span", is_cluster: bool, name: str, *args: "Any") -> None:
     if name:
-        span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_OPERATION_NAME, name)
 
     key = _extract_key(name, args)
     if key is not None:
-        span.set_attribute("db.redis.key", key)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_REDIS_KEY, key)
 
 
 def _extract_key(name: str, args: "Any") -> "Optional[str]":

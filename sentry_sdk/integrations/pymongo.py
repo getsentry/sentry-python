@@ -1,8 +1,10 @@
 import copy
 import json
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import (
@@ -92,21 +94,21 @@ def _strip_pii(command: "Dict[str, Any]") -> "Dict[str, Any]":
 def _get_db_data(event: "Any") -> "Dict[str, Any]":
     data = {}
 
-    data[SPANDATA.DB_DRIVER_NAME] = "pymongo"
+    data[ATTRIBUTE_NAMES.DB_DRIVER_NAME] = "pymongo"
     db_name = event.database_name
 
     server_address = event.connection_id[0]
     if server_address is not None:
-        data[SPANDATA.SERVER_ADDRESS] = server_address
+        data[ATTRIBUTE_NAMES.SERVER_ADDRESS] = server_address
 
     server_port = event.connection_id[1]
     if server_port is not None:
-        data[SPANDATA.SERVER_PORT] = server_port
+        data[ATTRIBUTE_NAMES.SERVER_PORT] = server_port
 
-    data["db.system.name"] = "mongodb"
+    data[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] = "mongodb"
 
     if db_name is not None:
-        data["db.namespace"] = db_name
+        data[ATTRIBUTE_NAMES.DB_NAMESPACE] = db_name
 
     return data
 
@@ -145,11 +147,11 @@ class CommandTracer(monitoring.CommandListener):
             query = json.dumps(command, default=str)
 
             data = {
-                "db.operation.name": operation_name,
-                "db.collection.name": collection_name,
-                SPANDATA.DB_QUERY_TEXT: query,
-                "sentry.op": OP.DB,
-                "sentry.origin": PyMongoIntegration.origin,
+                ATTRIBUTE_NAMES.DB_OPERATION_NAME: operation_name,
+                ATTRIBUTE_NAMES.DB_COLLECTION_NAME: collection_name,
+                ATTRIBUTE_NAMES.DB_QUERY_TEXT: query,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.DB,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: PyMongoIntegration.origin,
                 **db_data,
             }
 

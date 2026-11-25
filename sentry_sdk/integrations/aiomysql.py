@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable, TypeVar
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -181,8 +183,8 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             return await f(self)
 
         span_attributes: dict[str, Any] = {
-            "sentry.op": OP.DB,
-            "sentry.origin": AioMySQLIntegration.origin,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.DB,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: AioMySQLIntegration.origin,
         } | breadcrumb_data
 
         with sentry_sdk.start_span(name="connect", attributes=span_attributes):
@@ -193,24 +195,24 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
 
 def _get_connect_data(conn: Any, *, use_streaming_keys: bool = False) -> dict[str, Any]:
     if use_streaming_keys:
-        db_system = SPANDATA.DB_SYSTEM_NAME
-        db_name = SPANDATA.DB_NAMESPACE
+        db_system = ATTRIBUTE_NAMES.DB_SYSTEM_NAME
+        db_name = ATTRIBUTE_NAMES.DB_NAMESPACE
     else:
         db_system = SPANDATA.DB_SYSTEM
         db_name = SPANDATA.DB_NAME
 
     data: dict[str, Any] = {
         db_system: "mysql",
-        SPANDATA.DB_DRIVER_NAME: "aiomysql",
+        ATTRIBUTE_NAMES.DB_DRIVER_NAME: "aiomysql",
     }
 
     host = getattr(conn, "host", None)
     if host is not None:
-        data[SPANDATA.SERVER_ADDRESS] = host
+        data[ATTRIBUTE_NAMES.SERVER_ADDRESS] = host
 
     port = getattr(conn, "port", None)
     if port is not None:
-        data[SPANDATA.SERVER_PORT] = port
+        data[ATTRIBUTE_NAMES.SERVER_PORT] = port
 
     database = getattr(conn, "db", None)
     if database is not None:
@@ -218,28 +220,28 @@ def _get_connect_data(conn: Any, *, use_streaming_keys: bool = False) -> dict[st
 
     user = getattr(conn, "user", None)
     if user is not None:
-        data[SPANDATA.DB_USER] = user
+        data[ATTRIBUTE_NAMES.DB_USER] = user
 
     return data
 
 
 def _set_db_data(span: Any, conn: Any) -> None:
     """Set database-related span data from connection object."""
-    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "mysql")
-    span.set_attribute(SPANDATA.DB_DRIVER_NAME, "aiomysql")
+    span.set_attribute(ATTRIBUTE_NAMES.DB_SYSTEM_NAME, "mysql")
+    span.set_attribute(ATTRIBUTE_NAMES.DB_DRIVER_NAME, "aiomysql")
 
     host = getattr(conn, "host", None)
     if host is not None:
-        span.set_attribute(SPANDATA.SERVER_ADDRESS, host)
+        span.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, host)
 
     port = getattr(conn, "port", None)
     if port is not None:
-        span.set_attribute(SPANDATA.SERVER_PORT, port)
+        span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, port)
 
     database = getattr(conn, "db", None)
     if database is not None:
-        span.set_attribute(SPANDATA.DB_NAMESPACE, database)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_NAMESPACE, database)
 
     user = getattr(conn, "user", None)
     if user is not None:
-        span.set_attribute(SPANDATA.DB_USER, user)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_USER, user)

@@ -4,8 +4,10 @@ import contextlib
 import re
 from typing import Any, Awaitable, Callable, Iterator, TypeVar
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import Span
 from sentry_sdk.tracing_utils import (
@@ -202,17 +204,17 @@ def _wrap_connect_addr(
         addr = kwargs.get("addr")
 
         span_attributes = {
-            "sentry.op": OP.DB,
-            "sentry.origin": AsyncPGIntegration.origin,
-            SPANDATA.DB_SYSTEM_NAME: "postgresql",
-            SPANDATA.DB_USER: user,
-            SPANDATA.DB_NAMESPACE: database,
-            SPANDATA.DB_DRIVER_NAME: "asyncpg",
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.DB,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: AsyncPGIntegration.origin,
+            ATTRIBUTE_NAMES.DB_SYSTEM_NAME: "postgresql",
+            ATTRIBUTE_NAMES.DB_USER: user,
+            ATTRIBUTE_NAMES.DB_NAMESPACE: database,
+            ATTRIBUTE_NAMES.DB_DRIVER_NAME: "asyncpg",
         }
         if addr:
             try:
-                span_attributes[SPANDATA.SERVER_ADDRESS] = addr[0]
-                span_attributes[SPANDATA.SERVER_PORT] = addr[1]
+                span_attributes[ATTRIBUTE_NAMES.SERVER_ADDRESS] = addr[0]
+                span_attributes[ATTRIBUTE_NAMES.SERVER_PORT] = addr[1]
             except IndexError:
                 pass
 
@@ -235,17 +237,17 @@ def _set_db_data(span: "Span", conn: "Any") -> None:
     database = conn._params.database
     user = conn._params.user
 
-    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "postgresql")
-    span.set_attribute(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+    span.set_attribute(ATTRIBUTE_NAMES.DB_SYSTEM_NAME, "postgresql")
+    span.set_attribute(ATTRIBUTE_NAMES.DB_DRIVER_NAME, "asyncpg")
     if addr:
         try:
-            span.set_attribute(SPANDATA.SERVER_ADDRESS, addr[0])
-            span.set_attribute(SPANDATA.SERVER_PORT, addr[1])
+            span.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, addr[0])
+            span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, addr[1])
         except IndexError:
             pass
 
     if database:
-        span.set_attribute(SPANDATA.DB_NAMESPACE, database)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_NAMESPACE, database)
 
     if user:
-        span.set_attribute(SPANDATA.DB_USER, user)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_USER, user)
