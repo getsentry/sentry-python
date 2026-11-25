@@ -273,6 +273,22 @@ def test_coding_agent_hint_exit_hook_is_registered_before_the_client(
     assert registered_first == [True]
 
 
+def test_coding_agent_hint_for_a_later_init_from_a_changed_file(run_app, tmp_path):
+    old_file = tmp_path / "settings.py"
+    old_file.write_text("")
+    long_ago = time.time() - 2 * 60 * 60
+    os.utime(old_file, (long_ago, long_ago))
+
+    def init_from_the_old_file_first(app):
+        *imports, init = app.read_text().splitlines(keepends=True)
+        first = f"exec(compile({init!r}, {str(old_file)!r}, 'exec'))\n"
+        app.write_text("".join(imports) + first + init)
+
+    printed = run_app({"CLAUDECODE": "1"}, before_run=init_from_the_old_file_first)
+
+    assert SETUP_CHECKLIST_PATH in printed
+
+
 def test_setup_checklist_ships_with_the_package():
     with open(SETUP_CHECKLIST_PATH) as f:
         assert '_experiments={"agent_setup_complete": True}' in f.read()
