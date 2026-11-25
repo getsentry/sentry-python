@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.77.0
+
+### New Features ✨
+
+- Coding agents that set up Sentry now get a one-line note when tracing or logs is off. The note points to `SETUP_CHECKLIST.md`, a short setup checklist that ships in the package. It only prints while the setup is in progress, for an agent, and never in CI. Turn it off with `SENTRY_AGENT_HINTS=0` or with `_experiments={"agent_setup_complete": True}` in `sentry_sdk.init()`. by @wedamija, @claude and @alexander-alderman-webb in [#8395](https://github.com/getsentry/sentry-python/pull/8395)
+
+### Other
+
+- Revert "ci: Run test steps in parallel (#8313)" by @alexander-alderman-webb in [#8338](https://github.com/getsentry/sentry-python/pull/8338)
+
 ## 2.76.0
 
 ### New Features ✨
