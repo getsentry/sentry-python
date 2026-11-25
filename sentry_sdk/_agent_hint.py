@@ -144,7 +144,13 @@ def _setup_in_progress(init_file: str) -> bool:
 
 def _logs_on(client: "BaseClient") -> bool:
     options = client.options
-    return bool(options["enable_logs"] or options["_experiments"].get("enable_logs"))
+    if options["enable_logs"] or options["_experiments"].get("enable_logs"):
+        return True
+    # A log integration with capture_sentry_logs=True sends logs without enable_logs.
+    return any(
+        getattr(client.integrations.get(name), "capture_sentry_logs", None) is True
+        for name in ("logging", "loguru")
+    )
 
 
 def register_coding_agent_hint_exit_hook() -> None:
