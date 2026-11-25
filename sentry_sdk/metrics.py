@@ -15,6 +15,11 @@ def _capture_metric(
     unit: "Optional[str]" = None,
     attributes: "Optional[Attributes]" = None,
 ) -> None:
+    scope = sentry_sdk.get_current_scope()
+    batcher = scope.get_client().metrics_batcher
+    if batcher is not None and not batcher.should_capture(name):
+        return
+
     attrs: "Attributes" = {}
 
     if attributes:
@@ -32,7 +37,7 @@ def _capture_metric(
         "attributes": attrs,
     }
 
-    sentry_sdk.get_current_scope()._capture_metric(metric)
+    scope._capture_metric(metric)
 
 
 def count(
