@@ -1,8 +1,13 @@
+import inspect
 import re
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import logger, parse_version
+from sentry_sdk._agent_hint import (
+    register_coding_agent_hint_exit_hook,
+    show_coding_agent_hint,
+)
+from sentry_sdk.utils import capture_internal_exceptions, logger, parse_version
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -43,8 +48,15 @@ def _init(*args: "Optional[str]", **kwargs: "Any") -> None:
 
     This takes the same arguments as the client constructor.
     """
+    with capture_internal_exceptions():
+        register_coding_agent_hint_exit_hook()
     client = sentry_sdk.Client(*args, **kwargs)
     sentry_sdk.get_global_scope().set_client(client)
+    with capture_internal_exceptions():
+        # The frame that called sentry_sdk.init(). None on Pythons without frames.
+        frame = inspect.currentframe()
+        if frame is not None and frame.f_back is not None:
+            show_coding_agent_hint(client, frame.f_back)
     _check_version_deprecations()
 
 

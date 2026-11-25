@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
+            "agent_setup_complete": Optional[bool],
             "max_flags": Optional[int],
             "continuous_profiling_auto_start": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
