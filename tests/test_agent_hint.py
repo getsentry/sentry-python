@@ -8,6 +8,7 @@ import pytest
 
 import sentry_sdk
 import sentry_sdk._agent_hint
+import sentry_sdk.integrations.logging
 from sentry_sdk._agent_hint import CODING_AGENT_ENV_VARS, SETUP_CHECKLIST_PATH
 
 AGENT_HINT_DSN = "https://public@sentry.example.com/1"
@@ -66,6 +67,11 @@ def run_app(tmp_path, monkeypatch, capsys):
         (
             {"CLAUDECODE": "1"},
             "enable_logs=True",
+            "Sentry will get errors from this app but not the request trace around them. The checklist shows what to change.",
+        ),
+        (
+            {"CLAUDECODE": "1"},
+            "integrations=[sentry_sdk.integrations.logging.LoggingIntegration(capture_sentry_logs=True)]",
             "Sentry will get errors from this app but not the request trace around them. The checklist shows what to change.",
         ),
         (
