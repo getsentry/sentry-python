@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Any, List, Optional, TypedDict
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
@@ -106,48 +108,48 @@ def set_span_data_for_streaming_response(
     if accumulated_response.get("finish_reasons"):
         set_data_normalized(
             span,
-            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+            ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS,
             accumulated_response["finish_reasons"],
         )
 
     response_id = accumulated_response.get("id")
     if response_id is not None:
-        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID, response_id)
 
     response_model = accumulated_response.get("model")
     if response_model is not None:
-        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response_model)
 
     if accumulated_response["usage_metadata"] is None:
         return
 
     if accumulated_response["usage_metadata"]["input_tokens"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
             accumulated_response["usage_metadata"]["input_tokens"],
         )
 
     if accumulated_response["usage_metadata"]["input_tokens_cached"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
             accumulated_response["usage_metadata"]["input_tokens_cached"],
         )
 
     if accumulated_response["usage_metadata"]["output_tokens"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
             accumulated_response["usage_metadata"]["output_tokens"],
         )
 
     if accumulated_response["usage_metadata"]["output_tokens_reasoning"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             accumulated_response["usage_metadata"]["output_tokens_reasoning"],
         )
 
     if accumulated_response["usage_metadata"]["total_tokens"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
             accumulated_response["usage_metadata"]["total_tokens"],
         )
 

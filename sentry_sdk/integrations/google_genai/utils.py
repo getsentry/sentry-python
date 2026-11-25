@@ -17,6 +17,7 @@ from typing import (
 )
 
 from google.genai.types import Content, GenerateContentConfig, Part, PartDict
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -681,13 +682,13 @@ def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "Span":
     span = sentry_sdk.start_span(
         name=f"execute_tool {tool_name}",
         attributes={
-            "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
-            "sentry.origin": ORIGIN,
-            SPANDATA.GEN_AI_TOOL_NAME: tool_name,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_EXECUTE_TOOL,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME: tool_name,
         },
     )
     if tool_doc:
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_TOOL_DESCRIPTION, tool_doc)
     return span
 
 
@@ -709,7 +710,8 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
                     span.set_attribute(
-                        SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_input)
+                        ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS,
+                        safe_serialize(tool_input),
                     )
 
                 try:
@@ -718,7 +720,8 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                     # Capture tool output
                     with capture_internal_exceptions():
                         span.set_attribute(
-                            SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result)
+                            ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT,
+                            safe_serialize(result),
                         )
 
                     return result
@@ -736,7 +739,8 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                 tool_input = _capture_tool_input(args, kwargs, tool)
                 with capture_internal_exceptions():
                     span.set_attribute(
-                        SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_input)
+                        ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS,
+                        safe_serialize(tool_input),
                     )
 
                 try:
@@ -745,7 +749,8 @@ def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any
                     # Capture tool output
                     with capture_internal_exceptions():
                         span.set_attribute(
-                            SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result)
+                            ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT,
+                            safe_serialize(result),
                         )
 
                     return result
@@ -902,11 +907,11 @@ def set_span_data_for_request(
 ) -> None:
     """Set span data for the request."""
     client = sentry_sdk.get_client()
-    span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, GEN_AI_SYSTEM)
-    span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME, GEN_AI_SYSTEM)
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model)
 
     if kwargs.get("stream", False):
-        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING, True)
 
     config: "Optional[GenerateContentConfig]" = kwargs.get("config")
 
@@ -940,7 +945,7 @@ def set_span_data_for_request(
 
         if system_instructions is not None:
             span.set_attribute(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
                 json.dumps(_transform_system_instructions(system_instructions)),
             )
 
@@ -959,13 +964,13 @@ def set_span_data_for_request(
 
     # Extract parameters directly from config (not nested under generation_config)
     for param, span_key in [
-        ("temperature", SPANDATA.GEN_AI_REQUEST_TEMPERATURE),
-        ("top_p", SPANDATA.GEN_AI_REQUEST_TOP_P),
-        ("top_k", SPANDATA.GEN_AI_REQUEST_TOP_K),
-        ("max_output_tokens", SPANDATA.GEN_AI_REQUEST_MAX_TOKENS),
-        ("presence_penalty", SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY),
-        ("frequency_penalty", SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY),
-        ("seed", SPANDATA.GEN_AI_REQUEST_SEED),
+        ("temperature", ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE),
+        ("top_p", ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P),
+        ("top_k", ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_K),
+        ("max_output_tokens", ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS),
+        ("presence_penalty", ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY),
+        ("frequency_penalty", ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY),
+        ("seed", ATTRIBUTE_NAMES.GEN_AI_REQUEST_SEED),
     ]:
         if hasattr(config, param):
             value = getattr(config, param)
@@ -986,44 +991,44 @@ def set_span_data_for_response(
     finish_reasons = extract_finish_reasons(response)
     if finish_reasons:
         set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+            span, ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
         )
 
     response_id = getattr(response, "response_id", None)
     if response_id is not None:
-        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID, response_id)
 
     model_version = getattr(response, "model_version", None)
     if model_version is not None:
-        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, model_version)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, model_version)
 
     usage_data = extract_usage_data(response)
 
     if usage_data["input_tokens"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage_data["input_tokens"]
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, usage_data["input_tokens"]
         )
 
     if usage_data["input_tokens_cached"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
             usage_data["input_tokens_cached"],
         )
 
     if usage_data["output_tokens"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage_data["output_tokens"]
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS, usage_data["output_tokens"]
         )
 
     if usage_data["output_tokens_reasoning"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
             usage_data["output_tokens_reasoning"],
         )
 
     if usage_data["total_tokens"]:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"]
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"]
         )
 
     tool_calls = extract_tool_calls(response)
@@ -1102,7 +1107,7 @@ def set_span_data_for_embed_request(
             if input_texts:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                    ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT,
                     input_texts,
                     unpack=False,
                 )
@@ -1130,4 +1135,4 @@ def set_span_data_for_embed_response(
 
         # Set token count if we found any
         if total_tokens > 0:
-            span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, total_tokens)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, total_tokens)

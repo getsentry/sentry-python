@@ -3,6 +3,8 @@ import sys
 from functools import wraps
 from typing import TYPE_CHECKING, cast
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
@@ -89,24 +91,24 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         span = sentry_sdk.start_span(
             name=f"{operation_name} {model}",
             attributes={
-                "sentry.op": op,
-                "sentry.origin": HuggingfaceHubIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: op,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: HuggingfaceHubIntegration.origin,
             },
         )
 
-        span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME, operation_name)
 
         if model:
-            span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model)
 
         attribute_mapping = {
-            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-            "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-            "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
+            "frequency_penalty": ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            "max_tokens": ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS,
+            "presence_penalty": ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            "temperature": ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P,
+            "top_k": ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_K,
+            "stream": ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING,
         }
 
         if client.options["data_collection"]["gen_ai"]["inputs"]:
@@ -180,12 +182,14 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         response_text_buffer.append(choice.message.content)
 
             if response_model is not None:
-                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response_model
+                )
 
             if finish_reason is not None:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                    ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS,
                     finish_reason,
                 )
 
@@ -211,17 +215,18 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             if usage is not None:
                 if usage is not None and usage.prompt_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
                     )
 
                 if usage is not None and usage.completion_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.completion_tokens
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        usage.completion_tokens,
                     )
 
                 if usage is not None and usage.total_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
                     )
 
                 elif (
@@ -230,12 +235,12 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     and usage.completion_tokens is not None
                 ):
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
                         usage.prompt_tokens + usage.completion_tokens,
                     )
             elif tokens_used > 0:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
                     tokens_used,
                 )
 
@@ -285,7 +290,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         if finish_reason is not None:
                             set_data_normalized(
                                 span,
-                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS,
                                 finish_reason,
                             )
 
@@ -301,7 +306,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
 
                         if tokens_used > 0:
                             span.set_attribute(
-                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, tokens_used
+                                ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, tokens_used
                             )
 
                     span.__exit__(None, None, None)
@@ -367,13 +372,13 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     with capture_internal_exceptions():
                         if response_model is not None:
                             span.set_attribute(
-                                SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
+                                ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response_model
                             )
 
                         if finish_reason is not None:
                             set_data_normalized(
                                 span,
-                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS,
                                 finish_reason,
                             )
 
@@ -407,25 +412,27 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
 
                         if usage.prompt_tokens is not None:
                             span.set_attribute(
-                                SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
+                                ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
+                                usage.prompt_tokens,
                             )
 
                         if usage.completion_tokens is not None:
                             span.set_attribute(
-                                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 usage.completion_tokens,
                             )
 
                         if usage.total_tokens is not None:
                             span.set_attribute(
-                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens
+                                ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
+                                usage.total_tokens,
                             )
                         elif (
                             usage.prompt_tokens is not None
                             and usage.completion_tokens is not None
                         ):
                             span.set_attribute(
-                                SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                                ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
                                 usage.prompt_tokens + usage.completion_tokens,
                             )
 

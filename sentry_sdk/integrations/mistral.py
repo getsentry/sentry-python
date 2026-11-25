@@ -3,8 +3,10 @@ from collections.abc import Sequence
 from functools import wraps
 from typing import TYPE_CHECKING, cast
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 
 if TYPE_CHECKING:
@@ -231,16 +233,16 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"chat {model}" if model is not None else "chat",
             attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": MistralIntegration.origin,
-                SPANDATA.GEN_AI_PROVIDER_NAME: "mistral",
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: MistralIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: "mistral",
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
             },
         ) as span:
             if model is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model)
 
-            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING, False)
 
             messages = kwargs.get("messages")
             if (
@@ -252,43 +254,47 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 ]
                 if len(system_instructions) > 0:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
                         json.dumps(_transform_system_instructions(system_instructions)),
                     )
 
                 span.set_attribute(
-                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES,
                     json.dumps(_transform_input_messages(messages)),
                 )
 
             max_tokens = kwargs.get("max_tokens")
             if max_tokens is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS, max_tokens
+                )
 
             frequency_penalty = kwargs.get("frequency_penalty")
             if frequency_penalty is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
                 )
 
             presence_penalty = kwargs.get("presence_penalty")
             if presence_penalty is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
                 )
 
             temperature = kwargs.get("temperature")
             if temperature is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE, temperature
+                )
 
             top_p = kwargs.get("top_p")
             if top_p is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P, top_p)
 
             reasoning_effort = kwargs.get("reasoning_effort")
             if reasoning_effort is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_effort
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_effort
                 )
 
             response = f(self, *args, **kwargs)
@@ -298,18 +304,20 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             if response.usage.prompt_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.prompt_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
+                    response.usage.prompt_tokens,
                 )
 
             if response.usage.completion_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
                     response.usage.completion_tokens,
                 )
 
             if response.usage.total_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
+                    response.usage.total_tokens,
                 )
 
             if not client.options["data_collection"]["gen_ai"]["outputs"]:
@@ -327,7 +335,7 @@ def _wrap_complete(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 output_messages.append(transformed_message)
 
             span.set_attribute(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES,
                 json.dumps(output_messages),
             )
 
@@ -349,16 +357,16 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"chat {model}" if model is not None else "chat",
             attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": MistralIntegration.origin,
-                SPANDATA.GEN_AI_PROVIDER_NAME: "mistral",
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: MistralIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: "mistral",
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
             },
         ) as span:
             if model is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model)
 
-            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING, False)
 
             messages: "Optional[Union[Iterable[ChatCompletionRequestMessage], Iterable[ChatCompletionRequestMessageTypedDict]]]" = kwargs.get(
                 "messages"
@@ -372,43 +380,47 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 ]
                 if len(system_instructions) > 0:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
                         json.dumps(_transform_system_instructions(system_instructions)),
                     )
 
                 span.set_attribute(
-                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES,
                     json.dumps(_transform_input_messages(messages)),
                 )
 
             max_tokens = kwargs.get("max_tokens")
             if max_tokens is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS, max_tokens
+                )
 
             frequency_penalty = kwargs.get("frequency_penalty")
             if frequency_penalty is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
                 )
 
             presence_penalty = kwargs.get("presence_penalty")
             if presence_penalty is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
                 )
 
             temperature = kwargs.get("temperature")
             if temperature is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE, temperature
+                )
 
             top_p = kwargs.get("top_p")
             if top_p is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P, top_p)
 
             reasoning_effort = kwargs.get("reasoning_effort")
             if reasoning_effort is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_effort
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_effort
                 )
 
             response = await f(self, *args, **kwargs)
@@ -418,18 +430,20 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
             if response.usage.prompt_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.prompt_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
+                    response.usage.prompt_tokens,
                 )
 
             if response.usage.completion_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
                     response.usage.completion_tokens,
                 )
 
             if response.usage.total_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, response.usage.total_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
+                    response.usage.total_tokens,
                 )
 
             if not client.options["data_collection"]["gen_ai"]["outputs"]:
@@ -447,7 +461,7 @@ def _wrap_complete_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 output_messages.append(transformed_message)
 
             span.set_attribute(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES,
                 json.dumps(output_messages),
             )
 
