@@ -1,9 +1,11 @@
 import json
 from typing import TypeVar
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.api import get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.traces import (
@@ -141,10 +143,10 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         span = sentry_sdk.start_span(
             name=message.actor_name,
             attributes={
-                "sentry.op": OP.QUEUE_PROCESS,
-                "sentry.origin": DramatiqIntegration.origin,
-                "sentry.segment.name.source": SegmentNameSource.TASK.value,
-                SPANDATA.MESSAGING_DESTINATION_NAME: message.queue_name,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DramatiqIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.TASK.value,
+                ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME: message.queue_name,
             },
             parent_span=None,
         )

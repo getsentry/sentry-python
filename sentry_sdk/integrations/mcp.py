@@ -12,6 +12,8 @@ from contextlib import contextmanager, nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -154,14 +156,14 @@ def _set_span_input_data(
 
     # Set handler identifier
     span.set_attribute(span_data_key, handler_name)
-    span.set_attribute(SPANDATA.MCP_METHOD_NAME, mcp_method_name)
+    span.set_attribute(ATTRIBUTE_NAMES.MCP_METHOD_NAME, mcp_method_name)
 
     # Set transport/MCP transport type
     span.set_attribute(
-        SPANDATA.NETWORK_TRANSPORT,
+        ATTRIBUTE_NAMES.NETWORK_TRANSPORT,
         "pipe" if mcp_transport == "stdio" else "tcp",
     )
-    span.set_attribute(SPANDATA.MCP_TRANSPORT, mcp_transport)
+    span.set_attribute(ATTRIBUTE_NAMES.MCP_TRANSPORT, mcp_transport)
 
     # Set request_id if provided
     if request_id:
@@ -169,7 +171,7 @@ def _set_span_input_data(
 
     # Set session_id if provided
     if session_id:
-        span.set_attribute(SPANDATA.MCP_SESSION_ID, session_id)
+        span.set_attribute(ATTRIBUTE_NAMES.MCP_SESSION_ID, session_id)
 
     # Set request arguments (excluding common request context objects)
     for k, v in arguments.items():
@@ -252,15 +254,15 @@ async def _instrument_tool_call(
     with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"tools/call {handler_name}",
         attributes={
-            "sentry.op": OP.MCP_SERVER,
-            "sentry.origin": MCPIntegration.origin,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.MCP_SERVER,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: MCPIntegration.origin,
         },
     ) as span:
         # Set input span data
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.GEN_AI_TOOL_NAME,
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME,
             "tools/call",
             arguments,
             request_id,
@@ -295,7 +297,7 @@ async def _instrument_tool_call(
             return result
 
         span.set_attribute(
-            SPANDATA.GEN_AI_TOOL_CALL_RESULT,
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT,
             safe_serialize(result_content),
         )
 
@@ -328,15 +330,15 @@ async def _instrument_prompt_get(
     with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"prompts/get {handler_name}",
         attributes={
-            "sentry.op": OP.MCP_SERVER,
-            "sentry.origin": MCPIntegration.origin,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.MCP_SERVER,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: MCPIntegration.origin,
         },
     ) as span:
         # Set input span data
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.GEN_AI_PROMPT_NAME,
+            ATTRIBUTE_NAMES.GEN_AI_PROMPT_NAME,
             "prompts/get",
             arguments,
             request_id,
@@ -370,7 +372,7 @@ async def _instrument_prompt_get(
             # Always set message count if we found messages
             if message_count > 0:
                 span.set_attribute(
-                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
+                    ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
                 )
 
             if (
@@ -387,7 +389,7 @@ async def _instrument_prompt_get(
                 role = first_message["role"]
 
             if role:
-                span.set_attribute(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
+                span.set_attribute(ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_ROLE, role)
 
             content_text = None
             if "content" in first_message:
@@ -397,7 +399,7 @@ async def _instrument_prompt_get(
 
             if content_text:
                 span.set_attribute(
-                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
+                    ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
                     content_text,
                 )
         except Exception:
@@ -427,15 +429,15 @@ async def _instrument_resource_read(
     with _active_http_scopes(ctx=ctx), sentry_sdk.start_span(
         name=f"resources/read {handler_name}",
         attributes={
-            "sentry.op": OP.MCP_SERVER,
-            "sentry.origin": MCPIntegration.origin,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.MCP_SERVER,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: MCPIntegration.origin,
         },
     ) as span:
         # Set input span data
         _set_span_input_data(
             span,
             handler_name,
-            SPANDATA.MCP_RESOURCE_URI,
+            ATTRIBUTE_NAMES.MCP_RESOURCE_URI,
             "resources/read",
             {},
             request_id,
@@ -447,7 +449,7 @@ async def _instrument_resource_read(
         if handler_name and "://" in handler_name:
             protocol = handler_name.split("://")[0]
         if protocol:
-            span.set_attribute(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+            span.set_attribute(ATTRIBUTE_NAMES.MCP_RESOURCE_PROTOCOL, protocol)
 
         try:
             result = await call_next(ctx)

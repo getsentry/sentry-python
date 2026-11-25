@@ -3,8 +3,10 @@ import re
 import time
 import weakref
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.crons import MonitorStatus, capture_checkin
 from sentry_sdk.crons.utils import _get_interval_schedule
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -113,16 +115,18 @@ class RqIntegration(Integration):
                     with sentry_sdk.start_span(
                         name="unknown RQ task" if func_name is None else func_name,
                         attributes={
-                            "sentry.op": OP.QUEUE_PROCESS,
-                            "sentry.origin": RqIntegration.origin,
-                            "sentry.segment.name.source": SegmentNameSource.TASK,
-                            SPANDATA.MESSAGING_MESSAGE_ID: job.id,
-                            SPANDATA.MESSAGING_DESTINATION_NAME: queue.name,
+                            ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
+                            ATTRIBUTE_NAMES.SENTRY_ORIGIN: RqIntegration.origin,
+                            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.TASK,
+                            ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID: job.id,
+                            ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME: queue.name,
                         },
                         parent_span=None,
                     ) as span:
                         if func_name is not None:
-                            span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, func_name)
+                            span.set_attribute(
+                                ATTRIBUTE_NAMES.CODE_FUNCTION_NAME, func_name
+                            )
 
                         rv = old_perform_job(self, job, queue, *args, **kwargs)
 

@@ -4,9 +4,11 @@ from contextlib import nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk import isolation_scope
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -271,8 +273,8 @@ def _wrap_task_run(f: "F") -> "F":
             span = sentry_sdk.start_span(
                 name=task_name,
                 attributes={
-                    "sentry.op": OP.QUEUE_PUBLISH,
-                    "sentry.origin": CeleryIntegration.origin,
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PUBLISH,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: CeleryIntegration.origin,
                 },
             )
 
@@ -331,9 +333,9 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                     name=task_name,
                     parent_span=None,  # make this a segment
                     attributes={
-                        "sentry.origin": CeleryIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.TASK.value,
-                        "sentry.op": OP.QUEUE_PROCESS,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: CeleryIntegration.origin,
+                        ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.TASK.value,
+                        ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
                     },
                 )
 
@@ -352,7 +354,9 @@ def _set_messaging_destination_name(task: "Any", span: "Span") -> None:
             if delivery_info.get("exchange") == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning the tasks
                 # are sent to the queue with the same name as the routing key.
-                span.set_attribute(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME, routing_key
+                )
 
 
 def _wrap_task_call(task: "Any", f: "F") -> "F":
@@ -372,8 +376,8 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
             with sentry_sdk.start_span(
                 name=task.name,
                 attributes={
-                    "sentry.op": OP.QUEUE_PROCESS,
-                    "sentry.origin": CeleryIntegration.origin,
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: CeleryIntegration.origin,
                 },
             ) as span:
                 _set_messaging_destination_name(task, span)
@@ -391,22 +395,24 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
                 if latency is not None:
                     latency *= 1000  # milliseconds
                     span.set_attribute(
-                        SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency
+                        ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency
                     )
 
                 with capture_internal_exceptions():
-                    span.set_attribute(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                    span.set_attribute(
+                        ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID, task.request.id
+                    )
 
                 with capture_internal_exceptions():
                     span.set_attribute(
-                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT,
+                        ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RETRY_COUNT,
                         task.request.retries,
                     )
 
                 with capture_internal_exceptions():
                     with task.app.connection() as conn:
                         span.set_attribute(
-                            SPANDATA.MESSAGING_SYSTEM,
+                            ATTRIBUTE_NAMES.MESSAGING_SYSTEM,
                             conn.transport.driver_type,
                         )
 
@@ -502,24 +508,29 @@ def _patch_producer_publish() -> None:
         with sentry_sdk.start_span(
             name=task_name,
             attributes={
-                "sentry.op": OP.QUEUE_PUBLISH,
-                "sentry.origin": CeleryIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PUBLISH,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: CeleryIntegration.origin,
             },
         ) as span:
             if task_id is not None:
-                span.set_attribute(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+                span.set_attribute(ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID, task_id)
 
             if exchange == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning messages are
                 # routed to the queue with the same name as the routing key.
-                span.set_attribute(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME, routing_key
+                )
 
             if retries is not None:
-                span.set_attribute(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RETRY_COUNT, retries
+                )
 
             with capture_internal_exceptions():
                 span.set_attribute(
-                    SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
+                    ATTRIBUTE_NAMES.MESSAGING_SYSTEM,
+                    self.connection.transport.driver_type,
                 )
 
             return original_publish(self, *args, **kwargs)
