@@ -11,6 +11,7 @@ import threading
 import time
 import warnings
 from collections import namedtuple
+from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -2020,5 +2021,23 @@ def _is_localhost(
                 domain = header.split(":")[0]
             if _host_matches_local_domain(domain):
                 return True
+
+    return False
+
+
+def event_has_unhandled_exception(event: "Event") -> bool:
+    """Return True if any exception in ``event`` has ``mechanism.handled is False``."""
+    exceptions = (event.get("exception") or {}).get("values")
+    if not exceptions:
+        return False
+
+    for error in exceptions:
+        if isinstance(error, AnnotatedValue):
+            error = error.value or {}
+        if not isinstance(error, Mapping):
+            continue
+        mechanism = error.get("mechanism")
+        if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
+            return True
 
     return False

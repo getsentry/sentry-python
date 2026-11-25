@@ -38,6 +38,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
     env_to_bool,
+    event_has_unhandled_exception,
     format_timestamp,
     get_before_send_log,
     get_before_send_metric,
@@ -675,13 +676,7 @@ class _Client(BaseClient):
         exceptions = (event.get("exception") or {}).get("values")
         if exceptions:
             errored = True
-            for error in exceptions:
-                if isinstance(error, AnnotatedValue):
-                    error = error.value or {}
-                mechanism = error.get("mechanism")
-                if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
-                    crashed = True
-                    break
+            crashed = event_has_unhandled_exception(event)
 
         user = event.get("user")
 

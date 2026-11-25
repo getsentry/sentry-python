@@ -683,6 +683,70 @@ def test_dedupe_does_not_retain_builtin_exceptions(sentry_init):
     assert payload_ref() is None
 
 
+def test_dedupe_allows_unhandled_after_handled(sentry_init, capture_events):
+    """Logging or capturing before re-raising must still emit the crash event."""
+    import logging
+
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    sentry_init(
+        default_integrations=False,
+        integrations=[
+            LoggingIntegration(event_level=logging.ERROR),
+            DedupeIntegration(),
+        ],
+    )
+    events = capture_events()
+    log = logging.getLogger("test_dedupe_crash")
+
+    exc = ValueError("db down")
+    with sentry_sdk.new_scope() as scope:
+        scope._session = sentry_sdk.sessions.Session(release="1.0.0")
+        try:
+            raise exc
+        except ValueError:
+            log.exception("failed before reraise")
+            event, hint = sentry_sdk.utils.event_from_exception(
+                sys.exc_info(),
+                mechanism={"type": "generic", "handled": False},
+            )
+            sentry_sdk.capture_event(event, hint=hint)
+
+            # A third capture (handled or unhandled) of the same instance is still deduped.
+            sentry_sdk.capture_exception(exc)
+            dup_event, dup_hint = sentry_sdk.utils.event_from_exception(
+                sys.exc_info(),
+                mechanism={"type": "generic", "handled": False},
+            )
+            sentry_sdk.capture_event(dup_event, hint=dup_hint)
+
+        assert scope._session.status == "crashed"
+
+    assert len(events) == 2
+    assert events[0]["exception"]["values"][-1]["mechanism"]["handled"] is True
+    assert events[1]["exception"]["values"][-1]["mechanism"]["handled"] is False
+
+
+def test_dedupe_drops_handled_after_unhandled(sentry_init, capture_events):
+    """Handled captures after an unhandled crash of the same exc stay deduped."""
+    sentry_init()
+    events = capture_events()
+
+    exc = ValueError("crash first")
+    try:
+        raise exc
+    except ValueError:
+        event, hint = sentry_sdk.utils.event_from_exception(
+            sys.exc_info(),
+            mechanism={"type": "generic", "handled": False},
+        )
+        sentry_sdk.capture_event(event, hint=hint)
+        sentry_sdk.capture_exception(exc)
+
+    assert len(events) == 1
+    assert events[0]["exception"]["values"][-1]["mechanism"]["handled"] is False
+
+
 def test_event_processor_drop_records_client_report(
     sentry_init, capture_events, capture_record_lost_event_calls
 ):

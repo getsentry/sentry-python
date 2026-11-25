@@ -3,7 +3,11 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_has_unhandled_exception,
+    logger,
+)
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -30,11 +34,13 @@ class DedupeIntegration(Integration):
                 return event
 
             exc = exc_info[1]
+            is_unhandled = event_has_unhandled_exception(event)
+            seen_state = getattr(exc, "_handled_by_sentry", None)
 
-            if getattr(exc, "_handled_by_sentry", False):
+            if seen_state and (not is_unhandled or seen_state == "unhandled"):
                 logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
-            else:
-                with capture_internal_exceptions():
-                    exc._handled_by_sentry = True
-                return event
+
+            with capture_internal_exceptions():
+                exc._handled_by_sentry = "unhandled" if is_unhandled else "handled"
+            return event
