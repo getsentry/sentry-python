@@ -121,6 +121,7 @@ class _AgentFrameworkChatGenerationContext:
     ) -> None:
         if type(self._span) is not Span:
             self._span.__exit__(ty, value, tb)
+            return
 
         try:
             self._span.__exit__(ty, value, tb)
