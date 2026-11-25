@@ -22,11 +22,15 @@ if TYPE_CHECKING:
 
 
 class _Reservoir:
-    __slots__ = ("kept", "seen")
+    __slots__ = ("kept", "seen", "slots", "sampled_out")
 
     def __init__(self) -> None:
         self.kept: "list[Metric]" = []
         self.seen = 0
+        # Slots handed out by should_capture(). A slot stays empty if its
+        # metric never reaches add(), e.g. because before_send_metric dropped it.
+        self.slots = 0
+        self.sampled_out = 0
 
 
 class _ThreadState:
@@ -81,6 +85,9 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         self._retired: "deque[_Window]" = deque()
         # Holds the claim of the one thread that gets to start the flusher.
         self._flusher_claim: "dict[str, object]" = {}
+        # Per thread, the reservoir should_capture() admitted each metric name to.
+        # Keyed by name, since before_send_metric can capture other metrics.
+        self._admitted: "threading.local" = threading.local()
 
     def _reset_thread_state(self) -> None:
         super()._reset_thread_state()
@@ -88,6 +95,7 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
         self._window = _Window()
         self._retired = deque()
         self._flusher_claim = {}
+        self._admitted = threading.local()
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -129,11 +137,6 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
             if not self._ensure_thread():
                 return None
 
-            window = self._window
-            if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
-                self._retire_window(window)
-                window = self._window
-
             limit = self._limits.get(item["name"])
             if limit is None:
                 if len(self._queue) >= self.MAX_UNSAMPLED_BEFORE_DROP:
@@ -150,27 +153,63 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
                 self._flush_event.set()
                 return
 
-            self._add_to_window(item, window, limit)
+            admitted = getattr(self._admitted, "reservoirs", None)
+            reservoir = admitted.pop(item["name"], None) if admitted else None
+            # Not admitted by should_capture(), e.g. because before_send_metric
+            # renamed the metric
+            if reservoir is None:
+                reservoir = self._admit(item["name"], limit)
+                if reservoir is None:
+                    return None
+
+            reservoir.kept.append(item)
         finally:
             self._active.flag = False
 
-    def _add_to_window(self, item: "Metric", window: "_Window", limit: int) -> None:
-        state = window.threads[threading.get_ident()]
-        reservoir = state.reservoirs[item["name"]]
+    def should_capture(self, name: str) -> bool:
+        """
+        Decide whether a metric is kept before it's built, so metrics that
+        window sampling drops cost as little as possible.
+        """
+        limit = self._limits.get(name)
+        if limit is None:
+            return True
+
+        reservoir = self._admit(name, limit)
+        if reservoir is None:
+            return False
+
+        admitted = getattr(self._admitted, "reservoirs", None)
+        if admitted is None:
+            admitted = self._admitted.reservoirs = {}
+        admitted[name] = reservoir
+        return True
+
+    def _admit(self, name: str, limit: int) -> "Optional[_Reservoir]":
+        window = self._window
+        if time.monotonic() - window.start >= self.FLUSH_WAIT_TIME:
+            self._retire_window(window)
+            window = self._window
+
+        reservoir = window.threads[threading.get_ident()].reservoirs[name]
         reservoir.seen += 1
-        if (
-            len(reservoir.kept) < limit
-            and window.number_kept < self.MAX_KEPT_PER_WINDOW
-        ):
+        if reservoir.slots < limit and window.number_kept < self.MAX_KEPT_PER_WINDOW:
             window.number_kept += 1
-            reservoir.kept.append(item)
-            return
+            reservoir.slots += 1
+            return reservoir
 
         index = random.randrange(reservoir.seen)
-        if index >= len(reservoir.kept):
-            return
+        if index >= reservoir.slots:
+            reservoir.sampled_out += 1
+            return None
 
-        reservoir.kept[index] = item
+        # Evict now, so the slot is free for this metric. Slots are
+        # interchangeable, so an index past the kept metrics is an empty slot.
+        if index < len(reservoir.kept):
+            reservoir.kept[index] = reservoir.kept[-1]
+            reservoir.kept.pop()
+            reservoir.sampled_out += 1
+        return reservoir
 
     def _retire_window(self, window: "_Window") -> None:
         claim = object()
@@ -247,16 +286,22 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
             for position in random.sample(range(bounds[-1]), min(limit, bounds[-1])):
                 slots[bisect.bisect_right(bounds, position)] += 1
 
+            # Empty slots were dropped after being sampled, e.g. by
+            # before_send_metric, and still count towards the rate
             kept: "list[Metric]" = []
+            selected = 0
             for reservoir, count in zip(reservoirs, slots):
                 thread_kept = reservoir.kept.copy()
-                kept.extend(random.sample(thread_kept, min(count, len(thread_kept))))
-            if not kept:
-                sampled_out += bounds[-1]
-                continue
+                count = min(count, reservoir.slots)
+                selected += count
+                sampled_out += reservoir.sampled_out + len(thread_kept)
+                for index in random.sample(range(reservoir.slots), count):
+                    if index < len(thread_kept):
+                        kept.append(thread_kept[index])
+                        sampled_out -= 1
 
             items.extend(kept)
-            rate = len(kept) / bounds[-1]
+            rate = selected / bounds[-1]
             for item in kept:
                 user_rate = item["attributes"].get("sentry.client_sample_rate")
                 if isinstance(user_rate, (int, float)) and not isinstance(
@@ -266,7 +311,6 @@ class LockFreeMetricsBatcher(Batcher["Metric"]):
                     continue
 
                 item["attributes"]["sentry.client_sample_rate"] = rate
-            sampled_out += bounds[-1] - len(kept)
 
         return sampled_out
 

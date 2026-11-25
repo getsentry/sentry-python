@@ -94,6 +94,9 @@ class MetricsBatcher(Batcher["Metric"]):
         finally:
             self._active.flag = False
 
+    def should_capture(self, name: str) -> bool:
+        return True
+
     def _flush(self) -> "Optional[Envelope]":
         envelope = Envelope(
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
