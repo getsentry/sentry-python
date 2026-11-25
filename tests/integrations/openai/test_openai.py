@@ -320,6 +320,7 @@ def test_nonstreaming_chat_completion_no_sensitive_data(
             frequency_penalty=0.2,
             temperature=0.7,
             top_p=0.9,
+            seed=42,
         )
         .choices[0]
         .message.content
@@ -338,6 +339,7 @@ def test_nonstreaming_chat_completion_no_sensitive_data(
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_SEED] == 42
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]

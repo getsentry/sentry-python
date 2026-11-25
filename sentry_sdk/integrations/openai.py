@@ -490,6 +490,10 @@ def _set_completions_api_input_data(
     if frequency_penalty is not None and _is_given(frequency_penalty):
         span.set_attribute(SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty)
 
+    seed = kwargs.get("seed")
+    if seed is not None and _is_given(seed):
+        span.set_attribute(SPANDATA.GEN_AI_REQUEST_SEED, seed)
+
     temperature = kwargs.get("temperature")
     if temperature is not None and _is_given(temperature):
         span.set_attribute(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
