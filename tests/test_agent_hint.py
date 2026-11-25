@@ -19,7 +19,7 @@ def run_app(tmp_path, monkeypatch, capsys):
     """Run a script that calls sentry_sdk.init() and return what the SDK prints at exit."""
     for name in ("CI", "SENTRY_AGENT_HINTS", "AI_AGENT", *CODING_AGENT_ENV_VARS):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(sentry_sdk._agent_hint, "_hint_at_exit", None)
+    monkeypatch.setattr(sentry_sdk._agent_hint, "_hints_at_exit", [])
     monkeypatch.setattr(sentry_sdk._agent_hint, "_exit_hook_registered", False)
     at_exit = []
     monkeypatch.setattr(sentry_sdk._agent_hint.atexit, "register", at_exit.append)
@@ -274,10 +274,12 @@ def test_coding_agent_hint_exit_hook_is_registered_before_the_client(
 
 
 def test_coding_agent_hint_for_a_later_init_from_a_changed_file(run_app, tmp_path):
+    # Changed in the last hour, but not in the last 10 minutes, and there is no git
+    # here to say whose change it is.
     old_file = tmp_path / "settings.py"
     old_file.write_text("")
-    long_ago = time.time() - 2 * 60 * 60
-    os.utime(old_file, (long_ago, long_ago))
+    half_an_hour_ago = time.time() - 30 * 60
+    os.utime(old_file, (half_an_hour_ago, half_an_hour_ago))
 
     def init_from_the_old_file_first(app):
         *imports, init = app.read_text().splitlines(keepends=True)
