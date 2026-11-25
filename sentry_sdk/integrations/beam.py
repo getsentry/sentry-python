@@ -4,17 +4,18 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations import Integration, _check_minimum_version
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    parse_version,
     reraise,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, TypeVar
+    from typing import Any, Callable, Iterator, NoReturn, TypeVar
 
     from sentry_sdk._types import ExcInfo
 
@@ -32,10 +33,14 @@ class BeamIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        from apache_beam.transforms.core import DoFn, ParDo  # type: ignore
+        from apache_beam import __version__ as BEAM_VERSION  # type: ignore  # noqa: PLC0415
+        from apache_beam.transforms.core import DoFn, ParDo  # type: ignore  # noqa: PLC0415
 
-        ignore_logger("root")
-        ignore_logger("bundle_processor.create")
+        version = parse_version(BEAM_VERSION)
+        _check_minimum_version(BeamIntegration, version)
+
+        ignore_logger_for_events("root")
+        ignore_logger_for_events("bundle_processor.create")
 
         function_patches = ["process", "start_bundle", "finish_bundle", "setup"]
         for func_name in function_patches:
@@ -94,11 +99,11 @@ def _wrap_inspect_call(cls: "Any", func_name: "Any") -> "Any":
         # getfullargspec is deprecated in more recent beam versions and get_function_args_defaults
         # (which uses Signatures internally) should be used instead.
         try:
-            from apache_beam.transforms.core import get_function_args_defaults
+            from apache_beam.transforms.core import get_function_args_defaults  # noqa: PLC0415
 
             return get_function_args_defaults(process_func)
         except ImportError:
-            from apache_beam.typehints.decorators import getfullargspec  # type: ignore
+            from apache_beam.typehints.decorators import getfullargspec  # type: ignore  # noqa: PLC0415
 
             return getfullargspec(process_func)
 
@@ -131,17 +136,14 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
     """
     Send Beam exception to Sentry.
     """
-    client = sentry_sdk.get_client()
-
     event, hint = event_from_exception(
         exc_info,
-        client_options=client.options,
         mechanism={"type": "beam", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def raise_exception() -> None:
+def raise_exception() -> "NoReturn":
     """
     Raise an exception.
     """

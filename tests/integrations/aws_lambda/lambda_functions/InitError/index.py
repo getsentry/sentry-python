@@ -1,3 +1,3 @@
 # We have no handler() here and try to call a non-existing function.
 
-func()  # noqa: F821
+func()  # type: ignore[name-defined]  # noqa: F821

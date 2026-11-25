@@ -13,7 +13,9 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, Dict
+    from typing import List, Tuple
+
+    from sentry_sdk.client import BaseClient
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
 
@@ -29,11 +31,16 @@ CODING_AGENT_ENV_VARS = (
 SETUP_IN_PROGRESS_SECONDS = 60 * 60
 SETUP_IN_PROGRESS_SECONDS_WITHOUT_GIT = 10 * 60
 
-_coding_agent_hint_shown = False
+GIT_TIMEOUT_SECONDS = 2
+
+_exit_hook_registered = False
+# What _write_coding_agent_hint can print at exit: one entry for each file that called
+# init() with tracing or logs off.
+_hints_at_exit: "List[Tuple[str, bool, bool]]" = []
 
 
 def _running_under_coding_agent() -> bool:
-    if os.environ.get("CI"):
+    if env_to_bool(os.environ.get("CI")):
         return False
     if env_to_bool(os.environ.get("SENTRY_AGENT_HINTS"), strict=True) is False:
         return False
@@ -76,7 +83,7 @@ def _setup_in_progress(init_file: str) -> bool:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
-            timeout=0.25,
+            timeout=GIT_TIMEOUT_SECONDS,
         ).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         status = ""
@@ -106,7 +113,7 @@ def _setup_in_progress(init_file: str) -> bool:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
-            timeout=0.25,
+            timeout=GIT_TIMEOUT_SECONDS,
         ).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         return False
@@ -128,16 +135,38 @@ def _setup_in_progress(init_file: str) -> bool:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
-            timeout=0.25,
+            timeout=GIT_TIMEOUT_SECONDS,
         ).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         return False
     return committer == user_email
 
 
-def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) -> None:
+def _logs_on(client: "BaseClient") -> bool:
+    integrations = client.integrations
+    return (
+        getattr(integrations.get("logging"), "_logs_handler", None) is not None
+        or getattr(integrations.get("loguru"), "level", None) is not None
+    )
+
+
+def register_coding_agent_hint_exit_hook() -> None:
+    """Call before the client is made. Exit hooks run last-in first-out, so the hint then
+    prints after the client's own exit output."""
+    global _exit_hook_registered
+
+    if not _exit_hook_registered and _running_under_coding_agent():
+        _exit_hook_registered = True
+        atexit.register(_write_coding_agent_hint)
+
+
+def _write_coding_agent_hint() -> None:
     with capture_internal_exceptions():
-        if not _setup_in_progress(init_file):
+        # One hint, for the first init() from a file that this user changed.
+        for init_file, tracing_on, logs_on in _hints_at_exit:
+            if _setup_in_progress(init_file):
+                break
+        else:
             return
 
         codex = "codex" in (os.environ.get("AI_AGENT") or "").lower() or any(
@@ -146,8 +175,8 @@ def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) ->
         if codex and tracing_on:
             hint = (
                 "Logs are off, so Sentry gets errors and traces but no logs. If you "
-                "leave it off, tell the user it's off and that you can turn it on if "
-                "they want. Sentry's official setup checklist, included in the "
+                "leave them off, tell the user they're off and that you can turn them "
+                "on if they want. Sentry's official setup checklist, included in the "
                 f"sentry-sdk package you installed: {SETUP_CHECKLIST_PATH}"
             )
         elif codex and logs_on:
@@ -166,8 +195,8 @@ def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) ->
             )
         elif tracing_on:
             hint = (
-                "Sentry will get errors from this app but its logs only as "
-                "breadcrumbs. The checklist shows what to change. If you're setting "
+                "Sentry will get errors from this app but none of its logs. The "
+                "checklist shows what to change. If you're setting "
                 "up Sentry, it is strongly recommended to check your setup against "
                 "Sentry's official setup checklist, included in the sentry-sdk "
                 f"package you installed: {SETUP_CHECKLIST_PATH}"
@@ -183,7 +212,7 @@ def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) ->
         else:
             hint = (
                 "Sentry will get errors from this app but not the request trace "
-                "around them, and its logs only as breadcrumbs. The checklist shows "
+                "around them, and none of its logs. The checklist shows "
                 "what to change. If you're setting up Sentry, it is strongly "
                 "recommended to check your setup against Sentry's official setup "
                 "checklist, included in the sentry-sdk package you installed: "
@@ -194,32 +223,24 @@ def _write_coding_agent_hint(init_file: str, tracing_on: bool, logs_on: bool) ->
         sys.stderr.flush()
 
 
-def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> None:
-    global _coding_agent_hint_shown
-
+def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
+    options = client.options
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
-    logs_on = bool(options["enable_logs"])
+    logs_on = _logs_on(client)
     if (
-        _coding_agent_hint_shown
+        not _exit_hook_registered
         or sys.version_info < (3, 9)
         or sys.platform not in ("darwin", "linux")
         or not options["dsn"]
-        or options["agent_setup_complete"]
+        or options["_experiments"].get("agent_setup_complete")
         or (tracing_on and logs_on)
-        or not _running_under_coding_agent()
     ):
         return
 
     init_file = caller.f_code.co_filename
     if _is_external_source(init_file):
         return
-    try:
-        if os.stat(init_file).st_mtime < time.time() - SETUP_IN_PROGRESS_SECONDS:
-            return
-    except OSError:
-        return
-
-    _coding_agent_hint_shown = True
     # Agents often cut a command's output with `| tail`, so the hint goes last.
-    atexit.register(_write_coding_agent_hint, init_file, tracing_on, logs_on)
+    if all(init_file != seen[0] for seen in _hints_at_exit):
+        _hints_at_exit.append((init_file, tracing_on, logs_on))

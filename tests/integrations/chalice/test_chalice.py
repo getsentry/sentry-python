@@ -10,6 +10,9 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.chalice import CHALICE_VERSION, ChaliceIntegration
 from sentry_sdk.utils import parse_version
 
+CHALICE_VERSION_TUPLE = parse_version(CHALICE_VERSION)
+assert CHALICE_VERSION_TUPLE is not None
+
 
 def _populate_lambda_context(context):
     fn = context.function_name
@@ -26,7 +29,6 @@ def _generate_lambda_context(self):
     # Monkeypatch of the function _generate_lambda_context
     # from the class LocalGateway
     # for mock the timeout
-    # type: () -> LambdaContext
     if self._config.lambda_timeout is None:
         timeout = 10 * 1000
     else:
@@ -41,7 +43,10 @@ def _generate_lambda_context(self):
 
 @pytest.fixture
 def app(sentry_init):
-    sentry_init(integrations=[ChaliceIntegration()])
+    sentry_init(
+        integrations=[ChaliceIntegration()],
+        traces_sample_rate=1.0,
+    )
     app = Chalice(app_name="sentry_chalice")
 
     @app.route("/boom")
@@ -117,13 +122,12 @@ def test_scheduled_event(app, lambda_context_args):
         "id": "event-id",
         "resources": ["arn:aws:events:us-west-1:120987654312:rule/my-schedule"],
     }
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(Exception, match="schedule event!"):
         every_hour(lambda_event, context=context)
-    assert str(exc_info.value) == "schedule event!"
 
 
 @pytest.mark.skipif(
-    parse_version(CHALICE_VERSION) >= (1, 26, 0),
+    CHALICE_VERSION_TUPLE >= (1, 26, 0),
     reason="different behavior based on chalice version",
 )
 def test_bad_request_old(client: RequestHandler) -> None:
@@ -137,7 +141,7 @@ def test_bad_request_old(client: RequestHandler) -> None:
 
 
 @pytest.mark.skipif(
-    parse_version(CHALICE_VERSION) < (1, 26, 0),
+    CHALICE_VERSION_TUPLE < (1, 26, 0),
     reason="different behavior based on chalice version",
 )
 def test_bad_request(client: RequestHandler) -> None:
@@ -175,39 +179,13 @@ def test_transaction(
     assert event["transaction_info"] == {"source": expected_source}
 
 
-def _make_span_streaming_app(sentry_init):
-    sentry_init(
-        integrations=[ChaliceIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-    )
-    app = Chalice(app_name="sentry_chalice")
-
-    @app.route("/message")
-    def hi():
-        capture_message("hi")
-        return {"status": "ok"}
-
-    @app.route("/boom")
-    def boom():
-        raise Exception("boom goes the dynamite!")
-
-    LocalGateway._generate_lambda_context = _generate_lambda_context
-
-    return app
-
-
-def test_span_streaming_existing_span(
-    sentry_init,
-    capture_items,
-):
+def test_existing_span(sentry_init, capture_items, app):
     """When a segment already exists (e.g. created by the AWS Lambda
     integration), Chalice decorates it instead of creating a duplicate."""
-    app = _make_span_streaming_app(sentry_init)
     client = RequestHandler(app)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="lambda_segment",
         parent_span=None,
         attributes={
@@ -232,15 +210,15 @@ def test_span_streaming_existing_span(
     assert span["status"] == "ok"
 
 
-def test_span_streaming_existing_span_error(
+def test_existing_span_error(
     sentry_init,
     capture_items,
+    app,
 ):
-    app = _make_span_streaming_app(sentry_init)
     client = RequestHandler(app)
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(
+    with sentry_sdk.start_span(
         name="lambda_segment",
         parent_span=None,
         attributes={"sentry.origin": "auto.function.aws_lambda"},

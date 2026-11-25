@@ -51,7 +51,7 @@ class TestIntegration(Integration):
 try:
     import gevent
 except ImportError:
-    gevent = None
+    gevent = None  # type: ignore[assignment]
 
 
 def _normalize_distribution_name(name: str) -> str:
@@ -114,20 +114,6 @@ isoformat_inputs_and_datetime_outputs = (
 )
 def test_datetime_from_isoformat(input_str, expected_output):
     assert datetime_from_isoformat(input_str) == expected_output, input_str
-
-
-@pytest.mark.parametrize(
-    ("input_str", "expected_output"),
-    isoformat_inputs_and_datetime_outputs,
-)
-def test_datetime_from_isoformat_with_py_36_or_lower(input_str, expected_output):
-    """
-    `fromisoformat` was added in Python version 3.7
-    """
-    with mock.patch("sentry_sdk.utils.datetime") as datetime_mocked:
-        datetime_mocked.fromisoformat.side_effect = AttributeError()
-        datetime_mocked.strptime = datetime.strptime
-        assert datetime_from_isoformat(input_str) == expected_output, input_str
 
 
 @pytest.mark.parametrize(
@@ -485,49 +471,11 @@ def test_accepts_valid_sample_rate(rate):
         1.231,  # wrong value
     ],
 )
-def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
+def test_warns_on_invalid_sample_rate(rate, StringContaining):
     with mock.patch.object(logger, "warning", mock.Mock()):
         result = is_valid_sample_rate(rate, source="Testing")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert result is False
-
-
-@pytest.mark.parametrize(
-    "options,include_source_context,expected_source_context",
-    [
-        pytest.param({}, True, True, id="no_data_collection-include_true"),
-        pytest.param({}, False, False, id="no_data_collection-include_false"),
-        pytest.param(
-            {"data_collection": {}},
-            False,
-            True,
-            id="data_collection-spec_default_overrides_include_false",
-        ),
-        pytest.param(
-            {"data_collection": {"frame_context_lines": 3}},
-            True,
-            True,
-            id="data_collection-frame_context_lines_3",
-        ),
-        pytest.param(
-            {"data_collection": {"frame_context_lines": 0}},
-            True,
-            False,
-            id="data_collection-frame_context_lines_0_overrides_include_true",
-        ),
-    ],
-)
-def test_include_source_context_when_serializing_frame(
-    sentry_init, options, include_source_context, expected_source_context
-):
-    sentry_init(**options)
-
-    frame = sys._getframe()
-    result = serialize_frame(frame, include_source_context=include_source_context)
-
-    assert ("pre_context" in result) is expected_source_context
-    assert ("context_line" in result) is expected_source_context
-    assert ("post_context" in result) is expected_source_context
 
 
 def _frame_with_locals():
@@ -539,36 +487,31 @@ def _frame_with_locals():
 
 
 @pytest.mark.parametrize(
-    "data_collection,include_local_variables,expected_vars",
+    "data_collection,expected_vars",
     [
         pytest.param(
             {"stack_frame_variables": True},
-            False,
             True,
-            id="data_collection_stack_frame_variables_true_overrides_include_false",
+            id="data_collection_stack_frame_variables_true",
         ),
         pytest.param(
             {"stack_frame_variables": False},
-            True,
             False,
-            id="data_collection_stack_frame_variables_false_overrides_include_true",
+            id="data_collection_stack_frame_variables_false",
         ),
         pytest.param(
             {},
-            False,
             True,
             id="data_collection_stack_frame_variables_spec_default_is_true",
         ),
     ],
 )
 def test_stack_frame_variables_bool_when_serializing_frame(
-    sentry_init, data_collection, include_local_variables, expected_vars
+    sentry_init, data_collection, expected_vars
 ):
     sentry_init(data_collection=data_collection)
 
-    result = serialize_frame(
-        _frame_with_locals(), include_local_variables=include_local_variables
-    )
+    result = serialize_frame(_frame_with_locals())
 
     assert ("vars" in result) is expected_vars
 
@@ -666,58 +609,6 @@ def test_stack_frame_variables_filtering_uses_custom_repr(sentry_init):
 
     assert result["vars"]["safe_value"] == "CUSTOM"
     assert result["vars"]["password"] == "'[Filtered]'"
-
-
-@pytest.mark.parametrize(
-    "options,include_local_variables,expected_vars",
-    [
-        pytest.param(
-            {},
-            True,
-            True,
-            id="no_data_collection-include_local_variables_true",
-        ),
-        pytest.param(
-            {},
-            False,
-            False,
-            id="no_data_collection-include_local_variables_false",
-        ),
-    ],
-)
-def test_include_local_variables_when_data_collection_is_unset(
-    sentry_init, options, include_local_variables, expected_vars
-):
-    sentry_init(**options)
-
-    result = serialize_frame(
-        _frame_with_locals(), include_local_variables=include_local_variables
-    )
-
-    assert ("vars" in result) is expected_vars
-
-
-def test_data_collection_stack_frame_variables_overrides_include_local_variables_option(
-    sentry_init, capture_events
-):
-    sentry_init(
-        include_local_variables=False,
-        data_collection={"stack_frame_variables": True},
-    )
-    events = capture_events()
-
-    def raise_with_locals():
-        safe_value = "not sensitive"  # noqa: F841
-        raise ValueError("boom")
-
-    try:
-        raise_with_locals()
-    except ValueError:
-        sentry_sdk.capture_exception()
-
-    (event,) = events
-    frame = event["exception"]["values"][0]["stacktrace"]["frames"][-1]
-    assert frame["vars"]["safe_value"] == "'not sensitive'"
 
 
 def test_data_collection_stack_frame_variables_filtering_applies_to_captured_exception(
@@ -835,7 +726,6 @@ def test_parse_version(version, expected_result):
             ),
             False,
         ),
-        ("1.0.1", (2, 0, 0), False),
         ("2.0", (1,), True),
         (
             "2.0.1",
@@ -913,14 +803,12 @@ def test_is_sentry_url_no_client():
     ],
 )
 def test_get_error_message(error, expected_result):
-    with pytest.raises(BaseException) as exc_value:
-        exc_value.message = error
-        raise Exception
+    exc_value = Exception()
+    exc_value.message = error
     assert get_error_message(exc_value) == expected_result(exc_value)
 
-    with pytest.raises(BaseException) as exc_value:
-        exc_value.detail = error
-        raise Exception
+    exc_value = Exception()
+    exc_value.detail = error
     assert get_error_message(exc_value) == expected_result(exc_value)
 
 
@@ -1296,10 +1184,10 @@ def test_exc_info_from_error_dont_get_an_exc():
     class NotAnException:
         pass
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(
+        ValueError, match="Expected Exception object to report, got <class"
+    ):
         exc_info_from_error(NotAnException())
-
-    assert "Expected Exception object to report, got <class" in str(exc.value)
 
 
 def test_get_lines_from_file_handle_linecache_errors():
@@ -1348,14 +1236,6 @@ def test_get_lines_from_file_handle_linecache_errors():
             {"data_collection": {"frame_context_lines": 0}},
             0,
             id="data_collection-frame_context_lines_0",
-        ),
-        pytest.param(
-            {
-                "data_collection": {},
-                "include_source_context": False,
-            },
-            5,
-            id="data_collection-spec_default_overrides_include_source_context_false",
         ),
     ],
 )

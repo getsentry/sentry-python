@@ -325,22 +325,69 @@ def test_capture_checkin_sdk_not_initialized():
     assert check_in_id is None
 
 
-def test_capture_checkin_dropped_by_before_send(sentry_init, capture_envelopes):
-    sentry_init(before_send=lambda event, hint: None)
+def test_capture_checkin_dropped_by_before_send_check_in(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
+):
+    sentry_init(before_send_check_in=lambda check_in, hint: None)
     envelopes = capture_envelopes()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     check_in_id = capture_checkin(monitor_slug="abc123", status="in_progress")
 
     assert check_in_id is None
     assert envelopes == []
+    assert record_lost_event_calls == [("before_send", "monitor", None, 1)]
+
+
+def test_before_send_check_in_only_applies_to_check_ins(sentry_init, capture_envelopes):
+    def before_send(event, hint):
+        event["extra"] = {"before_send_called": True}
+        return event
+
+    def before_send_check_in(check_in, hint):
+        check_in["environment"] = "from_before_send_check_in"
+        return check_in
+
+    sentry_init(before_send=before_send, before_send_check_in=before_send_check_in)
+    envelopes = capture_envelopes()
+
+    capture_checkin(monitor_slug="abc123", status="ok")
+    sentry_sdk.capture_message("hello")
+
+    check_in_envelope, event_envelope = envelopes
+
+    check_in = check_in_envelope.items[0].payload.json
+    assert check_in["monitor_slug"] == "abc123"
+    assert check_in["environment"] == "from_before_send_check_in"
+    assert "extra" not in check_in
+
+    event = event_envelope.items[0].payload.json
+    assert event["message"] == "hello"
+    assert event["extra"] == {"before_send_called": True}
+    assert event["environment"] != "from_before_send_check_in"
+
+
+def test_event_processors_not_applied_to_check_ins(sentry_init, capture_envelopes):
+    def event_processor(event, hint):
+        event["extra"] = {"event_processor_called": True}
+        return event
+
+    sentry_init()
+    sentry_sdk.get_isolation_scope().add_event_processor(event_processor)
+    envelopes = capture_envelopes()
+
+    capture_checkin(monitor_slug="abc123", status="ok")
+
+    (envelope,) = envelopes
+    assert "extra" not in envelope.items[0].payload.json
 
 
 def test_context_monitor_exit_successfully_sends_checkin_when_enter_checkin_dropped(
     sentry_init, capture_envelopes
 ):
     sentry_init(
-        before_send=lambda event, hint: (
-            None if event.get("status") == "in_progress" else event
+        before_send_check_in=lambda check_in, hint: (
+            None if check_in.get("status") == "in_progress" else check_in
         )
     )
     envelopes = capture_envelopes()

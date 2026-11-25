@@ -6,10 +6,12 @@ from gql import Client, __version__, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 
+import sentry_sdk
 from sentry_sdk.integrations.gql import GQLIntegration
 from sentry_sdk.utils import parse_version
 
 GQL_VERSION = parse_version(__version__)
+assert GQL_VERSION is not None
 
 
 @responses.activate
@@ -109,7 +111,7 @@ def _make_erroneous_query(capture_events, execute_query):
     (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "TransportQueryError", (
-        "%s was captured, but we expected a TransportQueryError" % exception(type)
+        "%s was captured, but we expected a TransportQueryError" % exception["type"]
     )
 
     assert "request" in event
@@ -146,41 +148,9 @@ def test_real_gql_request_no_error(sentry_init, capture_events, execute_query):
 
 
 @pytest.mark.parametrize("execute_query", _execute_query_funcs)
-def test_real_gql_request_with_error_no_pii(sentry_init, capture_events, execute_query):
-    """
-    Integration test verifying that the GQLIntegration works as expected with query resulting
-    in a GraphQL error, and that PII is not sent.
-    """
-    sentry_init(integrations=[GQLIntegration()])
-
-    event = _make_erroneous_query(capture_events, execute_query)
-
-    assert "data" not in event["request"]
-    assert "response" not in event["contexts"]
-
-
-@pytest.mark.parametrize("execute_query", _execute_query_funcs)
-def test_real_gql_request_with_error_with_pii(
-    sentry_init, capture_events, execute_query
-):
-    """
-    Integration test verifying that the GQLIntegration works as expected with query resulting
-    in a GraphQL error, and that PII is not sent.
-    """
-    sentry_init(integrations=[GQLIntegration()], send_default_pii=True)
-
-    event = _make_erroneous_query(capture_events, execute_query)
-
-    assert "data" in event["request"]
-    assert "response" in event["contexts"]
-
-
-@pytest.mark.parametrize("execute_query", _execute_query_funcs)
 @pytest.mark.parametrize(
     "init_kwargs,expect_data",
     [
-        pytest.param({}, False, id="no_pii_no_data_collection"),
-        pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
         pytest.param(
             {"data_collection": {}},
             True,
@@ -195,22 +165,6 @@ def test_real_gql_request_with_error_with_pii(
             {"data_collection": {"graphql": {"document": False}}},
             False,
             id="data_collection_document_off",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"graphql": {"document": False}},
-            },
-            False,
-            id="data_collection_takes_precedence_over_send_default_pii_on",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "data_collection": {"graphql": {"document": True}},
-            },
-            True,
-            id="data_collection_takes_precedence_over_send_default_pii_off",
         ),
     ],
 )
@@ -230,6 +184,7 @@ def test_real_gql_request_with_error_data_collection(
         assert "data" in event["request"]
         assert "query" in event["request"]["data"]
         assert "response" in event["contexts"]
+        assert event["contexts"]["response"]["type"] == "response"
     else:
         assert "data" not in event["request"]
         assert "response" not in event["contexts"]
@@ -238,7 +193,6 @@ def test_real_gql_request_with_error_data_collection(
 @pytest.mark.parametrize(
     "init_kwargs,expect_variables",
     [
-        pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
         pytest.param(
             {"data_collection": {}},
             True,
@@ -281,16 +235,6 @@ def test_real_gql_request_with_error_data_collection_variables(
     "init_kwargs,expected_query_string",
     [
         pytest.param(
-            {},
-            "access_token=[Filtered]&v=[Filtered]&page=[Filtered]",
-            id="no_pii_no_data_collection",
-        ),
-        pytest.param(
-            {"send_default_pii": True},
-            "access_token=[Filtered]&v=[Filtered]&page=[Filtered]",
-            id="legacy_pii_on",
-        ),
-        pytest.param(
             {"data_collection": {}},
             "access_token=%5BFiltered%5D&v=1&page=2",
             id="data_collection_defaults",
@@ -317,14 +261,6 @@ def test_real_gql_request_with_error_data_collection_variables(
             },
             "access_token=%5BFiltered%5D&v=%5BFiltered%5D&page=2",
             id="data_collection_allowlist",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": True,
-                "data_collection": {"url_query_params": {"mode": "off"}},
-            },
-            None,
-            id="data_collection_takes_precedence_over_send_default_pii",
         ),
     ],
 )
@@ -356,3 +292,19 @@ def test_transport_url_is_sanitized(
     assert event["request"].get("query_string") == expected_query_string
     assert "password" not in str(event["request"])
     assert "secret" not in str(event["request"])
+
+
+def test_event_processor_does_not_outlive_query(sentry_init, capture_events):
+    """
+    Events captured after a query has finished must not get the query's
+    request data.
+    """
+    sentry_init(integrations=[GQLIntegration()])
+    events = capture_events()
+
+    _execute_mock_query({"data": {"example": "This is the example"}})
+    sentry_sdk.capture_message("unrelated")
+
+    (event,) = events
+    assert "request" not in event
+    assert "response" not in event.get("contexts", {})

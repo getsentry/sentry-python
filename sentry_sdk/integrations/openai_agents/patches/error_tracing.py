@@ -2,9 +2,7 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.traces import SpanStatus
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
     from typing import Any
@@ -24,7 +22,7 @@ def _patch_error_tracing() -> None:
 
     # Try newer location first (agents.util._error_tracing)
     try:
-        from agents.util import _error_tracing
+        from agents.util import _error_tracing  # noqa: PLC0415
 
         error_tracing_module = _error_tracing
     except (ImportError, AttributeError):
@@ -33,7 +31,7 @@ def _patch_error_tracing() -> None:
     # Try older location (agents._utils)
     if error_tracing_module is None:
         try:
-            import agents._utils
+            import agents._utils  # noqa: PLC0415
 
             error_tracing_module = agents._utils
         except (ImportError, AttributeError):
@@ -56,15 +54,9 @@ def _patch_error_tracing() -> None:
         the agents library swallows exceptions.
         """
         # Set the current Sentry span to errored
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            current_span = sentry_sdk.get_current_scope().streamed_span
-            if current_span is not None:
-                current_span.status = SpanStatus.ERROR
-        else:
-            current_span = sentry_sdk.get_current_span()
-            if current_span is not None:
-                current_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+        current_span = sentry_sdk.get_current_scope().span
+        if current_span is not None:
+            current_span.status = SpanStatus.ERROR
 
         # Call the original function
         return original_attach_error(error, *args, **kwargs)

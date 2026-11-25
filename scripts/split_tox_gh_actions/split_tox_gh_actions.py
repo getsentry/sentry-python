@@ -147,11 +147,13 @@ GROUPS = {
     ],
     "Web 1": [
         "django",
+    ],
+    "Web 2": [
         "flask",
         "starlette",
         "fastapi",
     ],
-    "Web 2": [
+    "Web 3": [
         "aiohttp",
         "asgi",
         "bottle",
@@ -165,13 +167,10 @@ GROUPS = {
     ],
     "Misc": [
         "loguru",
-        "opentelemetry",
         "otlp",
-        "potel",
         "pure_eval",
-        "trytond",
+        "trytond_wsgi",
         "typer",
-        "integration_deactivation",
         "shadowed_module",
     ],
 }

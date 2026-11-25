@@ -1,9 +1,4 @@
-try:
-    from re import Pattern
-except ImportError:
-    # 3.6
-    from typing import Pattern
-
+from re import Pattern
 from typing import TYPE_CHECKING, TypeVar, Union
 
 # Re-exported for compat, since code out there in the wild might use this variable.
@@ -117,28 +112,13 @@ class AnnotatedValue:
             },
         )
 
-    @classmethod
-    def substituted_because_contains_sensitive_data(cls) -> "AnnotatedValue":
-        """The actual value was removed because it contained sensitive information."""
-        return AnnotatedValue(
-            value=SENSITIVE_DATA_SUBSTITUTE,
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
-                        "s",  # The fields original value was substituted
-                    ]
-                ]
-            },
-        )
-
 
 T = TypeVar("T")
 Annotated = Union[AnnotatedValue, T]
 
 
 if TYPE_CHECKING:
-    from collections.abc import Container, MutableMapping, Sequence
+    from collections.abc import MutableMapping, Sequence
     from datetime import datetime
     from types import TracebackType
     from typing import Any, Callable, Dict, List, Mapping, NotRequired, Optional, Type
@@ -164,6 +144,14 @@ if TYPE_CHECKING:
         inputs: bool
         outputs: bool
 
+    class MCPCollectionUserOptions(TypedDict, total=False):
+        inputs: bool
+        outputs: bool
+
+    class MCPCollectionBehaviour(TypedDict):
+        inputs: bool
+        outputs: bool
+
     class GraphQLCollectionUserOptions(TypedDict, total=False):
         document: bool
         variables: bool
@@ -186,13 +174,13 @@ if TYPE_CHECKING:
         url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionUserOptions"
         gen_ai: "GenAICollectionUserOptions"
+        mcp: "MCPCollectionUserOptions"
         database_query_data: bool
         queues: bool
         stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
         frame_context_lines: int
 
     class DataCollection(TypedDict):
-        provided_by_user: bool
         user_info: bool
         cookies: "KeyValueCollectionBehaviour"
         http_headers: "HttpHeadersCollectionBehaviour"
@@ -200,6 +188,7 @@ if TYPE_CHECKING:
         url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionBehaviour"
         gen_ai: "GenAICollectionBehaviour"
+        mcp: "MCPCollectionBehaviour"
         database_query_data: bool
         queues: bool
         stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
@@ -236,17 +225,6 @@ if TYPE_CHECKING:
         "exbibyte",
     ]
 
-    FractionUnit = Literal["ratio", "percent"]
-    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
-
-    MeasurementValue = TypedDict(
-        "MeasurementValue",
-        {
-            "value": float,
-            "unit": NotRequired[Optional[MeasurementUnit]],
-        },
-    )
-
     Event = TypedDict(
         "Event",
         {
@@ -268,13 +246,11 @@ if TYPE_CHECKING:
             "level": LogLevelStr,
             "logentry": Mapping[str, object],
             "logger": str,
-            "measurements": dict[str, MeasurementValue],
             "message": str,
             "modules": dict[str, str],
             "monitor_config": Mapping[str, object],
             "monitor_slug": Optional[str],
             "platform": Literal["python"],
-            "profile": object,  # Should be sentry_sdk.profiler.Profile, but we can't import that here due to circular imports
             "release": Optional[str],
             "request": dict[str, object],
             "sdk": Mapping[str, object],
@@ -373,6 +349,16 @@ if TYPE_CHECKING:
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
 
+    SpanLink = TypedDict(
+        "SpanLink",
+        {
+            "span_id": str,
+            "trace_id": str,
+            "sampled": NotRequired[bool],
+            "attributes": NotRequired[Attributes],
+        },
+    )
+
     SpanJSON = TypedDict(
         "SpanJSON",
         {
@@ -385,7 +371,8 @@ if TYPE_CHECKING:
             "start_timestamp": float,
             "end_timestamp": NotRequired[float],
             "attributes": NotRequired[Attributes],
-            "_segment_span": NotRequired["sentry_sdk.traces.StreamedSpan"],
+            "links": NotRequired[list[SpanLink]],
+            "_segment_span": NotRequired["sentry_sdk.traces.Span"],
         },
     )
 
@@ -401,7 +388,6 @@ if TYPE_CHECKING:
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
-    TransactionProcessor = Callable[[Event, Hint], Optional[Event]]
     LogProcessor = Callable[[Log, Hint], Optional[Log]]
 
     TracesSampler = Callable[[SamplingContext], Union[float, int, bool]]
@@ -413,12 +399,10 @@ if TYPE_CHECKING:
         "default",
         "error",
         "crash",
-        "transaction",
         "security",
         "attachment",
         "session",
         "internal",
-        "profile",
         "profile_chunk",
         "monitor",
         "span",
@@ -430,7 +414,7 @@ if TYPE_CHECKING:
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
     ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
-    ProfilerMode = Union[ContinuousProfilerMode, Literal["sleep"]]
+    ProfilerMode = Union[ContinuousProfilerMode]
 
     MonitorConfigScheduleType = Literal["crontab", "interval"]
     MonitorConfigScheduleUnit = Literal[
@@ -466,8 +450,6 @@ if TYPE_CHECKING:
         },
         total=False,
     )
-
-    HttpStatusCodeRange = Union[int, Container[int]]
 
     class TextPart(TypedDict):
         type: Literal["text"]

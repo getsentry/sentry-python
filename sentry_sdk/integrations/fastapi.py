@@ -4,13 +4,18 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.traces import StreamedSpan, get_current_span
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.utils import has_data_collection_enabled, transaction_from_function
+from sentry_sdk.integrations import DidNotEnable, _check_minimum_version
+from sentry_sdk.traces import (
+    SegmentNameSource,
+    Span,
+    get_current_span,
+)
+from sentry_sdk.utils import (
+    parse_version,
+)
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional
+    from typing import Any, Awaitable, Callable, Dict
 
     from sentry_sdk._types import Event
 
@@ -22,12 +27,13 @@ try:
         _wrap_sync_handler,
     )
 except DidNotEnable:
-    raise DidNotEnable("Starlette is not installed")
+    raise DidNotEnable("Starlette is not installed or incompatible")
 
 try:
     import fastapi  # type: ignore
+    from fastapi import __version__ as FASTAPI_VERSION
 except ImportError:
-    raise DidNotEnable("FastAPI is not installed")
+    raise DidNotEnable("FastAPI is not installed or incompatible")
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
@@ -45,30 +51,10 @@ class FastApiIntegration(StarletteIntegration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(FASTAPI_VERSION)
+        _check_minimum_version(FastApiIntegration, version)
+
         patch_get_request_handler()
-
-
-def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope",
-    transaction_style: str,
-    endpoint: "Optional[Callable[..., Any]]",
-    route_path: "Optional[str]",
-) -> None:
-    name = ""
-
-    if transaction_style == "endpoint" and endpoint:
-        name = transaction_from_function(endpoint) or ""
-
-    elif transaction_style == "url" and route_path is not None:
-        name = route_path
-
-    if not name:
-        name = _DEFAULT_TRANSACTION_NAME
-        source = TransactionSource.ROUTE
-    else:
-        source = SOURCE_FOR_STYLE[transaction_style]
-
-    scope.set_transaction_name(name, source=source)
 
 
 async def _wrap_async_handler(
@@ -110,15 +96,12 @@ async def _wrap_async_handler(
     if server_span is not None and route_path is not None:
         server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
-    _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(),
-        integration.transaction_style,
-        endpoint=request.scope.get("endpoint"),
-        route_path=route_path,
+    sentry_sdk.get_current_scope().set_transaction_name(
+        route_path if route_path is not None else _DEFAULT_TRANSACTION_NAME,
+        source=SegmentNameSource.ROUTE,
     )
     sentry_scope = sentry_sdk.get_isolation_scope()
     extractor = StarletteRequestExtractor(request)
-    info = await extractor.extract_request_info()
 
     def _make_request_event_processor(
         req: "Any", integration: "Any"
@@ -126,16 +109,16 @@ async def _wrap_async_handler(
         def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
             # Extract information from request
             request_info = event.get("request", {})
+
+            info = extractor.extract_request_info()
             if info:
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
                 if "data" in info:
-                    attach_request_data = True
-                    if has_data_collection_enabled(client.options):
-                        attach_request_data = (
-                            "incoming_request"
-                            in client.options["data_collection"]["http_bodies"]
-                        )
+                    attach_request_data = (
+                        "incoming_request"
+                        in client.options["data_collection"]["http_bodies"]
+                    )
 
                     if attach_request_data:
                         request_info["data"] = info["data"]
@@ -155,13 +138,10 @@ async def _wrap_async_handler(
     finally:
         current_span = get_current_span()
 
-        if type(current_span) is StreamedSpan:
-            attach_request_data = True
-            if has_data_collection_enabled(client.options):
-                attach_request_data = (
-                    "incoming_request"
-                    in client.options["data_collection"]["http_bodies"]
-                )
+        if type(current_span) is Span:
+            attach_request_data = (
+                "incoming_request" in client.options["data_collection"]["http_bodies"]
+            )
 
             if attach_request_data:
                 request_body = _get_cached_request_body_attribute(

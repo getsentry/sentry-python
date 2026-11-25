@@ -140,17 +140,13 @@ def test_monkey_patch_signature(f, args, kwargs):
     except Exception:
         print("Failed on {} with parameters {}, {}".format(f_temp, args, kwargs))
         raise
-    try:
-        expected_signature = inspect.signature(f)
-        test_signature = inspect.signature(f_temp)
-        assert expected_signature == test_signature, (
-            "Failed on {}, signature {} does not match {}".format(
-                f, expected_signature, test_signature
-            )
+    expected_signature = inspect.signature(f)
+    test_signature = inspect.signature(f_temp)
+    assert expected_signature == test_signature, (
+        "Failed on {}, signature {} does not match {}".format(
+            f, expected_signature, test_signature
         )
-    except Exception:
-        # expected to pass for py2.7
-        pass
+    )
 
 
 class _OutputHandler(OutputHandler):
@@ -200,7 +196,7 @@ def test_invoker_normal(init_beam, fn):
 
 
 @pytest.mark.parametrize("fn", [test_simple, test_callable, test_place_holder])
-def test_invoker_exception(init_beam, capture_events, capture_exceptions, fn):
+def test_invoker_exception(init_beam, capture_events, fn):
     invoker = init_beam(fn)
     events = capture_events()
 

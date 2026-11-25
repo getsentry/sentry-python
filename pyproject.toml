@@ -2,7 +2,7 @@
 # Project dev dependencies (PEP 735 groups).
 # `dev` is installed by default; `typing` is opt-in via `uv run --group typing`.
 # Run tox with: `uv run tox -e <env>`
-# Run mypy with: `uv run --group typing mypy sentry_sdk`
+# Run mypy with: `uv run --group typing mypy sentry_sdk tests`
 #
 
 [dependency-groups]
@@ -12,6 +12,7 @@ dev = [
     "coverage[toml]",
     "pre-commit",
     "ruff",
+    "typos",
 ]
 
 toxgen = [
@@ -146,6 +147,7 @@ disallow_incomplete_defs = true
 disallow_subclassing_any = true
 disallow_untyped_decorators = true
 disallow_untyped_defs = true
+enable_error_code = ["possibly-undefined", "unused-awaitable"]
 no_implicit_optional = true
 python_version = "3.11"
 strict_equality = true
@@ -274,6 +276,21 @@ ignore_missing_imports = true
 module = "dramatiq.*"
 ignore_missing_imports = true
 
+# Tests are only checked at the module level and where they're annotated.
+# - Bodies of untyped test functions are not checked, so type: ignore comments
+#   in them would be reported as unused.
+# - Most integration test dependencies are not installed in the typing
+#   environment.
+[[tool.mypy.overrides]]
+module = "tests.*"
+check_untyped_defs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+disallow_subclassing_any = false
+warn_unused_ignores = false
+disable_error_code = ["import-not-found", "import-untyped", "annotation-unchecked"]
+
 #
 # Tool: Ruff (linting and formatting)
 #
@@ -299,8 +316,10 @@ select = [
     "W",   # pycodestyle warnings (same as flake8 default)
     "F",   # Pyflakes (same as flake8 default)
     "I",
-    # Note: B and N rules are NOT enabled by default in flake8
-    # They were only active through the plugins, which may not have been fully enabled
+    "T20",     # print() and pprint() calls
+    "PT011",   # pytest.raises() too broad
+    "PLC0415", # Import not at the top level of the file
+    "RUF100",  # Unused noqa directive
 ]
 
 # Use ONLY the same ignores as the original flake8 config + compatibility for this codebase
@@ -309,13 +328,14 @@ ignore = [
     "E501", # Line too long
     "E402", # Module level import not at top of file
     "E731", # Do not assign a lambda expression, use a def
-    "B014", # Redundant exception types
-    "N812", # Lowercase imported as non-lowercase
-    "N804", # First argument of classmethod should be named cls
 
     # Additional ignores for codebase compatibility
     "E721", # Use isinstance instead of type() == - existing pattern in this codebase
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["T20"]
+"tests/**" = ["T20", "PLC0415"]
 
 [tool.ruff.format]
 # ruff format already excludes the same files as specified in extend-exclude

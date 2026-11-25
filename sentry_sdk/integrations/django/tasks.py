@@ -2,7 +2,6 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import qualname_from_function
 
 try:
@@ -25,7 +24,7 @@ def patch_tasks() -> None:
 
     @wraps(old_task_enqueue)
     def _sentry_enqueue(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.django import DjangoIntegration  # noqa: PLC0415
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None:
@@ -33,22 +32,16 @@ def patch_tasks() -> None:
 
         name = qualname_from_function(self.func) or "<unknown Django task>"
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return old_task_enqueue(self, *args, **kwargs)
-            with sentry_sdk.traces.start_span(
-                name=name,
-                attributes={
-                    "sentry.op": OP.QUEUE_SUBMIT_DJANGO,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
-                return old_task_enqueue(self, *args, **kwargs)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.QUEUE_SUBMIT_DJANGO, name=name, origin=DjangoIntegration.origin
-            ):
-                return old_task_enqueue(self, *args, **kwargs)
+        if sentry_sdk.get_current_span() is None:
+            return old_task_enqueue(self, *args, **kwargs)
+
+        with sentry_sdk.start_span(
+            name=name,
+            attributes={
+                "sentry.op": OP.QUEUE_PUBLISH,
+                "sentry.origin": DjangoIntegration.origin,
+            },
+        ):
+            return old_task_enqueue(self, *args, **kwargs)
 
     Task.enqueue = _sentry_enqueue

@@ -237,7 +237,7 @@ def template_test3(request, *args, **kwargs):
 @csrf_exempt
 def template_test4(request, *args, **kwargs):
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
-    my_queryset = User.objects.all()  # noqa
+    my_queryset = User.objects.all()
 
     template_context = {
         "user_age": 25,
@@ -392,7 +392,7 @@ async def post_echo_async(request):
     return HttpResponse(request.body)
 
 
-post_echo_async.csrf_exempt = True
+post_echo_async.csrf_exempt = True  # type: ignore[attr-defined]
 
 
 @csrf_exempt
