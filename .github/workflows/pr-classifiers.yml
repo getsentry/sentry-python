@@ -2,8 +2,7 @@ name: PR classifiers
 
 on:
   pull_request_target:
-    # Keep `edited`: it is the only event fired when the base branch changes. The action
-    # itself skips title and description edits.
+    # Keep `edited`: it is the only event fired when the base branch changes.
     types: [opened, synchronize, reopened, ready_for_review, edited, converted_to_draft]
 
 permissions: {}
@@ -27,49 +26,10 @@ jobs:
       contents: read
       pull-requests: write   # this job only; needed to publish the risk label and the summary comment
     steps:
-      # This job must never check out or run code from the pull request. The only checkout
-      # is the classifiers repository, at a pinned commit.
-      - name: Get a token for the classifiers repository
-        id: app
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      # This job must never check out or run code from the pull request.
+      - uses: getsentry/github-workflows/pr-classifiers@edc87d6f133ac6204e22dee5123167a5eff3ed79
         with:
-          # The app's client ID, not its numeric App ID (`app-id` is deprecated in this action).
-          client-id: ${{ vars.CLASSIFIERS_APP_CLIENT_ID }}
-          private-key: ${{ secrets.CLASSIFIERS_APP_KEY }}
-          repositories: classifiers
-          # The token can read this one repository's contents and nothing else.
-          permission-contents: read
-
-      - name: Fetch the classifiers
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: getsentry/classifiers
-          ref: 3f2158c236f47bfb7e918a7350399769a59569ec
-          token: ${{ steps.app.outputs.token }}
-          path: .classifiers
-          persist-credentials: false
-
-      - name: Classify the pull request
-        id: classify
-        uses: ./.classifiers/actions/pr
-        env:
-          # On this step only, never at job or workflow level.
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-        with:
-          repo: ${{ github.repository }}
-          pr-number: ${{ github.event.pull_request.number }}
-          expected-head-sha: ${{ github.event.pull_request.head.sha }}
-          result-path: pr-classifiers-result.json
-          # The fact sheet is read from .github/classifiers.toml at the pull request's base commit.
-          publish-label: true
-          # Set to true to keep one summary comment on the pull request with the label and its reasons.
+          app-client-id: ${{ vars.CLASSIFIERS_APP_CLIENT_ID }}
+          app-private-key: ${{ secrets.CLASSIFIERS_APP_KEY }}
+          ai-gateway-api-key: ${{ secrets.AI_GATEWAY_API_KEY }}
           publish-comment: true
-
-      - name: Upload the result
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: pr-classifiers-${{ github.event.pull_request.number }}
-          path: pr-classifiers-result.json
-          if-no-files-found: warn
-          retention-days: 30
