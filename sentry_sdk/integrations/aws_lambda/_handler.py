@@ -6,6 +6,8 @@ from os import environ
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
@@ -99,7 +101,7 @@ def _get_producer_links(aws_event: "Any", trace_id: str) -> "list[SpanLink]":
         link: "SpanLink" = {
             "trace_id": str(data["trace_id"]),
             "span_id": str(data["parent_span_id"]),
-            "attributes": {SPANDATA.SENTRY_LINK_TYPE: "message_origin"},
+            "attributes": {ATTRIBUTE_NAMES.SENTRY_LINK_TYPE: "message_origin"},
         }
         if data["parent_sampled"] is not None:
             link["sampled"] = bool(data["parent_sampled"])
@@ -195,9 +197,9 @@ def _wrap_handler(handler: "F") -> "F":
 
             additional_attributes: "dict[str, Any]" = {}
             if "httpMethod" in request_data:
-                additional_attributes[SPANDATA.HTTP_REQUEST_METHOD] = request_data[
-                    "httpMethod"
-                ]
+                additional_attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] = (
+                    request_data["httpMethod"]
+                )
 
             data_collection = client.options["data_collection"]
             if "queryStringParameters" in request_data:
@@ -208,7 +210,7 @@ def _wrap_handler(handler: "F") -> "F":
                         behaviour=data_collection["url_query_params"],
                     )
                     if filtered_qs:
-                        additional_attributes[SPANDATA.URL_QUERY] = urlencode(
+                        additional_attributes[ATTRIBUTE_NAMES.URL_QUERY] = urlencode(
                             filtered_qs
                         )
 
@@ -225,18 +227,18 @@ def _wrap_handler(handler: "F") -> "F":
             function_name = aws_context.function_name
 
             attributes: "Attributes" = {
-                SPANDATA.SENTRY_OP: OP.FUNCTION_AWS,
-                SPANDATA.SENTRY_ORIGIN: ORIGIN,
-                SPANDATA.SENTRY_KIND: "server",
-                SPANDATA.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
-                SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
-                SPANDATA.CLOUD_PLATFORM: CLOUD_PLATFORM,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.FUNCTION_AWS,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                ATTRIBUTE_NAMES.SENTRY_KIND: "server",
+                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
+                ATTRIBUTE_NAMES.CLOUD_PROVIDER: CLOUD_PROVIDER,
+                ATTRIBUTE_NAMES.CLOUD_PLATFORM: CLOUD_PLATFORM,
                 **header_attributes,
                 **additional_attributes,
             }
 
             with capture_internal_exceptions():
-                attributes[SPANDATA.FAAS_TRIGGER] = _get_trigger(aws_event)
+                attributes[ATTRIBUTE_NAMES.FAAS_TRIGGER] = _get_trigger(aws_event)
 
             with capture_internal_exceptions():
                 invoked_function_arn = aws_context.invoked_function_arn
@@ -248,15 +250,19 @@ def _wrap_handler(handler: "F") -> "F":
 
                 attributes.update(
                     {
-                        SPANDATA.CLOUD_REGION: environ["AWS_REGION"],
-                        SPANDATA.CLOUD_ACCOUNT_ID: arn_parts[4],
-                        SPANDATA.CLOUD_RESOURCE_ID: resource_id,
-                        SPANDATA.FAAS_NAME: function_name,
-                        SPANDATA.FAAS_VERSION: function_version,
-                        SPANDATA.FAAS_INVOCATION_ID: aws_context.aws_request_id,
-                        SPANDATA.AWS_LAMBDA_INVOKED_ARN: invoked_function_arn,
-                        SPANDATA.AWS_LOG_GROUP_NAMES: [aws_context.log_group_name],
-                        SPANDATA.AWS_LOG_STREAM_NAMES: [aws_context.log_stream_name],
+                        ATTRIBUTE_NAMES.CLOUD_REGION: environ["AWS_REGION"],
+                        ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID: arn_parts[4],
+                        ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: resource_id,
+                        ATTRIBUTE_NAMES.FAAS_NAME: function_name,
+                        ATTRIBUTE_NAMES.FAAS_VERSION: function_version,
+                        ATTRIBUTE_NAMES.FAAS_INVOCATION_ID: aws_context.aws_request_id,
+                        ATTRIBUTE_NAMES.AWS_LAMBDA_INVOKED_ARN: invoked_function_arn,
+                        ATTRIBUTE_NAMES.AWS_LOG_GROUP_NAMES: [
+                            aws_context.log_group_name
+                        ],
+                        ATTRIBUTE_NAMES.AWS_LOG_STREAM_NAMES: [
+                            aws_context.log_stream_name
+                        ],
                     }
                 )
 
@@ -313,16 +319,16 @@ def _wrap_handler(handler: "F") -> "F":
                             process_span = sentry_sdk.start_span(
                                 name=f"process {destination}",
                                 attributes={
-                                    SPANDATA.SENTRY_OP: OP.QUEUE_PROCESS,
-                                    SPANDATA.SENTRY_ORIGIN: ORIGIN,
-                                    SPANDATA.SENTRY_KIND: "consumer",
-                                    SPANDATA.MESSAGING_SYSTEM: MESSAGING_SYSTEMS[
+                                    ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
+                                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                                    ATTRIBUTE_NAMES.SENTRY_KIND: "consumer",
+                                    ATTRIBUTE_NAMES.MESSAGING_SYSTEM: MESSAGING_SYSTEMS[
                                         event_source
                                     ],
-                                    SPANDATA.MESSAGING_OPERATION_TYPE: "process",
-                                    SPANDATA.MESSAGING_OPERATION_NAME: "process",
-                                    SPANDATA.MESSAGING_DESTINATION_NAME: destination,
-                                    SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT: len(
+                                    ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE: "process",
+                                    ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME: "process",
+                                    ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME: destination,
+                                    ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT: len(
                                         records
                                     ),
                                 },

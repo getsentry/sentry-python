@@ -3,7 +3,9 @@ import re
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlsplit
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
@@ -67,7 +69,7 @@ def _message_link(message: "Dict[str, Any]") -> "Optional[SpanLink]":
         "trace_id": str(data["trace_id"]),
         "span_id": str(data["parent_span_id"]),
         # Sentry drops other link attributes for now; add `messaging.message.id` in the future.
-        "attributes": {SPANDATA.SENTRY_LINK_TYPE: "message_origin"},
+        "attributes": {ATTRIBUTE_NAMES.SENTRY_LINK_TYPE: "message_origin"},
     }
     if data["parent_sampled"] is not None:
         link["sampled"] = bool(data["parent_sampled"])
@@ -88,7 +90,7 @@ class _SQSExtension(_ServiceExtension):
         # for example: `send <queue name>` when `messaging.operation.type=send`.
         # https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#span-name
         operation_type = _MESSAGING_OPERATIONS[ctx.operation_name][1]
-        destination_name = attributes.get(SPANDATA.MESSAGING_DESTINATION_NAME)
+        destination_name = attributes.get(ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME)
         return (
             f"{operation_type} {destination_name}"
             if destination_name
@@ -107,26 +109,28 @@ class _SQSExtension(_ServiceExtension):
 
         queue_url = ctx.params.get("QueueUrl")
         if queue_url is not None:
-            attributes[SPANDATA.AWS_SQS_QUEUE_URL] = queue_url
+            attributes[ATTRIBUTE_NAMES.AWS_SQS_QUEUE_URL] = queue_url
 
             with capture_internal_exceptions():
                 # `https://sqs.eu-north-1.amazonaws.com/123456789012/orders` => ['123456789012', 'orders']
                 path = unquote(urlsplit(queue_url).path).strip("/").split("/")
 
-                attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = path[-1]
+                attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] = path[-1]
                 if re.fullmatch(r"[0-9]{12}", path[0]):
-                    attributes[SPANDATA.CLOUD_ACCOUNT_ID] = path[0]
+                    attributes[ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID] = path[0]
         elif "QueueName" in ctx.params:
             # `CreateQueue` & `GetQueueUrl` operations.
-            attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params["QueueName"]
+            attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] = ctx.params[
+                "QueueName"
+            ]
 
             if "QueueOwnerAWSAccountId" in ctx.params:
-                attributes[SPANDATA.CLOUD_ACCOUNT_ID] = ctx.params[
+                attributes[ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID] = ctx.params[
                     "QueueOwnerAWSAccountId"
                 ]
         elif "SourceArn" in ctx.params:
             # `arn:aws:sqs:eu-north-1:123456789012:orders` => `orders`
-            attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params[
+            attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] = ctx.params[
                 "SourceArn"
             ].split(":")[-1]
 
@@ -134,16 +138,16 @@ class _SQSExtension(_ServiceExtension):
             operation_type = _MESSAGING_OPERATIONS[ctx.operation_name][1]
             attributes.update(
                 {
-                    SPANDATA.MESSAGING_SYSTEM: "aws_sqs",
-                    SPANDATA.MESSAGING_OPERATION_TYPE: operation_type,
-                    SPANDATA.MESSAGING_OPERATION_NAME: operation_type,
+                    ATTRIBUTE_NAMES.MESSAGING_SYSTEM: "aws_sqs",
+                    ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE: operation_type,
+                    ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME: operation_type,
                 }
             )
             if operation_type == "send":
-                attributes[SPANDATA.SENTRY_KIND] = "producer"
+                attributes[ATTRIBUTE_NAMES.SENTRY_KIND] = "producer"
             if "Entries" in ctx.params:
                 with capture_internal_exceptions():
-                    attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(
+                    attributes[ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT] = len(
                         ctx.params["Entries"]
                     )
         return attributes
@@ -157,18 +161,22 @@ class _SQSExtension(_ServiceExtension):
         # `Stubber` or an SQS-compatible service, must only lose these attributes.
         with capture_internal_exceptions():
             if ctx.operation_name == "SendMessage" and "MessageId" in response:
-                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
+                attributes[ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID] = response["MessageId"]
             elif ctx.operation_name == "ReceiveMessage":
                 # `Messages` is left out when no message was received.
                 messages = response.get("Messages", ())
-                attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(messages)
+                attributes[ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT] = len(
+                    messages
+                )
                 if len(messages) == 1 and "MessageId" in messages[0]:
-                    attributes[SPANDATA.MESSAGING_MESSAGE_ID] = messages[0]["MessageId"]
+                    attributes[ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID] = messages[0][
+                        "MessageId"
+                    ]
 
             error_type = _get_batch_error_type(response)
             if error_type is not None:
                 span.status = SpanStatus.ERROR
-                attributes[SPANDATA.ERROR_TYPE] = error_type
+                attributes[ATTRIBUTE_NAMES.ERROR_TYPE] = error_type
 
         if ctx.operation_name == "ReceiveMessage":
             with capture_internal_exceptions():

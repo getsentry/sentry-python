@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
@@ -34,9 +36,9 @@ class _SNSExtension(_ServiceExtension):
         if ctx.operation_name not in _PUBLISH_OPERATIONS:
             return None
 
-        destination = attributes.get(SPANDATA.MESSAGING_DESTINATION_NAME)
-        if destination is None and SPANDATA.SERVER_ADDRESS in attributes:
-            destination = f"{attributes[SPANDATA.SERVER_ADDRESS]}:{attributes[SPANDATA.SERVER_PORT]}"
+        destination = attributes.get(ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME)
+        if destination is None and ATTRIBUTE_NAMES.SERVER_ADDRESS in attributes:
+            destination = f"{attributes[ATTRIBUTE_NAMES.SERVER_ADDRESS]}:{attributes[ATTRIBUTE_NAMES.SERVER_PORT]}"
 
         # for example: `send <topic name>` when `messaging.operation.type=send` (always send).
         # https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#span-name
@@ -64,29 +66,31 @@ class _SNSExtension(_ServiceExtension):
             )
 
             if topic_arn:
-                attributes[SPANDATA.AWS_SNS_TOPIC_ARN] = topic_arn
+                attributes[ATTRIBUTE_NAMES.AWS_SNS_TOPIC_ARN] = topic_arn
                 # `arn:aws:sns:eu-north-1:123456789012:alerts` -> `alerts`
                 topic_name = topic_arn.split(":")[-1]
-                attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = topic_name
+                attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] = topic_name
             elif ctx.operation_name == "CreateTopic" and "Name" in ctx.params:
-                attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = ctx.params["Name"]
+                attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] = ctx.params[
+                    "Name"
+                ]
 
         if ctx.operation_name in _PUBLISH_OPERATIONS:
             attributes.update(
                 {
-                    SPANDATA.SENTRY_KIND: "producer",
-                    SPANDATA.MESSAGING_SYSTEM: "aws.sns",
-                    SPANDATA.MESSAGING_OPERATION_TYPE: "send",
-                    SPANDATA.MESSAGING_OPERATION_NAME: "publish",
+                    ATTRIBUTE_NAMES.SENTRY_KIND: "producer",
+                    ATTRIBUTE_NAMES.MESSAGING_SYSTEM: "aws.sns",
+                    ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE: "send",
+                    ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME: "publish",
                 }
             )
 
             # phone numbers and device endpoints are PII.
             if "PhoneNumber" in ctx.params or endpoint_arn:
-                attributes[SPANDATA.MESSAGING_DESTINATION_NAME] = "[Filtered]"
+                attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] = "[Filtered]"
             if "PublishBatchRequestEntries" in ctx.params:
                 with capture_internal_exceptions():
-                    attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] = len(
+                    attributes[ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT] = len(
                         ctx.params["PublishBatchRequestEntries"]
                     )
 
@@ -121,12 +125,12 @@ class _SNSExtension(_ServiceExtension):
         # `Stubber` or an SNS-compatible service, must only lose these attributes.
         with capture_internal_exceptions():
             if ctx.operation_name == "Publish" and "MessageId" in response:
-                attributes[SPANDATA.MESSAGING_MESSAGE_ID] = response["MessageId"]
+                attributes[ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID] = response["MessageId"]
 
             error_type = _get_batch_error_type(response)
             if error_type is not None:
                 span.status = SpanStatus.ERROR
-                attributes[SPANDATA.ERROR_TYPE] = error_type
+                attributes[ATTRIBUTE_NAMES.ERROR_TYPE] = error_type
 
         span.set_attributes(attributes)
         span.end()
