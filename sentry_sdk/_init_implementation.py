@@ -67,7 +67,7 @@ def _init(*args: "Optional[str]", **kwargs: "Any") -> "ContextManager[Any]":
         # The frame that called sentry_sdk.init(). None on Pythons without frames.
         frame = inspect.currentframe()
         if frame is not None and frame.f_back is not None:
-            show_coding_agent_hint(client.options, frame.f_back)
+            show_coding_agent_hint(client, frame.f_back)
     _check_python_deprecations()
     rv = _InitGuard(client)
     return rv

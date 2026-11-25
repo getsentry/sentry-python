@@ -13,7 +13,9 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, Dict, Optional, Tuple
+    from typing import Optional, Tuple
+
+    from sentry_sdk.client import BaseClient
 
 SETUP_CHECKLIST_PATH = os.path.join(os.path.dirname(__file__), "SETUP_CHECKLIST.md")
 
@@ -112,6 +114,11 @@ def _setup_in_progress(init_file: str) -> bool:
     return bool(committer) and committer == git("config", "user.email")
 
 
+def _logs_on(client: "BaseClient") -> bool:
+    options = client.options
+    return bool(options["enable_logs"] or options["_experiments"].get("enable_logs"))
+
+
 def register_coding_agent_hint_exit_hook() -> None:
     """Call before the client is made. Exit hooks run last-in first-out, so the hint then
     prints after the client's own exit output."""
@@ -151,13 +158,14 @@ def _write_coding_agent_hint() -> None:
         sys.stderr.flush()
 
 
-def show_coding_agent_hint(options: "Dict[str, Any]", caller: "FrameType") -> None:
+def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     """Point a coding agent at the setup checklist while Sentry is being set up."""
     global _hint_at_exit
 
+    options = client.options
     rate = options["traces_sample_rate"]
     tracing_on = options["traces_sampler"] is not None or rate not in (0, None)
-    logs_on = bool(options["enable_logs"] or options["_experiments"].get("enable_logs"))
+    logs_on = _logs_on(client)
     if (
         _hint_at_exit is not None
         or not _exit_hook_registered
