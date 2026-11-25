@@ -185,8 +185,8 @@ def show_coding_agent_hint(client: "BaseClient", caller: "FrameType") -> None:
     # An installed tool that uses Sentry itself isn't the user's app.
     if _is_external_source(init_file):
         return
-    # Only the first init() that qualifies gets the hint, so skip a file that didn't
-    # change and leave the hint for a later init() from one that did.
+    # A process prints one hint. Don't use it up on a file that wasn't changed: another
+    # init() call, from a file that was, may come later.
     try:
         if os.stat(init_file).st_mtime < time.time() - SETUP_IN_PROGRESS_SECONDS:
             return
