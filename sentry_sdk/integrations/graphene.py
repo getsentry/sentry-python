@@ -1,5 +1,7 @@
 from contextlib import contextmanager
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -148,14 +150,14 @@ def graphql_span(
 
     additional_attributes = {}
     if client_options["data_collection"]["graphql"]["document"]:
-        additional_attributes["graphql.document"] = source
+        additional_attributes[ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] = source
 
     _graphql_span = sentry_sdk.start_span(
         name=operation_name,
         attributes={
-            "sentry.op": op,
-            "graphql.operation.name": operation_name,
-            "graphql.operation.type": operation_type,
+            ATTRIBUTE_NAMES.SENTRY_OP: op,
+            ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME: operation_name,
+            ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE: operation_type,
             **additional_attributes,
         },
     )

@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -130,7 +131,7 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
 
     server_span = sentry_sdk.get_current_scope()._server_segment_span
     if server_span is not None and route_path is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+        server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
     # Set the transaction name and source here,
     # but rely on WSGI middleware to actually start the transaction

@@ -1,8 +1,10 @@
 from contextlib import nullcontext
 from copy import deepcopy
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -157,9 +159,9 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             return sentry_sdk.start_span(
                 name=name,
                 attributes={
-                    "sentry.op": op,
-                    "sentry.origin": StarliteIntegration.origin,
-                    SPANDATA.MIDDLEWARE_NAME: middleware_name,
+                    ATTRIBUTE_NAMES.SENTRY_OP: op,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: StarliteIntegration.origin,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: middleware_name,
                 },
             )
 

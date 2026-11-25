@@ -1,8 +1,9 @@
 import functools
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -112,7 +113,7 @@ class BottleIntegration(Integration):
                     pass
 
                 if route_path is not None:
-                    server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+                    server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
             name = _get_transaction_name(bottle_request)
             if name:

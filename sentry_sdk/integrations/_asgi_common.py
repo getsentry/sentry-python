@@ -2,6 +2,8 @@ import urllib
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -161,7 +163,9 @@ def _get_request_attributes(
     client_options = sentry_sdk.get_client().options
     if ty in ("http", "websocket"):
         if asgi_scope.get("method"):
-            attributes["http.request.method"] = asgi_scope["method"].upper()
+            attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] = asgi_scope[
+                "method"
+            ].upper()
 
         headers = _get_headers(asgi_scope)
 
@@ -178,10 +182,10 @@ def _get_request_attributes(
                 behaviour=client_options["data_collection"]["url_query_params"],
             )
             if filtered_query_string:
-                attributes["http.query"] = filtered_query_string
+                attributes[ATTRIBUTE_NAMES.HTTP_QUERY] = filtered_query_string
 
         path = _get_path(asgi_scope=asgi_scope, root_path_in_path=root_path_in_path)
-        attributes["url.path"] = path
+        attributes[ATTRIBUTE_NAMES.URL_PATH] = path
 
         url_without_query_string = _get_url(
             asgi_scope,
@@ -190,7 +194,7 @@ def _get_request_attributes(
             path=path,
         )
 
-        attributes["url.full"] = (
+        attributes[ATTRIBUTE_NAMES.URL_FULL] = (
             f"{url_without_query_string}?{filtered_query_string}"
             if filtered_query_string is not None
             else url_without_query_string
@@ -200,6 +204,6 @@ def _get_request_attributes(
     if asgi_scope_client:
         if client_options["data_collection"]["user_info"]:
             ip = _get_ip(asgi_scope)
-            attributes["client.address"] = ip
+            attributes[ATTRIBUTE_NAMES.CLIENT_ADDRESS] = ip
 
     return attributes

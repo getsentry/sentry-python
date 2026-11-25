@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -99,7 +100,7 @@ class SentryFalconMiddleware:
 
         server_span = sentry_sdk.get_current_scope()._server_segment_span
         if server_span is not None:
-            server_span.set_attribute(SPANDATA.HTTP_ROUTE, req.uri_template)
+            server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, req.uri_template)
 
         sentry_sdk.set_transaction_name(req.uri_template, SegmentNameSource.ROUTE)
 

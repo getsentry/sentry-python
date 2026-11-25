@@ -4,6 +4,8 @@ from inspect import isawaitable
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import (
@@ -135,7 +137,7 @@ async def _context_enter(request: "Request") -> None:
     scope.set_custom_sampling_context({"sanic_request": request})
 
     scope.set_attribute(
-        SPANDATA.SENTRY_IS_LOCALHOST,
+        ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST,
         _is_localhost(
             client_ip=request.remote_addr or None,
             url_host=urlsplit(request.url).hostname,
@@ -145,20 +147,20 @@ async def _context_enter(request: "Request") -> None:
     )
 
     if request.remote_addr and client.options["data_collection"]["user_info"]:
-        scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+        scope.set_attribute(ATTRIBUTE_NAMES.USER_IP_ADDRESS, request.remote_addr)
 
     user_agent = request.headers.get("user-agent")
     if user_agent:
-        scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+        scope.set_attribute(ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL, user_agent)
 
     span = sentry_sdk.start_span(
         # Unless the request results in a 404 error, the name and source
         # will get overwritten in _set_transaction
         name=request.path,
         attributes={
-            "sentry.op": OP.HTTP_SERVER,
-            "sentry.origin": SanicIntegration.origin,
-            "sentry.segment.name.source": SegmentNameSource.URL.value,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_SERVER,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: SanicIntegration.origin,
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.URL.value,
         },
         parent_span=None,
     )
@@ -184,7 +186,9 @@ async def _context_exit(
                     span.set_attribute(attr, value)
 
             if response_status is not None:
-                span.set_attribute(SPANDATA.HTTP_STATUS_CODE, response_status)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE, response_status
+                )
                 span.status = "error" if response_status >= 400 else "ok"
 
             span.end()
@@ -257,7 +261,7 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
     attributes = {}  # type: Dict[str, Any]
 
     if request.method:
-        attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
+        attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] = request.method.upper()
 
     headers = _filter_headers(dict(request.headers))
     for header, value in headers.items():
@@ -266,7 +270,7 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
     urlparts = urlsplit(request.url)
     client_options = sentry_sdk.get_client().options
 
-    attributes["url.path"] = urlparts.path
+    attributes[ATTRIBUTE_NAMES.URL_PATH] = urlparts.path
 
     filtered_query = None
     if urlparts.query:
@@ -275,17 +279,17 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
             behaviour=client_options["data_collection"]["url_query_params"],
         )
         if filtered_query:
-            attributes[SPANDATA.HTTP_QUERY] = filtered_query
+            attributes[ATTRIBUTE_NAMES.HTTP_QUERY] = filtered_query
 
-    attributes[SPANDATA.URL_FULL] = urlparts._replace(
+    attributes[ATTRIBUTE_NAMES.URL_FULL] = urlparts._replace(
         query=filtered_query or ""
     ).geturl()
 
     if request.remote_addr and client_options["data_collection"]["user_info"]:
-        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
+        attributes[ATTRIBUTE_NAMES.CLIENT_ADDRESS] = request.remote_addr
 
     if urlparts.scheme:
-        attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = urlparts.scheme
+        attributes[ATTRIBUTE_NAMES.NETWORK_PROTOCOL_NAME] = urlparts.scheme
 
     return attributes
 

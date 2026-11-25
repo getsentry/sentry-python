@@ -4,6 +4,8 @@ import sys
 import threading
 import weakref
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANNAME
 from sentry_sdk.integrations import (
@@ -341,8 +343,8 @@ def _patch_drf() -> None:
                     with sentry_sdk.start_span(
                         name="authenticate",
                         attributes={
-                            "sentry.op": OP.VIEW,
-                            "sentry.origin": DjangoIntegration.origin,
+                            ATTRIBUTE_NAMES.SENTRY_OP: OP.VIEW,
+                            ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
                         },
                     ):
                         return old_drf_authenticate(self)
@@ -396,7 +398,7 @@ def _set_transaction_name_and_source(
         if route_path is not None:
             server_span = scope._server_segment_span
             if server_span is not None:
-                server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+                server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
     except Exception:
         pass
 
@@ -426,7 +428,7 @@ def _before_get_response(request: "WSGIRequest") -> None:
 
     server_span = sentry_sdk.get_current_scope()._server_segment_span
     if server_span is not None and route_path is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+        server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
     # Rely on WSGI middleware to start a trace
     _set_transaction_name_and_source(scope, request, route_path=route_path)
@@ -464,7 +466,7 @@ def _attempt_resolve_again(
 
     server_span = sentry_sdk.get_current_scope()._server_segment_span
     if server_span is not None and route_path is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+        server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
     _set_transaction_name_and_source(scope, request, route_path=route_path)
 
@@ -788,8 +790,8 @@ def install_sql_hook() -> None:
         with sentry_sdk.start_span(
             name="connect",
             attributes={
-                "sentry.op": OP.DB,
-                "sentry.origin": DjangoIntegration.origin_db,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.DB,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin_db,
             },
         ) as span:
             _set_db_data(span, self)
@@ -807,8 +809,8 @@ def install_sql_hook() -> None:
         with sentry_sdk.start_span(
             name=SPANNAME.DB_COMMIT,
             attributes={
-                "sentry.op": OP.DB,
-                "sentry.origin": DjangoIntegration.origin_db,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.DB,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin_db,
             },
         ) as span:
             _set_db_data(span, self, SPANNAME.DB_COMMIT)
@@ -826,8 +828,8 @@ def install_sql_hook() -> None:
         with sentry_sdk.start_span(
             name=SPANNAME.DB_ROLLBACK,
             attributes={
-                "sentry.op": OP.DB,
-                "sentry.origin": DjangoIntegration.origin_db,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.DB,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin_db,
             },
         ) as span:
             _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
@@ -848,10 +850,10 @@ def _set_db_data(
 ) -> None:
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
-    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, vendor)
+    span.set_attribute(ATTRIBUTE_NAMES.DB_SYSTEM_NAME, vendor)
 
     if db_operation is not None:
-        span.set_attribute(SPANDATA.DB_OPERATION_NAME, db_operation)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_OPERATION_NAME, db_operation)
 
     # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
     # actually has a `connection` and the `connection` has a `get_dsn_parameters`
@@ -885,15 +887,15 @@ def _set_db_data(
     db_name = connection_params.get("dbname") or connection_params.get("database")
 
     if db_name is not None:
-        span.set_attribute(SPANDATA.DB_NAMESPACE, db_name)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_NAMESPACE, db_name)
 
     server_address = connection_params.get("host")
     if server_address is not None:
-        span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, server_address)
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        span.set_attribute(SPANDATA.SERVER_PORT, str(server_port))
+        span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, str(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:

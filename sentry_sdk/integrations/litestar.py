@@ -1,8 +1,10 @@
 from collections.abc import Set
 from copy import deepcopy
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
@@ -170,11 +172,13 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
         with sentry_sdk.start_span(
             name=middleware_name,
             attributes={
-                "sentry.op": OP.MIDDLEWARE,
-                "sentry.origin": LitestarIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: LitestarIntegration.origin,
             },
         ) as middleware_span:
-            middleware_span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+            middleware_span.set_attribute(
+                ATTRIBUTE_NAMES.MIDDLEWARE_NAME, middleware_name
+            )
 
             # Creating spans for the "receive" callback
             async def _sentry_receive(
@@ -187,11 +191,11 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     name=getattr(receive, "__qualname__", str(receive)),
                     attributes={
-                        "sentry.op": OP.MIDDLEWARE,
-                        "sentry.origin": LitestarIntegration.origin,
+                        ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: LitestarIntegration.origin,
                     },
                 ) as span:
-                    span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+                    span.set_attribute(ATTRIBUTE_NAMES.MIDDLEWARE_NAME, middleware_name)
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -207,11 +211,11 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     name=getattr(send, "__qualname__", str(send)),
                     attributes={
-                        "sentry.op": OP.MIDDLEWARE,
-                        "sentry.origin": LitestarIntegration.origin,
+                        ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: LitestarIntegration.origin,
                     },
                 ) as span:
-                    span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+                    span.set_attribute(ATTRIBUTE_NAMES.MIDDLEWARE_NAME, middleware_name)
                     return await send(message)
 
             send_name = getattr(send, "__name__", str(send))

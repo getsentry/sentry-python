@@ -4,8 +4,9 @@ import sys
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -138,7 +139,7 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
 
     server_span = sentry_sdk.get_current_scope()._server_segment_span
     if server_span is not None and route_path is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+        server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
     # Set the transaction name here, but rely on ASGI middleware
     # to actually start the transaction
@@ -156,7 +157,9 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     if type(current_span) is Span:
         segment = current_span._segment
 
-        segment.set_attribute("http.request.method", request_websocket.method)
+        segment.set_attribute(
+            ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD, request_websocket.method
+        )
         header_attributes: "dict[str, Any]" = {}
 
         for header, header_value in _filter_headers(
@@ -176,11 +179,11 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
                 behaviour=client_options["data_collection"]["url_query_params"],
             )
             if filtered_query_string:
-                segment.set_attribute("url.query", filtered_query_string)
+                segment.set_attribute(ATTRIBUTE_NAMES.URL_QUERY, filtered_query_string)
 
         parsed_url = parse_url(request_websocket.url)
         segment.set_attribute(
-            "url.full",
+            ATTRIBUTE_NAMES.URL_FULL,
             f"{parsed_url.url}?{filtered_query_string}"
             if filtered_query_string
             else parsed_url.url,
@@ -191,7 +194,7 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
 
             if len(request_websocket.access_route) >= 1:
                 segment.set_attribute(
-                    "client.address", request_websocket.access_route[0]
+                    ATTRIBUTE_NAMES.CLIENT_ADDRESS, request_websocket.access_route[0]
                 )
                 user_properties["ip_address"] = request_websocket.access_route[0]
 

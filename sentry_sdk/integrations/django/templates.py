@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from django.template import TemplateSyntaxError
 from django.template.base import Origin
 from django.utils.safestring import mark_safe
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -60,8 +61,8 @@ def patch_templates() -> None:
         with sentry_sdk.start_span(
             name=_get_template_name_description(self.template_name),
             attributes={
-                "sentry.op": OP.TEMPLATE_RENDER,
-                "sentry.origin": DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.TEMPLATE_RENDER,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
             },
         ):
             return real_rendered_content.fget(self)
@@ -94,8 +95,8 @@ def patch_templates() -> None:
         with sentry_sdk.start_span(
             name=_get_template_name_description(template_name),
             attributes={
-                "sentry.op": OP.TEMPLATE_RENDER,
-                "sentry.origin": DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.TEMPLATE_RENDER,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
             },
         ):
             return real_render(request, template_name, context, *args, **kwargs)

@@ -4,9 +4,11 @@ from contextvars import ContextVar
 from functools import partial
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk._werkzeug import _get_headers, get_host
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -126,7 +128,7 @@ class SentryWsgiMiddleware:
                         )
 
                     scope.set_attribute(
-                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST,
                         _is_localhost(
                             client_ip=get_client_ip(environ),
                             url_host=environ.get("SERVER_NAME")
@@ -138,7 +140,8 @@ class SentryWsgiMiddleware:
                     )
                     if environ.get("HTTP_USER_AGENT"):
                         scope.set_attribute(
-                            SPANDATA.USER_AGENT_ORIGINAL, environ["HTTP_USER_AGENT"]
+                            ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL,
+                            environ["HTTP_USER_AGENT"],
                         )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
@@ -151,14 +154,16 @@ class SentryWsgiMiddleware:
                         if client.options["data_collection"]["user_info"]:
                             client_ip = get_client_ip(environ)
                             if client_ip:
-                                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, client_ip)
+                                scope.set_attribute(
+                                    ATTRIBUTE_NAMES.USER_IP_ADDRESS, client_ip
+                                )
 
                         span_ctx = sentry_sdk.start_span(
                             name=_DEFAULT_TRANSACTION_NAME,
                             attributes={
-                                "sentry.segment.name.source": SegmentNameSource.ROUTE,
-                                "sentry.origin": self.span_origin,
-                                "sentry.op": OP.HTTP_SERVER,
+                                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.ROUTE,
+                                ATTRIBUTE_NAMES.SENTRY_ORIGIN: self.span_origin,
+                                ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_SERVER,
                             },
                             parent_span=None,
                         )
@@ -219,7 +224,7 @@ def _sentry_start_response(
         status_int = int(status.split(" ", 1)[0])
         if span is not None:
             span.status = "error" if status_int >= 400 else "ok"
-            span.set_attribute("http.response.status_code", status_int)
+            span.set_attribute(ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE, status_int)
 
     if exc_info is None:
         # The Django Rest Framework WSGI test client, and likely other
@@ -392,7 +397,7 @@ def _get_request_attributes(
 
     method = environ.get("REQUEST_METHOD")
     if method:
-        attributes["http.request.method"] = method.upper()
+        attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] = method.upper()
 
     headers = _filter_headers(dict(_get_headers(environ)))
     for header, value in headers.items():
@@ -400,12 +405,12 @@ def _get_request_attributes(
 
     url_scheme = environ.get("wsgi.url_scheme")
     if url_scheme:
-        attributes["network.protocol.name"] = url_scheme
+        attributes[ATTRIBUTE_NAMES.NETWORK_PROTOCOL_NAME] = url_scheme
 
     server_port = environ.get("SERVER_PORT")
     if server_port:
         try:
-            attributes["server.port"] = int(server_port)
+            attributes[ATTRIBUTE_NAMES.SERVER_PORT] = int(server_port)
         except ValueError:
             pass
 
@@ -419,19 +424,19 @@ def _get_request_attributes(
             behaviour=client_options["data_collection"]["url_query_params"],
         )
         if filtered_qs:
-            attributes["http.query"] = filtered_qs
+            attributes[ATTRIBUTE_NAMES.HTTP_QUERY] = filtered_qs
 
     path = environ.get("PATH_INFO", "")
     if path:
-        attributes["url.path"] = path
+        attributes[ATTRIBUTE_NAMES.URL_PATH] = path
 
-    attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+    attributes[ATTRIBUTE_NAMES.URL_FULL] = get_request_url(environ, use_x_forwarded_for)
     if filtered_qs is not None:
-        attributes["url.full"] += f"?{filtered_qs}"
+        attributes[ATTRIBUTE_NAMES.URL_FULL] += f"?{filtered_qs}"
 
     if client_options["data_collection"]["user_info"]:
         client_ip = get_client_ip(environ)
         if client_ip:
-            attributes["client.address"] = client_ip
+            attributes[ATTRIBUTE_NAMES.CLIENT_ADDRESS] = client_ip
 
     return attributes
