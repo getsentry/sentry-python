@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import grpc
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -77,9 +78,11 @@ def test_grpc_server_starts_transaction(
     spans = [item["payload"] for item in items if item["type"] == "span"]
     span = spans[0]
 
-    assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
-    assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
-    assert span["attributes"]["sentry.op"] == "test"
+    assert (
+        spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "custom"
+    )
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRPC_SERVER
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "test"
 
 
 @pytest.mark.forked
@@ -117,9 +120,11 @@ def test_grpc_server_other_interceptors(
     spans = [item["payload"] for item in items if item["type"] == "span"]
     span = spans[0]
 
-    assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
-    assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
-    assert span["attributes"]["sentry.op"] == "test"
+    assert (
+        spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "custom"
+    )
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRPC_SERVER
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "test"
 
 
 @pytest.mark.forked
@@ -167,10 +172,12 @@ def test_grpc_server_continues_transaction(
     spans = [item["payload"] for item in items if item["type"] == "span"]
     span = spans[0]
 
-    assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
-    assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
+    assert (
+        spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "custom"
+    )
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRPC_SERVER
     assert spans[1]["trace_id"] == segment_span.trace_id
-    assert span["attributes"]["sentry.op"] == "test"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "test"
 
 
 @pytest.mark.forked
@@ -201,26 +208,26 @@ def test_grpc_client_starts_span(
     span = spans[2]
 
     assert len(spans) == 4
-    assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRPC_CLIENT
     assert (
         span["name"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
     assert span["attributes"] == ApproxDict(
         {
-            "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
-            "sentry.environment": mock.ANY,
-            "sentry.op": "grpc.client",
-            "sentry.origin": "auto.grpc.grpc",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "custom parent",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-            "rpc.response.status_code": "OK",
+            ATTRIBUTE_NAMES.RPC_METHOD: "/grpc_test_server.gRPCTestService/TestServe",
+            ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_OP: "grpc.client",
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.grpc.grpc",
+            ATTRIBUTE_NAMES.SENTRY_RELEASE: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SDK_NAME: "sentry.python",
+            ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_ID: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME: "custom parent",
+            ATTRIBUTE_NAMES.SERVER_ADDRESS: mock.ANY,
+            ATTRIBUTE_NAMES.THREAD_ID: mock.ANY,
+            ATTRIBUTE_NAMES.THREAD_NAME: mock.ANY,
+            ATTRIBUTE_NAMES.RPC_RESPONSE_STATUS_CODE: "OK",
         }
     )
 
@@ -253,25 +260,25 @@ def test_grpc_client_unary_stream_starts_span(
     span = spans[0]
 
     assert len(spans) == 2
-    assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRPC_CLIENT
     assert (
         span["name"]
         == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
     )
     assert span["attributes"] == ApproxDict(
         {
-            "rpc.method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
-            "sentry.environment": mock.ANY,
-            "sentry.op": "grpc.client",
-            "sentry.origin": "auto.grpc.grpc",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "custom parent",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
+            ATTRIBUTE_NAMES.RPC_METHOD: "/grpc_test_server.gRPCTestService/TestUnaryStream",
+            ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_OP: "grpc.client",
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.grpc.grpc",
+            ATTRIBUTE_NAMES.SENTRY_RELEASE: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SDK_NAME: "sentry.python",
+            ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_ID: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME: "custom parent",
+            ATTRIBUTE_NAMES.SERVER_ADDRESS: mock.ANY,
+            ATTRIBUTE_NAMES.THREAD_ID: mock.ANY,
+            ATTRIBUTE_NAMES.THREAD_NAME: mock.ANY,
         }
     )
 
@@ -318,26 +325,26 @@ def test_grpc_client_other_interceptor(
     span = spans[2]
 
     assert len(spans) == 4
-    assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRPC_CLIENT
     assert (
         span["name"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
     assert span["attributes"] == ApproxDict(
         {
-            "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
-            "sentry.environment": mock.ANY,
-            "sentry.op": "grpc.client",
-            "sentry.origin": "auto.grpc.grpc",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "custom parent",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-            "rpc.response.status_code": "OK",
+            ATTRIBUTE_NAMES.RPC_METHOD: "/grpc_test_server.gRPCTestService/TestServe",
+            ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_OP: "grpc.client",
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.grpc.grpc",
+            ATTRIBUTE_NAMES.SENTRY_RELEASE: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SDK_NAME: "sentry.python",
+            ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_ID: mock.ANY,
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME: "custom parent",
+            ATTRIBUTE_NAMES.SERVER_ADDRESS: mock.ANY,
+            ATTRIBUTE_NAMES.THREAD_ID: mock.ANY,
+            ATTRIBUTE_NAMES.THREAD_NAME: mock.ANY,
+            ATTRIBUTE_NAMES.RPC_RESPONSE_STATUS_CODE: "OK",
         }
     )
 
@@ -371,15 +378,15 @@ def test_prevent_dual_client_interceptor(
     span = spans[2]
 
     assert len(spans) == 4
-    assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRPC_CLIENT
     assert (
         span["name"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
     assert span["attributes"] == ApproxDict(
         {
-            "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
-            "rpc.response.status_code": "OK",
+            ATTRIBUTE_NAMES.RPC_METHOD: "/grpc_test_server.gRPCTestService/TestServe",
+            ATTRIBUTE_NAMES.RPC_RESPONSE_STATUS_CODE: "OK",
         }
     )
 
@@ -479,13 +486,14 @@ def test_span_origin(
 
     spans = [item["payload"] for item in items if item["type"] == "span"]
 
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.grpc.grpc"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.grpc.grpc"
     assert (
-        spans[0]["attributes"]["sentry.origin"] == "auto.grpc.grpc.TestService"
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.grpc.grpc.TestService"
     )  # manually created in TestService, not the instrumentation
 
-    assert spans[3]["attributes"]["sentry.origin"] == "manual"
-    assert spans[2]["attributes"]["sentry.origin"] == "auto.grpc.grpc"
+    assert spans[3]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.grpc.grpc"
 
 
 class TestService(gRPCTestServiceServicer):
@@ -496,8 +504,8 @@ class TestService(gRPCTestServiceServicer):
         with sentry_sdk.start_span(
             name="test",
             attributes={
-                "sentry.op": "test",
-                "sentry.origin": "auto.grpc.grpc.TestService",
+                ATTRIBUTE_NAMES.SENTRY_OP: "test",
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.grpc.grpc.TestService",
             },
         ):
             pass

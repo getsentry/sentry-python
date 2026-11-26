@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
@@ -58,9 +60,9 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     with sentry_sdk.start_span(
                         name=name,
                         attributes={
-                            "sentry.op": OP.GRPC_SERVER,
-                            "sentry.segment.name.source": SegmentNameSource.CUSTOM.value,
-                            "sentry.origin": SPAN_ORIGIN,
+                            ATTRIBUTE_NAMES.SENTRY_OP: OP.GRPC_SERVER,
+                            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.CUSTOM.value,
+                            ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
                         },
                         parent_span=None,
                     ):

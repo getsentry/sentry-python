@@ -11,6 +11,7 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -277,7 +278,7 @@ def test_outgoing_trace_headers(sentry_init, capture_items):
     with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
-            "sentry.op": "greeting.sniff",
+            ATTRIBUTE_NAMES.SENTRY_OP: "greeting.sniff",
         },
     ):
         connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
@@ -531,7 +532,7 @@ def test_option_trace_propagation_targets(
     with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
-            "sentry.op": "greeting.sniff",
+            ATTRIBUTE_NAMES.SENTRY_OP: "greeting.sniff",
         },
     ):
         connection = HTTPSConnectionRecordingRequestHeaders(host)
@@ -568,10 +569,10 @@ def test_request_source_disabled(sentry_init, capture_items):
 
     attributes = span["attributes"]
 
-    assert SPANDATA.CODE_LINE_NUMBER not in attributes
-    assert SPANDATA.CODE_NAMESPACE not in attributes
-    assert SPANDATA.CODE_FILE_PATH not in attributes
-    assert SPANDATA.CODE_FUNCTION not in attributes
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in attributes
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in attributes
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in attributes
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in attributes
 
 
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
@@ -599,10 +600,10 @@ def test_request_source_enabled(sentry_init, capture_items, enable_http_request_
 
     attributes = span["attributes"]
 
-    assert SPANDATA.CODE_LINE_NUMBER in attributes
-    assert SPANDATA.CODE_NAMESPACE in attributes
-    assert SPANDATA.CODE_FILE_PATH in attributes
-    assert SPANDATA.CODE_FUNCTION in attributes
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
 
 def test_request_source(sentry_init, capture_items):
@@ -626,25 +627,25 @@ def test_request_source(sentry_init, capture_items):
 
     attributes = span["attributes"]
 
-    assert SPANDATA.CODE_LINE_NUMBER in attributes
-    assert SPANDATA.CODE_NAMESPACE in attributes
-    assert SPANDATA.CODE_FILE_PATH in attributes
-    assert SPANDATA.CODE_FUNCTION in attributes
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-    assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-    assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+    assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
     assert (
-        attributes.get(SPANDATA.CODE_NAMESPACE)
+        attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
         == "tests.integrations.stdlib.test_httplib"
     )
-    assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+    assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
         "tests/integrations/stdlib/test_httplib.py"
     )
 
-    is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+    is_relative_path = attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
-    assert attributes.get(SPANDATA.CODE_FUNCTION) == "test_request_source"
+    assert attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "test_request_source"
 
 
 def test_request_source_with_module_in_search_path(sentry_init, capture_items):
@@ -672,20 +673,24 @@ def test_request_source_with_module_in_search_path(sentry_init, capture_items):
 
     attributes = span["attributes"]
 
-    assert SPANDATA.CODE_LINE_NUMBER in attributes
-    assert SPANDATA.CODE_NAMESPACE in attributes
-    assert SPANDATA.CODE_FILE_PATH in attributes
-    assert SPANDATA.CODE_FUNCTION in attributes
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-    assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-    assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
-    assert attributes.get(SPANDATA.CODE_NAMESPACE) == "httplib_helpers.helpers"
-    assert attributes.get(SPANDATA.CODE_FILE_PATH) == "httplib_helpers/helpers.py"
+    assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
+    assert attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE) == "httplib_helpers.helpers"
+    assert (
+        attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH) == "httplib_helpers/helpers.py"
+    )
 
-    is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+    is_relative_path = attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
-    assert attributes.get(SPANDATA.CODE_FUNCTION) == "get_request_with_connection"
+    assert (
+        attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "get_request_with_connection"
+    )
 
 
 def test_no_request_source_if_duration_too_short(sentry_init, capture_items):
@@ -720,10 +725,10 @@ def test_no_request_source_if_duration_too_short(sentry_init, capture_items):
 
     attributes = span["attributes"]
 
-    assert SPANDATA.CODE_LINE_NUMBER not in attributes
-    assert SPANDATA.CODE_NAMESPACE not in attributes
-    assert SPANDATA.CODE_FILE_PATH not in attributes
-    assert SPANDATA.CODE_FUNCTION not in attributes
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in attributes
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in attributes
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in attributes
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in attributes
 
 
 def test_request_source_if_duration_over_threshold(sentry_init, capture_items):
@@ -760,26 +765,26 @@ def test_request_source_if_duration_over_threshold(sentry_init, capture_items):
 
     attributes = span["attributes"]
 
-    assert SPANDATA.CODE_LINE_NUMBER in attributes
-    assert SPANDATA.CODE_NAMESPACE in attributes
-    assert SPANDATA.CODE_FILE_PATH in attributes
-    assert SPANDATA.CODE_FUNCTION in attributes
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-    assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-    assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+    assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
     assert (
-        attributes.get(SPANDATA.CODE_NAMESPACE)
+        attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
         == "tests.integrations.stdlib.test_httplib"
     )
-    assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+    assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
         "tests/integrations/stdlib/test_httplib.py"
     )
 
-    is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+    is_relative_path = attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
     assert (
-        attributes.get(SPANDATA.CODE_FUNCTION)
+        attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION)
         == "add_http_request_source_with_pinned_timestamps"
     )
 
@@ -798,10 +803,13 @@ def test_span_origin(sentry_init, capture_items):
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
-    assert spans[0]["attributes"]["sentry.op"] == "http.client"
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.http.stdlib.httplib"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.http.stdlib.httplib"
+    )
 
 
 def test_http_timeout(monkeypatch, sentry_init, capture_items):
@@ -817,7 +825,7 @@ def test_http_timeout(monkeypatch, sentry_init, capture_items):
         with sentry_sdk.start_span(
             name="name",
             attributes={
-                "sentry.op": "op",
+                ATTRIBUTE_NAMES.SENTRY_OP: "op",
             },
         ):
             conn = HTTPConnection("localhost", port=PORT)
@@ -828,7 +836,7 @@ def test_http_timeout(monkeypatch, sentry_init, capture_items):
     spans = [item.payload for item in items]
     assert len(spans) == 2
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == "http.client"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
     assert span["name"] == f"GET http://localhost:{PORT}/bla"
 
 
@@ -850,20 +858,21 @@ def test_proxy_http_tunnel(sentry_init, capture_items, tunnel_port):
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.stdlib.httplib"
     )
 
     port_modifier = f":{tunnel_port}" if tunnel_port else ""
     assert span["name"] == f"GET http://api.example.com{port_modifier}/foo"
-    assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
-    assert span["attributes"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
-    assert span["attributes"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.NETWORK_PEER_ADDRESS] == "localhost"
+    assert span["attributes"][ATTRIBUTE_NAMES.NETWORK_PEER_PORT] == PROXY_PORT
 
     assert (
-        span["attributes"][SPANDATA.URL_FULL]
+        span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
         == f"http://api.example.com{port_modifier}/foo?bar=1"
     )
-    assert span["attributes"][SPANDATA.URL_QUERY] == "bar=1"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == "bar=1"
 
 
 def test_chunked_response_span_covers_body_read(sentry_init, capture_items):
@@ -940,13 +949,14 @@ def test_url_query_data_collection(
     (span,) = (
         item.payload
         for item in items
-        if item.payload["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+        if item.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.stdlib.httplib"
     )
 
     if expected_query is None:
-        assert SPANDATA.URL_QUERY not in span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in span["attributes"]
     else:
-        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+        assert span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
 
 
 @pytest.mark.parametrize(
@@ -987,11 +997,12 @@ def test_url_full_reassembly(
     (span,) = (
         item.payload
         for item in items
-        if item.payload["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+        if item.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.stdlib.httplib"
     )
 
     base_url = "http://localhost:{}/some/random/url".format(PORT)
-    assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == base_url + expected_suffix
 
 
 @pytest.mark.parametrize(

@@ -10,6 +10,7 @@ import pytest
 from pyreqwest.client import ClientBuilder, SyncClientBuilder
 from pyreqwest.simple.request import pyreqwest_get as async_pyreqwest_get
 from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -78,18 +79,18 @@ def test_sync_client_spans(sentry_init, capture_items, server_port):
     spans = [item.payload for item in items]
     assert len(spans) == 2
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == "http.client"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
     assert span["name"] == f"GET http://localhost:{server_port}/hello"
-    assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
-    assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-    assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.pyreqwest"
 
     assert (
-        span["attributes"]["url.full"]
+        span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
         == f"http://localhost:{server_port}/hello?q=test#frag"
     )
-    assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
-    assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == "q=test"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FRAGMENT] == "frag"
 
 
 @pytest.mark.asyncio
@@ -111,13 +112,13 @@ async def test_async_client_spans(sentry_init, capture_items, server_port):
     spans = [item.payload for item in items]
     assert len(spans) == 2
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == "http.client"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
     assert span["name"] == f"GET {url}"
-    assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
-    assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-    assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.pyreqwest"
 
-    assert span["attributes"]["url.full"] == url
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == url
 
 
 def test_sync_simple_request_spans(sentry_init, capture_items, server_port):
@@ -137,12 +138,12 @@ def test_sync_simple_request_spans(sentry_init, capture_items, server_port):
     spans = [item.payload for item in items]
     assert len(spans) == 2
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == "http.client"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
     assert span["name"] == f"GET {url}"
-    assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
-    assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-    assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
-    assert span["attributes"]["url.full"] == url
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.pyreqwest"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == url
 
 
 @pytest.mark.asyncio
@@ -163,13 +164,13 @@ async def test_async_simple_request_spans(sentry_init, capture_items, server_por
     spans = [item.payload for item in items]
     assert len(spans) == 2
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == "http.client"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
     assert span["name"] == f"GET {url}"
-    assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
-    assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-    assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.pyreqwest"
 
-    assert span["attributes"]["url.full"] == url
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == url
 
 
 def test_span_origin(
@@ -191,7 +192,9 @@ def test_span_origin(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.pyreqwest"
+    )
 
 
 def test_outgoing_trace_headers(
@@ -221,7 +224,9 @@ def test_outgoing_trace_headers(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     http_span = next(
-        span for span in spans if span["attributes"].get("sentry.op") == "http.client"
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "http.client"
     )
 
     assert "sentry-trace" in headers
@@ -249,7 +254,7 @@ def test_outgoing_trace_headers_append_to_baggage(
         with sentry_sdk.start_span(
             name="/interactions/other-dogs/new-dog",
             attributes={
-                "sentry.op": "greeting.sniff",
+                ATTRIBUTE_NAMES.SENTRY_OP: "greeting.sniff",
             },
         ):
             client = SyncClientBuilder().build()
@@ -261,7 +266,9 @@ def test_outgoing_trace_headers_append_to_baggage(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     http_span = next(
-        span for span in spans if span["attributes"].get("sentry.op") == "http.client"
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "http.client"
     )
 
     assert "baggage" in headers
@@ -339,11 +346,11 @@ def test_omit_url_data_if_parsing_fails(
     span = spans[0]
 
     assert span["name"] == "GET [Filtered]"
-    assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
-    assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-    assert "url.full" not in span["attributes"]
-    assert SPANDATA.URL_QUERY not in span["attributes"]
-    assert SPANDATA.URL_FRAGMENT not in span["attributes"]
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
+    assert ATTRIBUTE_NAMES.URL_FULL not in span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_QUERY not in span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_FRAGMENT not in span["attributes"]
 
 
 def test_request_source_disabled(
@@ -370,10 +377,10 @@ def test_request_source_disabled(
     span = spans[0]
     data = span.get("attributes", {})
 
-    assert SPANDATA.CODE_LINE_NUMBER not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILE_PATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in data
 
 
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
@@ -406,10 +413,10 @@ def test_request_source_enabled(
     span = spans[0]
     data = span.get("attributes", {})
 
-    assert SPANDATA.CODE_LINE_NUMBER in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILE_PATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in data
 
 
 def test_request_source(
@@ -436,20 +443,20 @@ def test_request_source(
     span = spans[0]
     data = span.get("attributes", {})
 
-    assert type(data.get(SPANDATA.CODE_LINE_NUMBER)) == int
-    assert data.get(SPANDATA.CODE_LINE_NUMBER) > 0
+    assert type(data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
     assert (
-        data.get(SPANDATA.CODE_NAMESPACE)
+        data.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
         == "tests.integrations.pyreqwest.test_pyreqwest"
     )
-    assert data.get(SPANDATA.CODE_FILE_PATH).endswith(
+    assert data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
         "tests/integrations/pyreqwest/test_pyreqwest.py"
     )
 
-    is_relative_path = data.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+    is_relative_path = data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "test_request_source"
+    assert data.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "test_request_source"
 
 
 def test_request_source_with_module_in_search_path(
@@ -478,15 +485,15 @@ def test_request_source_with_module_in_search_path(
     span = spans[0]
     data = span.get("attributes", {})
 
-    assert type(data.get(SPANDATA.CODE_LINE_NUMBER)) == int
-    assert data.get(SPANDATA.CODE_LINE_NUMBER) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "pyreqwest_helpers.helpers"
-    assert data.get(SPANDATA.CODE_FILE_PATH) == "pyreqwest_helpers/helpers.py"
+    assert type(data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
+    assert data.get(ATTRIBUTE_NAMES.CODE_NAMESPACE) == "pyreqwest_helpers.helpers"
+    assert data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH) == "pyreqwest_helpers/helpers.py"
 
-    is_relative_path = data.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+    is_relative_path = data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_client"
+    assert data.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "get_request_with_client"
 
 
 def test_no_request_source_if_duration_too_short(
@@ -529,10 +536,10 @@ def test_no_request_source_if_duration_too_short(
     span = spans[0]
     data = span.get("attributes", {})
 
-    assert SPANDATA.CODE_LINE_NUMBER not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILE_PATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in data
 
 
 def test_request_source_if_duration_over_threshold(
@@ -575,10 +582,10 @@ def test_request_source_if_duration_over_threshold(
     span = spans[0]
     data = span.get("attributes", {})
 
-    assert SPANDATA.CODE_LINE_NUMBER in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILE_PATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in data
 
 
 def test_crumb_capture(
@@ -769,9 +776,9 @@ def test_url_query_data_collection_sync(
     span = [item.payload for item in items][0]
 
     if expected_query is None:
-        assert SPANDATA.URL_QUERY not in span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in span["attributes"]
     else:
-        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+        assert span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
 
 
 @pytest.mark.asyncio
@@ -832,9 +839,9 @@ async def test_url_query_data_collection_async(
     span = [item.payload for item in items][0]
 
     if expected_query is None:
-        assert SPANDATA.URL_QUERY not in span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in span["attributes"]
     else:
-        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+        assert span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
 
 
 @pytest.mark.parametrize(
@@ -879,7 +886,7 @@ def test_url_full_reassembly_sync(
 
     span = [item.payload for item in items][0]
 
-    assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == base_url + expected_suffix
 
 
 @pytest.mark.asyncio
@@ -925,7 +932,7 @@ async def test_url_full_reassembly_async(
 
     span = [item.payload for item in items][0]
 
-    assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == base_url + expected_suffix
 
 
 def test_url_query_params_off_keeps_bare_url_sync(
@@ -951,9 +958,9 @@ def test_url_query_params_off_keeps_bare_url_sync(
 
     span = [item.payload for item in items][0]
 
-    assert SPANDATA.URL_QUERY not in span["attributes"]
-    assert span["attributes"][SPANDATA.URL_FULL] == base_url + "#frag"
-    assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+    assert ATTRIBUTE_NAMES.URL_QUERY not in span["attributes"]
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == base_url + "#frag"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FRAGMENT] == "frag"
 
 
 @pytest.mark.asyncio
@@ -980,9 +987,9 @@ async def test_url_query_params_off_keeps_bare_url_async(
 
     span = [item.payload for item in items][0]
 
-    assert SPANDATA.URL_QUERY not in span["attributes"]
-    assert span["attributes"][SPANDATA.URL_FULL] == base_url + "#frag"
-    assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+    assert ATTRIBUTE_NAMES.URL_QUERY not in span["attributes"]
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == base_url + "#frag"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_FRAGMENT] == "frag"
 
 
 @pytest.mark.parametrize(
@@ -1137,9 +1144,9 @@ def test_omit_url_data_if_parsing_fails_data_collection(
 
     span = [item.payload for item in items][0]
 
-    assert SPANDATA.URL_FULL not in span["attributes"]
-    assert SPANDATA.URL_QUERY not in span["attributes"]
-    assert SPANDATA.URL_FRAGMENT not in span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_FULL not in span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_QUERY not in span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_FRAGMENT not in span["attributes"]
 
     crumb = event["breadcrumbs"]["values"][0]
 

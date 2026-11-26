@@ -1,7 +1,9 @@
 from typing import Any, AsyncIterable, Callable, Union
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 
@@ -58,9 +60,9 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
         with sentry_sdk.start_span(
             name="unary unary call to %s" % method.decode(),
             attributes={
-                "sentry.op": OP.GRPC_CLIENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.RPC_METHOD: method.decode(),
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRPC_CLIENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+                ATTRIBUTE_NAMES.RPC_METHOD: method.decode(),
             },
         ) as span:
             client_call_details = self._update_client_call_details_metadata_from_scope(
@@ -69,7 +71,9 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
 
             response = await continuation(client_call_details, request)
             status_code = await response.code()
-            span.set_attribute(SPANDATA.RPC_RESPONSE_STATUS_CODE, status_code.name)
+            span.set_attribute(
+                ATTRIBUTE_NAMES.RPC_RESPONSE_STATUS_CODE, status_code.name
+            )
 
             return response
 
@@ -95,9 +99,9 @@ class SentryUnaryStreamClientInterceptor(
         with sentry_sdk.start_span(
             name="unary stream call to %s" % method.decode(),
             attributes={
-                "sentry.op": OP.GRPC_CLIENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.RPC_METHOD: method.decode(),
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRPC_CLIENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+                ATTRIBUTE_NAMES.RPC_METHOD: method.decode(),
             },
         ):
             client_call_details = self._update_client_call_details_metadata_from_scope(

@@ -1,8 +1,10 @@
 import socket
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk._types import MYPY
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 
 if MYPY:
@@ -61,13 +63,13 @@ def _patch_create_connection() -> None:
         with sentry_sdk.start_span(
             name=_get_span_description(address[0], address[1]),
             attributes={
-                "sentry.op": OP.SOCKET_CONNECTION,
-                "sentry.origin": SocketIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.SOCKET_CONNECTION,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SocketIntegration.origin,
             },
         ) as span:
             if address[0] is not None:
-                span.set_attribute(SPANDATA.SERVER_ADDRESS, address[0])
-            span.set_attribute(SPANDATA.SERVER_PORT, address[1])
+                span.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, address[0])
+            span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, address[1])
 
             return real_create_connection(
                 address=address, timeout=timeout, source_address=source_address
@@ -98,22 +100,22 @@ def _patch_getaddrinfo() -> None:
         with sentry_sdk.start_span(
             name=_get_span_description(host, port),
             attributes={
-                "sentry.op": OP.SOCKET_DNS,
-                "sentry.origin": SocketIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.SOCKET_DNS,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: SocketIntegration.origin,
             },
         ) as span:
             if isinstance(host, str):
-                span.set_attribute(SPANDATA.SERVER_ADDRESS, host)
+                span.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, host)
             elif isinstance(host, bytes):
                 span.set_attribute(
-                    SPANDATA.SERVER_ADDRESS, host.decode(errors="replace")
+                    ATTRIBUTE_NAMES.SERVER_ADDRESS, host.decode(errors="replace")
                 )
 
             if isinstance(port, int):
-                span.set_attribute(SPANDATA.SERVER_PORT, port)
+                span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, port)
             elif port is not None:
                 try:
-                    span.set_attribute(SPANDATA.SERVER_PORT, int(port))
+                    span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, int(port))
                 except (ValueError, TypeError):
                     pass
 

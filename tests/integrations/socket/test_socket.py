@@ -1,5 +1,7 @@
 import socket
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.integrations.socket import SocketIntegration
 from tests.conftest import create_mock_http_server
@@ -23,11 +25,11 @@ def test_getaddrinfo_trace(sentry_init, capture_items):
     spans = [item.payload for item in items]
     dns_span, _root = spans
 
-    assert dns_span["attributes"]["sentry.op"] == "socket.dns"
-    assert dns_span["attributes"]["sentry.origin"] == "auto.socket.socket"
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "socket.dns"
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.socket.socket"
     assert dns_span["name"] == f"localhost:{PORT}"
-    assert dns_span["attributes"]["server.address"] == "localhost"
-    assert dns_span["attributes"]["server.port"] == PORT
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SERVER_PORT] == PORT
 
 
 def test_create_connection_trace(sentry_init, capture_items):
@@ -50,15 +52,15 @@ def test_create_connection_trace(sentry_init, capture_items):
     # spans finish in order: dns (inner) ends first, connect ends, then root
     dns_span, connect_span, _root = spans
 
-    assert connect_span["attributes"]["sentry.op"] == "socket.connection"
+    assert connect_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "socket.connection"
     assert connect_span["name"] == f"localhost:{PORT}"
-    assert connect_span["attributes"]["server.address"] == "localhost"
-    assert connect_span["attributes"]["server.port"] == PORT
+    assert connect_span["attributes"][ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+    assert connect_span["attributes"][ATTRIBUTE_NAMES.SERVER_PORT] == PORT
 
-    assert dns_span["attributes"]["sentry.op"] == "socket.dns"
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "socket.dns"
     assert dns_span["name"] == f"localhost:{PORT}"
-    assert dns_span["attributes"]["server.address"] == "localhost"
-    assert dns_span["attributes"]["server.port"] == PORT
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SERVER_PORT] == PORT
 
 
 def test_span_origin(sentry_init, capture_items):
@@ -77,8 +79,11 @@ def test_span_origin(sentry_init, capture_items):
     spans = [item.payload for item in items]
     dns_span, connect_span, _root = spans
 
-    assert connect_span["attributes"]["sentry.op"] == "socket.connection"
-    assert connect_span["attributes"]["sentry.origin"] == "auto.socket.socket"
+    assert connect_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "socket.connection"
+    assert (
+        connect_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.socket.socket"
+    )
 
-    assert dns_span["attributes"]["sentry.op"] == "socket.dns"
-    assert dns_span["attributes"]["sentry.origin"] == "auto.socket.socket"
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "socket.dns"
+    assert dns_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.socket.socket"

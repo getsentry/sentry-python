@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generator
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -124,9 +126,9 @@ def _sentry_pyreqwest_span(
     with sentry_sdk.start_span(
         name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
         attributes={
-            "sentry.op": OP.HTTP_CLIENT,
-            "sentry.origin": PyreqwestIntegration.origin,
-            SPANDATA.HTTP_REQUEST_METHOD: request.method,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_CLIENT,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: PyreqwestIntegration.origin,
+            ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD: request.method,
         },
     ) as span:
         for key, value in url_attributes.items():
@@ -163,7 +165,7 @@ async def sentry_async_middleware(
         if span is not None:
             span.status = "error" if response.status >= 400 else "ok"
             span.set_attribute(
-                SPANDATA.HTTP_STATUS_CODE,
+                ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE,
                 response.status,
             )
 
@@ -201,7 +203,7 @@ def sentry_sync_middleware(
         if span is not None:
             span.status = "error" if response.status >= 400 else "ok"
             span.set_attribute(
-                SPANDATA.HTTP_STATUS_CODE,
+                ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE,
                 response.status,
             )
 
