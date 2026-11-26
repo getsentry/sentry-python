@@ -1,0 +1,306 @@
+{
+  "$schema": "https://develop.sentry.dev/schemas/spec-compliance.json",
+  "sdk": "sentry-python",
+  "last_updated": "2026-11-26",
+  "specs": {
+    "sdk/foundations/client": {
+      "version": "0.0.0",
+      "sections": {
+        "client-lifecycle": "3.0.0",
+        "client-resolution": "3.0.0"
+      }
+    },
+    "sdk/foundations/client/configuration": {
+      "version": "0.0.0",
+      "sections": {
+        "debug-mode": "1.0.0",
+        "event-sampling": "1.0.0"
+      }
+    },
+    "sdk/foundations/client/data-collection": {
+      "version": "0.0.0",
+      "sections": {
+        "integration-overrides": "0.19.0"
+      },
+      "non_applicable": {
+        "data-sensitivity-levels": "Conceptual taxonomy with no SDK implementation requirement."
+      }
+    },
+    "sdk/foundations/client/hooks": {
+      "version": "0.0.0",
+      "sections": {
+        "before-send-hook": "1.1.1",
+        "before-send-check-in-hook": "1.1.1",
+        "before-breadcrumb-hook": "1.1.1"
+      },
+      "non_applicable": {
+        "before-send-transaction-hook": "The SDK only does span streaming and never creates transaction events, so there is nothing for this hook to apply to."
+      }
+    },
+    "sdk/foundations/client/integrations": {
+      "version": "1.0.0",
+      "sections": {
+        "integration-interface": "1.0.0",
+        "integration-configuration": "1.0.0",
+        "default-integration-guidelines": "1.0.0"
+      }
+    },
+    "sdk/foundations/client/integrations/feature-flags": {
+      "version": "0.0.0",
+      "sections": {
+        "feature-flag-integrations": "1.0.2"
+      }
+    },
+    "sdk/foundations/client/integrations/modules": {
+      "version": "1.0.0",
+      "sections": {
+        "event-enrichment": "1.0.0",
+        "module-sources": "1.0.0",
+        "event-type-filtering": "1.0.0"
+      }
+    },
+    "sdk/foundations/data-scrubbing": {
+      "version": "0.0.0",
+      "sections": {
+        "parameterization": "1.0.0"
+      },
+      "non_applicable": {
+        "terms": "Definitions only; no SDK implementation requirement.",
+        "purpose-decides-category": "Conceptual guidance on categorizing operations; no SDK implementation requirement.",
+        "user-set-data": "Defers to data-collection#user-set-data-scrubbing and has no standalone requirement."
+      }
+    },
+    "sdk/foundations/state-management/scopes": {
+      "version": "0.0.0",
+      "sections": {
+        "global-scope": "1.15.0",
+        "scope-data-application": "1.15.0",
+        "scope-attributes": "1.15.0",
+        "scope-breadcrumbs": "1.15.0",
+        "scope-data-methods": "1.15.0",
+        "client-resolution": "1.15.0",
+        "propagation-context": "1.15.0",
+        "backwards-compatibility": "1.15.0"
+      },
+      "non_applicable": {
+        "otel-context-alignment": "Applies only to SDKs that instrument through OpenTelemetry; the Python SDK uses its own instrumentation."
+      }
+    },
+    "sdk/foundations/state-management/scopes/attributes": {
+      "version": "0.0.0",
+      "sections": {
+        "attribute-structure": "1.6.0",
+        "primitive-types": "1.6.0",
+        "complex-types": "1.6.0",
+        "removing-attributes": "1.6.0",
+        "scope-precedence": "1.6.0"
+      },
+      "non_applicable": {
+        "units": "Only lists unit names; the section requires no SDK behavior."
+      }
+    },
+    "sdk/foundations/state-management/scopes/breadcrumbs": {
+      "version": "0.0.0",
+      "sections": {
+        "event-payload": "1.1.0",
+        "ring-buffer": "1.1.0",
+        "before-breadcrumb": "1.1.0"
+      }
+    },
+    "sdk/foundations/trace-propagation": {
+      "version": "0.0.0",
+      "sections": {
+        "outgoing-propagation": "1.9.0",
+        "incoming-propagation": "1.9.0",
+        "strict-trace-continuation": "1.9.0",
+        "deferred-sampling": "1.9.0",
+        "trace-data-on-events": "1.9.0",
+        "sentry-trace-header": "1.9.0",
+        "sentry-trace-sampled": "1.9.0",
+        "continue-trace": "1.9.0",
+        "get-trace-data": "1.9.0",
+        "start-new-trace": "1.9.0"
+      }
+    },
+    "sdk/foundations/trace-propagation/dynamic-sampling-context": {
+      "version": "0.0.0",
+      "sections": {
+        "baggage-header": "1.4.0",
+        "envelope-header": "1.4.0"
+      }
+    },
+    "sdk/telemetry/attachments": {
+      "version": "0.0.0",
+      "sections": {
+        "standard-attachments": "1.8.1",
+        "wire-standard-attachment": "1.8.1"
+      },
+      "non_applicable": {
+        "screenshots": "Only for SDKs with a user interface; the Python SDK has no UI to capture.",
+        "view-hierarchy": "Describes UI view trees; the Python SDK has no UI hierarchy."
+      }
+    },
+    "sdk/telemetry/check-ins": {
+      "version": "0.0.0",
+      "sections": {
+        "check-in-lifecycle": "1.6.0",
+        "trace-context-linking": "1.6.0",
+        "zero-uuid-update": "1.6.0",
+        "auto-instrumentation": "1.6.0",
+        "check-in-payload": "1.6.0",
+        "monitor-config-payload": "1.6.0",
+        "schedule-config": "1.6.0",
+        "monitor-wrapper": "1.6.0",
+        "hooks": "1.6.0"
+      }
+    },
+    "sdk/telemetry/client-reports": {
+      "version": "0.0.0",
+      "sections": {
+        "network-success": "1.26.0",
+        "network-413": "1.26.0",
+        "network-429": "1.26.0",
+        "network-transport-errors": "1.26.0",
+        "network-discarded-quantity": "1.26.0",
+        "log-byte-outcomes": "1.26.0",
+        "metric-byte-outcomes": "1.26.0",
+        "sdk-recommendations": "1.26.0",
+        "configuration": "1.26.0",
+        "envelope-item": "1.26.0",
+        "payload-structure": "1.26.0",
+        "relay-outcome-types": "1.26.0"
+      },
+      "non_applicable": {
+        "span-outcomes": "The SDK never emits transactions (span streaming only), so there are no dropped transactions to expand into span outcomes.",
+        "legacy-events": "The SDK only sends envelopes and has no store endpoint path.",
+        "custom-transports": "Only permits custom transports to skip client reports; requires no SDK behavior."
+      }
+    },
+    "sdk/telemetry/errors": {
+      "version": "0.0.0",
+      "sections": {
+        "uncaught-exception-handler": "1.8.1",
+        "in-app-frames": "1.8.1",
+        "source-context": "1.8.1",
+        "exception-groups": "1.8.1",
+        "chained-exceptions": "1.8.1"
+      },
+      "non_applicable": {
+        "desymbolication": "Python stack frames carry original module and function names, so there is nothing to desymbolicate.",
+        "startup-crash-detection": "Targets mobile and desktop SDKs with offline envelope caches; the Python SDK has no on-disk envelope cache."
+      }
+    },
+    "sdk/telemetry/feedbacks": {
+      "version": "0.0.0",
+      "non_applicable": {
+        "session-replay-flush": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "replay-widget-sampling-timing": "Requires a feedback widget and Session Replay, neither of which exists in a server SDK.",
+        "replay-manual-api-sampling-timing": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "user-facing-platforms": "Applies only to mobile, desktop, and browser SDKs."
+      }
+    },
+    "sdk/telemetry/logs": {
+      "version": "0.0.0",
+      "sections": {
+        "log-processing-pipeline": "4.0.0",
+        "sdk-integration-origin": "4.0.0",
+        "backend-attributes": "4.0.0",
+        "data-category-rate-limiting": "4.0.0",
+        "sdk-integrations": "4.0.0",
+        "auto-emitted-logs": "4.0.0",
+        "tracing-association": "4.0.0",
+        "log-envelope-item": "4.0.0",
+        "log-payload": "4.0.0",
+        "initialization-options": "4.0.0",
+        "threading-concurrency": "4.0.0"
+      },
+      "non_applicable": {
+        "user-agent-parsing": "Browser attributes only apply to client-side SDKs; a server SDK has no browser.",
+        "mobile-native-attributes": "OS and device attributes are for mobile, desktop, and native SDKs.",
+        "replay-association": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "otel-log-format": "Informational appendix; the SDK sends logs only as log items."
+      }
+    },
+    "sdk/telemetry/metrics": {
+      "version": "0.0.0",
+      "sections": {
+        "processing-pipeline": "3.2.0",
+        "backend-attributes": "3.2.0",
+        "buffering": "3.2.0",
+        "tracing-association": "3.2.0",
+        "data-category-rate-limiting": "3.2.0",
+        "debug-logging": "3.2.0",
+        "auto-emitted-metrics": "3.2.0",
+        "trace-metric-envelope": "3.2.0",
+        "metric-payload": "3.2.0",
+        "initialization-options": "3.2.0"
+      },
+      "non_applicable": {
+        "browser-attributes": "Browser attributes only apply to client-side SDKs; a server SDK has no browser.",
+        "replay-association": "Session Replay is a browser and mobile feature; the Python server SDK has no replay."
+      }
+    },
+    "sdk/telemetry/profiles": {
+      "version": "0.0.0",
+      "sections": {
+        "sampling-frequency": "2.5.1",
+        "profile-data": "2.5.1",
+        "v2-envelope": "2.5.1",
+        "profile-session-sample-rate": "2.5.1",
+        "profile-lifecycle": "2.5.1"
+      },
+      "non_applicable": {
+        "v1-sample-format": "Deprecated transaction-based profiling; the SDK has no transactions and removed transaction profiling.",
+        "v1-validation": "Deprecated transaction-based profiling; the SDK has no transactions and removed transaction profiling.",
+        "v1-envelope": "Deprecated transaction-based profiling; the SDK has no transactions and removed transaction profiling.",
+        "tracing-context-linking": "Defines linking on transaction payloads, which the SDK no longer emits.",
+        "tracing-context-payload": "Defines fields on transaction payloads, which the SDK no longer emits.",
+        "start-profiler-on-app-start": "Optional app-start profiling for mobile SDKs."
+      }
+    },
+    "sdk/telemetry/replays": {
+      "version": "1.3.0",
+      "non_applicable": {
+        "session-mode": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "buffer-mode": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "replay-event-payload": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "replay-recording-item": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "session-sample-rate": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "error-sample-rate": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "replay-integration": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "get-replay": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "get-replay-id": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "start": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "start-buffering": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "stop": "Session Replay is a browser and mobile feature; the Python server SDK has no replay.",
+        "flush": "Session Replay is a browser and mobile feature; the Python server SDK has no replay."
+      }
+    },
+    "sdk/telemetry/sessions": {
+      "version": "0.0.0",
+      "sections": {
+        "session-lifecycle": "1.7.1",
+        "attribute-immutability": "1.7.1",
+        "session-modes": "1.7.1",
+        "session-update-filtering": "1.7.1",
+        "session-update-payload": "1.7.1",
+        "session-aggregates-payload": "1.7.1",
+        "auto-session-tracking": "1.7.1"
+      }
+    },
+    "sdk/telemetry/spans": {
+      "version": "0.0.0",
+      "sections": {
+        "span-on-scope": "1.2.0",
+        "sampling": "1.2.0",
+        "data-scrubbing": "1.2.0",
+        "trace-propagation": "1.2.0",
+        "span-buffer": "1.2.0",
+        "span-links": "1.2.0"
+      },
+      "non_applicable": {
+        "trace-lifecycle-option": "The SDK only supports span streaming, so there is no mode to choose between."
+      }
+    }
+  }
+}
