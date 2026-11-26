@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 
 import pytest
 from botocore.stub import Stubber
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3.consts import AWS_RPC_SYSTEM_NAME, ORIGIN
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
@@ -31,15 +31,15 @@ def _stubbed_span(client, capture_items, method, params, response):
     assert span["name"] == "S3.%s" % operation
     assert span.get("end_timestamp") is not None
     attributes = span.get("attributes", {})
-    assert attributes[SPANDATA.SENTRY_ORIGIN] == ORIGIN
-    assert attributes[SPANDATA.SENTRY_KIND] == "client"
-    assert attributes[SPANDATA.CLOUD_PROVIDER] == "aws"
-    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
-    assert attributes[SPANDATA.RPC_SERVICE] == "S3"
-    assert attributes[SPANDATA.RPC_METHOD] == operation
-    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
-    assert attributes[SPANDATA.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
-    assert attributes[SPANDATA.SERVER_PORT] == 443
+    assert attributes[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == ORIGIN
+    assert attributes[ATTRIBUTE_NAMES.SENTRY_KIND] == "client"
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_PROVIDER] == "aws"
+    assert attributes[ATTRIBUTE_NAMES.RPC_SYSTEM_NAME] == AWS_RPC_SYSTEM_NAME
+    assert attributes[ATTRIBUTE_NAMES.RPC_SERVICE] == "S3"
+    assert attributes[ATTRIBUTE_NAMES.RPC_METHOD] == operation
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_REGION] == "eu-north-1"
+    assert attributes[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "s3.eu-north-1.amazonaws.com"
+    assert attributes[ATTRIBUTE_NAMES.SERVER_PORT] == 443
     return span
 
 
@@ -57,16 +57,16 @@ def test_request_attributes(s3_client, capture_items):
     span = _stubbed_span(s3_client, capture_items, "upload_part", params, {})
 
     attributes = span.get("attributes", {})
-    assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
-    assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == bucket_arn
-    assert attributes[SPANDATA.AWS_S3_BUCKET] == bucket_arn
-    assert attributes[SPANDATA.AWS_S3_KEY] == "file.txt"
-    assert attributes[SPANDATA.AWS_S3_UPLOAD_ID] == "upload-id"
-    assert attributes[SPANDATA.AWS_S3_PART_NUMBER] == 1
-    assert SPANDATA.AWS_S3_COPY_SOURCE not in attributes
-    assert SPANDATA.AWS_S3_DELETE not in attributes
-    assert SPANDATA.FILE_SIZE not in attributes
-    assert SPANDATA.HTTP_BODY_SIZE not in attributes
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID] == "123456789012"
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID] == bucket_arn
+    assert attributes[ATTRIBUTE_NAMES.AWS_S3_BUCKET] == bucket_arn
+    assert attributes[ATTRIBUTE_NAMES.AWS_S3_KEY] == "file.txt"
+    assert attributes[ATTRIBUTE_NAMES.AWS_S3_UPLOAD_ID] == "upload-id"
+    assert attributes[ATTRIBUTE_NAMES.AWS_S3_PART_NUMBER] == 1
+    assert ATTRIBUTE_NAMES.AWS_S3_COPY_SOURCE not in attributes
+    assert ATTRIBUTE_NAMES.AWS_S3_DELETE not in attributes
+    assert ATTRIBUTE_NAMES.FILE_SIZE not in attributes
+    assert ATTRIBUTE_NAMES.HTTP_RESPONSE_BODY_SIZE not in attributes
     assert params == original
     assert "private-content" not in json.dumps(span)
 
@@ -98,14 +98,17 @@ def test_copy_source(s3_client, capture_items, method, copy_source, expected):
     source = deepcopy(copy_source)
     params = {"Bucket": "bucket", "Key": "file.txt", "CopySource": source}
     expected_attributes = {
-        SPANDATA.AWS_S3_BUCKET: "bucket",
-        SPANDATA.AWS_S3_KEY: "file.txt",
-        SPANDATA.AWS_S3_COPY_SOURCE: expected,
+        ATTRIBUTE_NAMES.AWS_S3_BUCKET: "bucket",
+        ATTRIBUTE_NAMES.AWS_S3_KEY: "file.txt",
+        ATTRIBUTE_NAMES.AWS_S3_COPY_SOURCE: expected,
     }
     if method == "upload_part_copy":
         params.update(UploadId="upload-id", PartNumber=1)
         expected_attributes.update(
-            {SPANDATA.AWS_S3_UPLOAD_ID: "upload-id", SPANDATA.AWS_S3_PART_NUMBER: 1}
+            {
+                ATTRIBUTE_NAMES.AWS_S3_UPLOAD_ID: "upload-id",
+                ATTRIBUTE_NAMES.AWS_S3_PART_NUMBER: 1,
+            }
         )
 
     span = _stubbed_span(s3_client, capture_items, method, params, {})
@@ -114,11 +117,11 @@ def test_copy_source(s3_client, capture_items, method, copy_source, expected):
     for key, value in expected_attributes.items():
         assert attributes[key] == value
     for key in (
-        SPANDATA.AWS_S3_UPLOAD_ID,
-        SPANDATA.AWS_S3_PART_NUMBER,
-        SPANDATA.AWS_S3_DELETE,
-        SPANDATA.FILE_SIZE,
-        SPANDATA.HTTP_BODY_SIZE,
+        ATTRIBUTE_NAMES.AWS_S3_UPLOAD_ID,
+        ATTRIBUTE_NAMES.AWS_S3_PART_NUMBER,
+        ATTRIBUTE_NAMES.AWS_S3_DELETE,
+        ATTRIBUTE_NAMES.FILE_SIZE,
+        ATTRIBUTE_NAMES.HTTP_RESPONSE_BODY_SIZE,
     ):
         if key not in expected_attributes:
             assert key not in attributes
@@ -172,14 +175,14 @@ def test_delete_serialization(
     span = _stubbed_span(s3_client, capture_items, "delete_objects", params, {})
 
     attributes = span.get("attributes", {})
-    assert attributes[SPANDATA.AWS_S3_BUCKET] == "bucket"
-    assert attributes[SPANDATA.AWS_S3_DELETE] == expected_serialized_delete
-    assert SPANDATA.AWS_S3_KEY not in attributes
-    assert SPANDATA.AWS_S3_UPLOAD_ID not in attributes
-    assert SPANDATA.AWS_S3_COPY_SOURCE not in attributes
-    assert SPANDATA.AWS_S3_PART_NUMBER not in attributes
-    assert SPANDATA.FILE_SIZE not in attributes
-    assert SPANDATA.HTTP_BODY_SIZE not in attributes
+    assert attributes[ATTRIBUTE_NAMES.AWS_S3_BUCKET] == "bucket"
+    assert attributes[ATTRIBUTE_NAMES.AWS_S3_DELETE] == expected_serialized_delete
+    assert ATTRIBUTE_NAMES.AWS_S3_KEY not in attributes
+    assert ATTRIBUTE_NAMES.AWS_S3_UPLOAD_ID not in attributes
+    assert ATTRIBUTE_NAMES.AWS_S3_COPY_SOURCE not in attributes
+    assert ATTRIBUTE_NAMES.AWS_S3_PART_NUMBER not in attributes
+    assert ATTRIBUTE_NAMES.FILE_SIZE not in attributes
+    assert ATTRIBUTE_NAMES.HTTP_RESPONSE_BODY_SIZE not in attributes
     assert params == original
     assert params["Delete"] is caller_delete
     assert caller_delete["Objects"] is caller_objects
@@ -192,14 +195,14 @@ def test_delete_serialization(
             "head_object",
             {},
             {"ContentLength": 1024},
-            {SPANDATA.FILE_SIZE: 1024},
+            {ATTRIBUTE_NAMES.FILE_SIZE: 1024},
             id="head-whole-object",
         ),
         pytest.param(
             "head_object",
             {},
             {"ContentLength": 0},
-            {SPANDATA.FILE_SIZE: 0},
+            {ATTRIBUTE_NAMES.FILE_SIZE: 0},
             id="head-empty-object",
         ),
         pytest.param(
@@ -216,21 +219,21 @@ def test_delete_serialization(
             "get_object",
             {"Range": "bytes=0-3"},
             {"ContentLength": 4},
-            {SPANDATA.HTTP_BODY_SIZE: 4},
+            {ATTRIBUTE_NAMES.HTTP_RESPONSE_BODY_SIZE: 4},
             id="get-range",
         ),
         pytest.param(
             "get_object_attributes",
             {"ObjectAttributes": ["ObjectSize"]},
             {"ObjectSize": 1024},
-            {SPANDATA.FILE_SIZE: 1024},
+            {ATTRIBUTE_NAMES.FILE_SIZE: 1024},
             id="object-attributes-size",
         ),
         pytest.param(
             "put_object",
             {"Body": b"data", "WriteOffsetBytes": 1020},
             {"Size": 1024},
-            {SPANDATA.FILE_SIZE: 1024},
+            {ATTRIBUTE_NAMES.FILE_SIZE: 1024},
             id="put-append-size",
         ),
         pytest.param("put_object", {"Body": b"data"}, {}, {}, id="put-missing-size"),
@@ -238,7 +241,10 @@ def test_delete_serialization(
             "complete_multipart_upload",
             {"UploadId": "upload-id", "MpuObjectSize": 1024},
             {},
-            {SPANDATA.FILE_SIZE: 1024, SPANDATA.AWS_S3_UPLOAD_ID: "upload-id"},
+            {
+                ATTRIBUTE_NAMES.FILE_SIZE: 1024,
+                ATTRIBUTE_NAMES.AWS_S3_UPLOAD_ID: "upload-id",
+            },
             id="multipart-request-size",
         ),
     ],
@@ -262,19 +268,19 @@ def test_size_attributes(
 
     attributes = span.get("attributes", {})
     expected_attributes = {
-        SPANDATA.AWS_S3_BUCKET: "bucket",
-        SPANDATA.AWS_S3_KEY: "file.txt",
+        ATTRIBUTE_NAMES.AWS_S3_BUCKET: "bucket",
+        ATTRIBUTE_NAMES.AWS_S3_KEY: "file.txt",
         **expected,
     }
     for key, value in expected_attributes.items():
         assert attributes[key] == value
     for key in (
-        SPANDATA.AWS_S3_UPLOAD_ID,
-        SPANDATA.AWS_S3_COPY_SOURCE,
-        SPANDATA.AWS_S3_PART_NUMBER,
-        SPANDATA.AWS_S3_DELETE,
-        SPANDATA.FILE_SIZE,
-        SPANDATA.HTTP_BODY_SIZE,
+        ATTRIBUTE_NAMES.AWS_S3_UPLOAD_ID,
+        ATTRIBUTE_NAMES.AWS_S3_COPY_SOURCE,
+        ATTRIBUTE_NAMES.AWS_S3_PART_NUMBER,
+        ATTRIBUTE_NAMES.AWS_S3_DELETE,
+        ATTRIBUTE_NAMES.FILE_SIZE,
+        ATTRIBUTE_NAMES.HTTP_RESPONSE_BODY_SIZE,
     ):
         if key not in expected_attributes:
             assert key not in attributes

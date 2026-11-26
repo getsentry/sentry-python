@@ -4,6 +4,7 @@ import pytest
 from chalice import BadRequestError, Chalice
 from chalice.local import LambdaContext, LocalGateway
 from pytest_chalice.handlers import RequestHandler
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -189,9 +190,9 @@ def test_existing_span(sentry_init, capture_items, app):
         name="lambda_segment",
         parent_span=None,
         attributes={
-            "sentry.origin": "auto.function.aws_lambda",
-            "sentry.op": "function.aws",
-            "faas.name": "api_handler",
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.function.aws_lambda",
+            ATTRIBUTE_NAMES.SENTRY_OP: "function.aws",
+            ATTRIBUTE_NAMES.FAAS_NAME: "api_handler",
         },
     ):
         response = client.get("/message")
@@ -204,9 +205,9 @@ def test_existing_span(sentry_init, capture_items, app):
     span = segment_spans[0]
 
     attrs = span["attributes"]
-    assert attrs["sentry.origin"] == "auto.function.chalice"
-    assert attrs["sentry.op"] == "function.aws"
-    assert attrs["faas.name"] == "api_handler"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.function.chalice"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == "function.aws"
+    assert attrs[ATTRIBUTE_NAMES.FAAS_NAME] == "api_handler"
     assert span["status"] == "ok"
 
 
@@ -221,7 +222,7 @@ def test_existing_span_error(
     with sentry_sdk.start_span(
         name="lambda_segment",
         parent_span=None,
-        attributes={"sentry.origin": "auto.function.aws_lambda"},
+        attributes={ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.function.aws_lambda"},
     ):
         response = client.get("/boom")
         assert response.status_code == 500
@@ -235,5 +236,8 @@ def test_existing_span_error(
         s.payload for s in items if s.type == "span" and s.payload.get("is_segment")
     ]
     assert len(segment_spans) == 1
-    assert segment_spans[0]["attributes"]["sentry.origin"] == "auto.function.chalice"
+    assert (
+        segment_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.function.chalice"
+    )
     assert segment_spans[0]["status"] == "error"

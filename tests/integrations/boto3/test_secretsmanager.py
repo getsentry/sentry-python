@@ -1,8 +1,9 @@
 import pytest
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from tests.integrations.boto3.helpers import capture_spans_by_op
 from tests.integrations.boto3.helpers import client_factory as client_factory
 
@@ -71,8 +72,8 @@ def test_secret_attributes(
     operation = secretsmanager_client.meta.method_to_api_mapping[method]
     assert span["name"] == "SecretsManager." + operation
     attributes = span["attributes"]
-    assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN] == expected_arn
-    assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] == expected_name
+    assert attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_ARN] == expected_arn
+    assert attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_NAME] == expected_name
     # secret value is never recorded.
     assert "hunter2" not in str(span)
 
@@ -97,9 +98,9 @@ def test_client_error(secretsmanager_client, capture_items):
     (span,) = spans[OP.RPC]
     attributes = span["attributes"]
     assert span["status"] == "error"
-    assert attributes[SPANDATA.ERROR_TYPE] == "ResourceNotFoundException"
-    assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
-    assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == SECRET_ARN
+    assert attributes[ATTRIBUTE_NAMES.ERROR_TYPE] == "ResourceNotFoundException"
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID] == "123456789012"
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID] == SECRET_ARN
     # both from the request's `SecretId`.
-    assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN] == SECRET_ARN
-    assert attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] == "db-password"
+    assert attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_ARN] == SECRET_ARN
+    assert attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_NAME] == "db-password"

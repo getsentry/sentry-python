@@ -12,6 +12,7 @@ import tempfile
 from textwrap import dedent
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 from sentry_sdk.traces import SpanStatus
 
@@ -466,7 +467,10 @@ def test_span_origin(run_cloud_function):
     )
 
     assert len(span_items) == 1
-    assert span_items[0]["attributes"]["sentry.origin"] == "auto.function.gcp"
+    assert (
+        span_items[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.function.gcp"
+    )
 
 
 def test_performance_no_error(run_cloud_function):
@@ -493,14 +497,26 @@ def test_performance_no_error(run_cloud_function):
 
     assert segment_span["is_segment"] is True
     assert segment_span["name"] == "Google Cloud function"
-    assert segment_span["attributes"]["sentry.op"] == "function.gcp"
-    assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
-    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
-    assert segment_span["attributes"]["cloud.provider"] == "gcp"
-    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
-    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
-    assert segment_span["attributes"]["faas.identity"] == "func_ID"
-    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function.gcp"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.function.gcp"
+    )
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "component"
+    )
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.CLOUD_PROVIDER] == "gcp"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_NAME] == "Google Cloud function"
+    )
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.GCP_PROJECT_ID]
+        == "serverless_project"
+    )
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_IDENTITY] == "func_ID"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_ENTRY_POINT] == "cloud_function"
+    )
 
 
 def test_performance_error(run_cloud_function):
@@ -533,14 +549,26 @@ def test_performance_error(run_cloud_function):
     segment_span = span_items[0]
     assert segment_span["is_segment"] is True
     assert segment_span["name"] == "Google Cloud function"
-    assert segment_span["attributes"]["sentry.op"] == "function.gcp"
-    assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
-    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
-    assert segment_span["attributes"]["cloud.provider"] == "gcp"
-    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
-    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
-    assert segment_span["attributes"]["faas.identity"] == "func_ID"
-    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function.gcp"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.function.gcp"
+    )
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "component"
+    )
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.CLOUD_PROVIDER] == "gcp"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_NAME] == "Google Cloud function"
+    )
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.GCP_PROJECT_ID]
+        == "serverless_project"
+    )
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_IDENTITY] == "func_ID"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_ENTRY_POINT] == "cloud_function"
+    )
     assert segment_span["status"] == SpanStatus.ERROR
 
 
@@ -582,14 +610,26 @@ def test_existing_trace_context(run_cloud_function):
     assert segment_span["is_segment"] is True
     assert segment_span["trace_id"] == trace_id
     assert segment_span["name"] == "Google Cloud function"
-    assert segment_span["attributes"]["sentry.op"] == "function.gcp"
-    assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
-    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
-    assert segment_span["attributes"]["cloud.provider"] == "gcp"
-    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
-    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
-    assert segment_span["attributes"]["faas.identity"] == "func_ID"
-    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function.gcp"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.function.gcp"
+    )
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "component"
+    )
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.CLOUD_PROVIDER] == "gcp"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_NAME] == "Google Cloud function"
+    )
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.GCP_PROJECT_ID]
+        == "serverless_project"
+    )
+    assert segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_IDENTITY] == "func_ID"
+    assert (
+        segment_span["attributes"][ATTRIBUTE_NAMES.FAAS_ENTRY_POINT] == "cloud_function"
+    )
 
 
 def test_request_attributes(run_cloud_function):
@@ -623,14 +663,14 @@ def test_request_attributes(run_cloud_function):
     segment_span = span_items[0]
     attrs = segment_span["attributes"]
 
-    assert attrs["http.request.method"] == "POST"
-    assert attrs["url.query"] == "foo=bar"
+    assert attrs[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "POST"
+    assert attrs[ATTRIBUTE_NAMES.URL_QUERY] == "foo=bar"
     assert attrs["http.request.header.content-type"] == ["application/json"]
     assert attrs["http.request.header.accept"] == ["text/html"]
-    assert attrs["faas.name"] == "Google Cloud function"
-    assert attrs["gcp.project.id"] == "serverless_project"
-    assert attrs["faas.identity"] == "func_ID"
-    assert attrs["faas.entry_point"] == "cloud_function"
+    assert attrs[ATTRIBUTE_NAMES.FAAS_NAME] == "Google Cloud function"
+    assert attrs[ATTRIBUTE_NAMES.GCP_PROJECT_ID] == "serverless_project"
+    assert attrs[ATTRIBUTE_NAMES.FAAS_IDENTITY] == "func_ID"
+    assert attrs[ATTRIBUTE_NAMES.FAAS_ENTRY_POINT] == "cloud_function"
 
 
 # Each case is (data_collection, expected_span). ``data_collection`` of None
@@ -710,9 +750,9 @@ def test_query_string_data_collection(
     assert len(span_items) == 1
     attrs = span_items[0]["attributes"]
     if expected_span is None:
-        assert "url.query" not in attrs
+        assert ATTRIBUTE_NAMES.URL_QUERY not in attrs
     else:
-        assert attrs["url.query"] == expected_span
+        assert attrs[ATTRIBUTE_NAMES.URL_QUERY] == expected_span
 
 
 # Each case is (data_collection, expected_data, expected_meta).

@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 import boto3
 import pytest
 from botocore.config import Config
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.boto3.consts import ORIGIN
 
@@ -108,8 +108,8 @@ def capture_spans_by_op(
     spans_by_op: Dict[Optional[str], List["SpanJSON"]] = {}
     for item in items:
         span = item.payload
-        if span["attributes"].get(SPANDATA.SENTRY_ORIGIN) == expected_origin:
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN) == expected_origin:
             spans_by_op.setdefault(
-                span["attributes"].get(SPANDATA.SENTRY_OP), []
+                span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP), []
             ).append(span)
     return spans_by_op

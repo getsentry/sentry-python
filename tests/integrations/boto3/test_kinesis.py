@@ -1,7 +1,8 @@
 import pytest
 from botocore.stub import Stubber
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
     require_botocore_model_fields,
@@ -33,7 +34,7 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             "put_record",
             {"StreamName": "orders", "Data": b"{}", "PartitionKey": "customer-1"},
             {"ShardId": "shardId-000000000000", "SequenceNumber": "1"},
-            {SPANDATA.AWS_KINESIS_STREAM_NAME: "orders"},
+            {ATTRIBUTE_NAMES.AWS_KINESIS_STREAM_NAME: "orders"},
             id="stream-name",
         ),
         pytest.param(
@@ -41,8 +42,8 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"StreamARN": STREAM_ARN},
             {"Consumers": []},
             {
-                SPANDATA.AWS_KINESIS_STREAM_NAME: "orders",
-                SPANDATA.CLOUD_RESOURCE_ID: STREAM_ARN,
+                ATTRIBUTE_NAMES.AWS_KINESIS_STREAM_NAME: "orders",
+                ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: STREAM_ARN,
             },
             id="stream-arn",
         ),
@@ -51,8 +52,8 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"ConsumerARN": CONSUMER_ARN},
             {},
             {
-                SPANDATA.AWS_KINESIS_STREAM_NAME: "orders",
-                SPANDATA.CLOUD_RESOURCE_ID: CONSUMER_ARN,
+                ATTRIBUTE_NAMES.AWS_KINESIS_STREAM_NAME: "orders",
+                ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: CONSUMER_ARN,
             },
             id="consumer-arn",
         ),
@@ -61,8 +62,8 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"ResourceARN": CONSUMER_ARN},
             {"Tags": []},
             {
-                SPANDATA.AWS_KINESIS_STREAM_NAME: "orders",
-                SPANDATA.CLOUD_RESOURCE_ID: CONSUMER_ARN,
+                ATTRIBUTE_NAMES.AWS_KINESIS_STREAM_NAME: "orders",
+                ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: CONSUMER_ARN,
             },
             id="resource-arn",
         ),
@@ -76,7 +77,8 @@ def test_stream_attributes(
     assert {
         key: value
         for key, value in span["attributes"].items()
-        if key in (SPANDATA.AWS_KINESIS_STREAM_NAME, SPANDATA.CLOUD_RESOURCE_ID)
+        if key
+        in (ATTRIBUTE_NAMES.AWS_KINESIS_STREAM_NAME, ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID)
     } == expected
 
 
@@ -117,4 +119,4 @@ def test_put_records_outcome(
     span = _stubbed_span(client_factory, capture_items, "put_records", params, response)
 
     assert span["status"] == ("ok" if expected_error_type is None else "error")
-    assert span["attributes"].get(SPANDATA.ERROR_TYPE) == expected_error_type
+    assert span["attributes"].get(ATTRIBUTE_NAMES.ERROR_TYPE) == expected_error_type

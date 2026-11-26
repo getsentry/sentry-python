@@ -2,8 +2,9 @@ from datetime import datetime, timezone
 
 import pytest
 from botocore.stub import Stubber
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
     require_botocore_model_fields,
@@ -41,10 +42,10 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"stateMachineArn": ALIAS_ARN, "name": "order-1234"},
             {"executionArn": EXECUTION_ARN, "startDate": DATE},
             {
-                SPANDATA.CLOUD_RESOURCE_ID: ALIAS_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN: ALIAS_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
-                SPANDATA.AWS_STEP_FUNCTIONS_EXECUTION_ARN: EXECUTION_ARN,
+                ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: ALIAS_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN: ALIAS_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_EXECUTION_ARN: EXECUTION_ARN,
             },
             id="alias",
         ),
@@ -53,9 +54,9 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"executionArn": EXECUTION_ARN},
             {"stopDate": DATE},
             {
-                SPANDATA.CLOUD_RESOURCE_ID: EXECUTION_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_EXECUTION_ARN: EXECUTION_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
+                ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: EXECUTION_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_EXECUTION_ARN: EXECUTION_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
             },
             id="execution",
         ),
@@ -64,8 +65,8 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"mapRunArn": MAP_RUN_ARN},
             {"executions": []},
             {
-                SPANDATA.CLOUD_RESOURCE_ID: MAP_RUN_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
+                ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: MAP_RUN_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
             },
             id="map-run",
         ),
@@ -78,8 +79,8 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             },
             {"stateMachineArn": STATE_MACHINE_ARN, "creationDate": DATE},
             {
-                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN: STATE_MACHINE_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_STATE_MACHINE_ARN: STATE_MACHINE_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_STATE_MACHINE_NAME: "orders",
             },
             id="create-state-machine",
         ),
@@ -88,8 +89,8 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"name": "approve"},
             {"activityArn": ACTIVITY_ARN, "creationDate": DATE},
             {
-                SPANDATA.AWS_STEP_FUNCTIONS_ACTIVITY_ARN: ACTIVITY_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_ACTIVITY_NAME: "approve",
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_ACTIVITY_ARN: ACTIVITY_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_ACTIVITY_NAME: "approve",
             },
             id="create-activity",
         ),
@@ -98,8 +99,8 @@ def _stubbed_span(client_factory, capture_items, method, params, response):
             {"resourceArn": ACTIVITY_ARN, "tags": [{"key": "team", "value": "a"}]},
             {},
             {
-                SPANDATA.CLOUD_RESOURCE_ID: ACTIVITY_ARN,
-                SPANDATA.AWS_STEP_FUNCTIONS_ACTIVITY_NAME: "approve",
+                ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: ACTIVITY_ARN,
+                ATTRIBUTE_NAMES.AWS_STEP_FUNCTIONS_ACTIVITY_NAME: "approve",
             },
             id="tag-activity",
         ),
@@ -114,7 +115,8 @@ def test_resource_attributes(
     assert {
         key: value
         for key, value in span["attributes"].items()
-        if key.startswith("aws.step_functions.") or key == SPANDATA.CLOUD_RESOURCE_ID
+        if key.startswith("aws.step_functions.")
+        or key == ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID
     } == expected
 
 
@@ -147,7 +149,7 @@ def test_execution_outcome(
     span = _stubbed_span(client_factory, capture_items, method, params, response)
 
     assert span["status"] == ("ok" if expected_error_type is None else "error")
-    assert span["attributes"].get(SPANDATA.ERROR_TYPE) == expected_error_type
+    assert span["attributes"].get(ATTRIBUTE_NAMES.ERROR_TYPE) == expected_error_type
     # the execution's input, error and cause are never recorded.
     assert "4242" not in str(span)
     assert "States.TaskFailed" not in str(span)

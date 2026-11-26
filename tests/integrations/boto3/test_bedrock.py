@@ -15,9 +15,10 @@ from botocore.loaders import Loader
 from botocore.parsers import EventStreamJSONParser
 from botocore.stub import Stubber
 from packaging.version import Version
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3 import Boto3Integration
 
 BOTOCORE_VERSION = Version(botocore.__version__)
@@ -454,30 +455,39 @@ def test_converse(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
     assert (
-        span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
         == "anthropic.claude-3-sonnet-20240229-v1:0"
     )
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     if BOTOCORE_VERSION < Version("1.37.24"):
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
         return
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 110
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 20
+    )
 
 
 def test_converse_error(
@@ -528,24 +538,26 @@ def test_converse_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
     assert (
-        span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
         == "anthropic.claude-3-sonnet-20240229-v1:0"
     )
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    assert span["attributes"][SPANDATA.ERROR_TYPE] == "AccessDeniedException"
-    assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 403
-    assert span["attributes"][SPANDATA.AWS_REQUEST_ID] == "test-id"
-    assert span["attributes"][SPANDATA.HTTP_REQUEST_RESEND_COUNT] == 1
+    assert span["attributes"][ATTRIBUTE_NAMES.ERROR_TYPE] == "AccessDeniedException"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 403
+    assert span["attributes"][ATTRIBUTE_NAMES.AWS_REQUEST_ID] == "test-id"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_RESEND_COUNT] == 1
     assert span["status"] == "error"
 
 
@@ -611,11 +623,13 @@ def test_converse_tool_definitions(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS])
         == expected_tool_definitions
     )
 
@@ -656,15 +670,19 @@ def test_converse_input_attributes(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+    assert json.loads(
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
+    ) == [
         {"type": "text", "content": "You are a helpful assistant."},
         {"type": "text", "content": "Be concise and clear."},
     ]
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES])
         == expected_input_messages
     )
 
@@ -713,11 +731,13 @@ def test_converse_output_attributes(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES])
         == expected_output_messages
     )
 
@@ -759,31 +779,40 @@ def test_converse_stream(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "aws.bedrock"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
         == "anthropic.claude-3-sonnet-20240229-v1:0"
     )
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
+    assert ATTRIBUTE_NAMES.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     if BOTOCORE_VERSION < Version("1.37.24"):
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
         return
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 110
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 110
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 20
+    )
 
 
 def test_converse_stream_error_during_iteration(
@@ -820,7 +849,9 @@ def test_converse_stream_error_during_iteration(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert span["status"] == "error"
@@ -892,11 +923,13 @@ def test_converse_stream_tool_definitions(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS])
         == expected_tool_definitions
     )
 
@@ -941,15 +974,19 @@ def test_converse_stream_input_attributes(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+    assert json.loads(
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
+    ) == [
         {"type": "text", "content": "You are a helpful assistant."},
         {"type": "text", "content": "Be concise and clear."},
     ]
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES])
         == expected_input_messages
     )
 
@@ -1153,9 +1190,11 @@ def test_converse_stream_output_attributes(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]

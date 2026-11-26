@@ -4,8 +4,9 @@ import json
 import pytest
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
     require_botocore_model_fields,
@@ -80,11 +81,11 @@ def test_request_attributes(
 
     (span,) = spans[OP.RPC]
     attributes = span["attributes"]
-    assert attributes[SPANDATA.MESSAGING_DESTINATION_NAME] == "orders"
-    assert attributes.get(SPANDATA.AWS_SQS_QUEUE_URL) == queue_url
-    assert attributes.get(SPANDATA.CLOUD_ACCOUNT_ID) == account_id
-    assert attributes.get(SPANDATA.CLOUD_RESOURCE_ID) == resource_id
-    assert SPANDATA.MESSAGING_SYSTEM not in attributes
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] == "orders"
+    assert attributes.get(ATTRIBUTE_NAMES.AWS_SQS_QUEUE_URL) == queue_url
+    assert attributes.get(ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID) == account_id
+    assert attributes.get(ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID) == resource_id
+    assert ATTRIBUTE_NAMES.MESSAGING_SYSTEM not in attributes
 
 
 @pytest.mark.parametrize(
@@ -192,12 +193,14 @@ def test_send_message(
     assert span["name"] == "send orders"
     assert span["status"] == ("ok" if error_type is None else "error")
     attributes = span["attributes"]
-    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_TYPE] == "send"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "send"
-    assert attributes.get(SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
-    assert attributes.get(SPANDATA.MESSAGING_MESSAGE_ID) == message_id
-    assert attributes.get(SPANDATA.ERROR_TYPE) == error_type
+    assert attributes[ATTRIBUTE_NAMES.SENTRY_KIND] == "producer"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE] == "send"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME] == "send"
+    assert (
+        attributes.get(ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
+    )
+    assert attributes.get(ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID) == message_id
+    assert attributes.get(ATTRIBUTE_NAMES.ERROR_TYPE) == error_type
 
 
 @pytest.mark.parametrize(
@@ -247,11 +250,11 @@ def test_receive_message(
     (span,) = spans[OP.QUEUE_RECEIVE]
     assert span["name"] == "receive orders"
     attributes = span["attributes"]
-    assert attributes[SPANDATA.SENTRY_KIND] == "client"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_TYPE] == "receive"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "receive"
-    assert attributes[SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT] == message_count
-    assert attributes.get(SPANDATA.MESSAGING_MESSAGE_ID) == message_id
+    assert attributes[ATTRIBUTE_NAMES.SENTRY_KIND] == "client"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE] == "receive"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME] == "receive"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT] == message_count
+    assert attributes.get(ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID) == message_id
     assert "receipt-handle" not in str(span)
 
 
@@ -274,7 +277,7 @@ def test_receive_message_error(client_factory, capture_items):
         spans = capture_spans_by_op(call, capture_items)
 
     (span,) = spans[OP.QUEUE_RECEIVE]
-    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in span["attributes"]
+    assert ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT not in span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -319,10 +322,12 @@ def test_delete_message(
     (span,) = spans[OP.QUEUE_SETTLE]
     assert span["name"] == "settle orders"
     attributes = span["attributes"]
-    assert attributes[SPANDATA.SENTRY_KIND] == "client"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_TYPE] == "settle"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "settle"
-    assert attributes.get(SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
+    assert attributes[ATTRIBUTE_NAMES.SENTRY_KIND] == "client"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE] == "settle"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME] == "settle"
+    assert (
+        attributes.get(ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
+    )
     assert "receipt-handle" not in str(span)
 
 
@@ -421,7 +426,7 @@ def test_receive_message_links(client_factory, capture_items):
 
     (span,) = spans[OP.QUEUE_RECEIVE]
     link_type = {
-        SPANDATA.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
+        ATTRIBUTE_NAMES.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
     }
     assert span["links"] == [
         # messages 1 and 2 share a context, so one link.
