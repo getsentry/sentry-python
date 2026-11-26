@@ -1,7 +1,8 @@
 import sys
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import capture_internal_exceptions, reraise
@@ -70,7 +71,7 @@ def _maybe_start_agent_span(
     if not is_streaming:
         return span
 
-    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING, True)
 
     return span
 

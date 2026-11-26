@@ -8,6 +8,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.outputs import ChatResult
 from langgraph.errors import GraphBubbleUp
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -194,16 +195,23 @@ def test_pregel_invoke(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
     assert invoke_span["name"] == "invoke_agent test_graph"
-    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.langgraph"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME]
+        == "invoke_agent"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME] == "test_graph"
+    )
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME] == "test_graph"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
@@ -287,16 +295,23 @@ def test_pregel_invoke_no_sensitive_data(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
     assert invoke_span["name"] == "invoke_agent test_graph"
-    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.langgraph"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME]
+        == "invoke_agent"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME] == "test_graph"
+    )
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME] == "test_graph"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
@@ -357,16 +372,23 @@ def test_pregel_ainvoke(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
     assert invoke_span["name"] == "invoke_agent async_graph"
-    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "async_graph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "async_graph"
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.langgraph"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME]
+        == "invoke_agent"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME] == "async_graph"
+    )
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME] == "async_graph"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
@@ -439,16 +461,23 @@ def test_pregel_ainvoke_no_sensitive_data(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
     assert invoke_span["name"] == "invoke_agent async_graph"
-    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "async_graph"
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "async_graph"
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.langgraph"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME]
+        == "invoke_agent"
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME] == "async_graph"
+    )
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME] == "async_graph"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
@@ -488,7 +517,7 @@ def test_pregel_invoke_error(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
@@ -532,7 +561,7 @@ def test_pregel_ainvoke_error(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
@@ -576,7 +605,7 @@ def test_pregel_invoke_with_different_graph_names(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
@@ -584,12 +613,21 @@ def test_pregel_invoke_with_different_graph_names(
 
     if graph_name and graph_name.strip():
         assert invoke_span["name"] == "invoke_agent my_graph"
-        assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == graph_name
-        assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == graph_name
+        assert (
+            invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME]
+            == graph_name
+        )
+        assert (
+            invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME] == graph_name
+        )
     else:
         assert invoke_span["name"] == "invoke_agent"
-        assert SPANDATA.GEN_AI_PIPELINE_NAME not in invoke_span.get("attributes", {})
-        assert SPANDATA.GEN_AI_AGENT_NAME not in invoke_span.get("attributes", {})
+        assert ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME not in invoke_span.get(
+            "attributes", {}
+        )
+        assert ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME not in invoke_span.get(
+            "attributes", {}
+        )
 
 
 def test_complex_message_parsing():
@@ -700,7 +738,7 @@ def test_extraction_functions_complex_scenario(
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
@@ -769,7 +807,7 @@ def test_langgraph_message_role_mapping(
     span = next(item.payload for item in items)
 
     # Verify that the span was created correctly
-    assert span["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.invoke_agent"
 
     # If messages were captured, verify role mapping
     if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]:
@@ -819,7 +857,7 @@ def _invoke_span_data(items_or_events):
     invoke_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
     return invoke_spans[0]["attributes"]

@@ -5,6 +5,8 @@ from collections import OrderedDict
 from functools import wraps
 from typing import TYPE_CHECKING, NamedTuple
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
@@ -240,8 +242,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     else parent,
                     name=name,
                     attributes={
-                        "sentry.op": op,
-                        "sentry.origin": origin,
+                        ATTRIBUTE_NAMES.SENTRY_OP: op,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: origin,
                     },
                 )
 
@@ -249,8 +251,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
             span = sentry_sdk.start_span(
                 name=name,
                 attributes={
-                    "sentry.op": op,
-                    "sentry.origin": origin,
+                    ATTRIBUTE_NAMES.SENTRY_OP: op,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: origin,
                 },
             )
 
@@ -277,8 +279,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     else parent,
                     name=name,
                     attributes={
-                        "sentry.op": op,
-                        "sentry.origin": origin,
+                        ATTRIBUTE_NAMES.SENTRY_OP: op,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: origin,
                     },
                 )
 
@@ -286,8 +288,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
             context = _AgentFrameworkChatGenerationContext(
                 name=name,
                 attributes={
-                    "sentry.op": op,
-                    "sentry.origin": origin,
+                    ATTRIBUTE_NAMES.SENTRY_OP: op,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: origin,
                 },
             )
 
@@ -335,21 +337,21 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 origin=LangchainIntegration.origin,
             )
 
-            span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME, "text_completion")
 
             run_name = kwargs.get("name")
             if run_name:
-                span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID, run_name)
 
             if model:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_MODEL,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL,
                     model,
                 )
 
             ai_system = _get_ai_system(all_params)
             if ai_system:
-                span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, ai_system)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME, ai_system)
 
             client = sentry_sdk.get_client()
 
@@ -357,7 +359,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if frequency_penalty is not None:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY,
                     frequency_penalty,
                     unpack=False,
                 )
@@ -365,14 +367,17 @@ class SentryLangchainCallback(BaseCallbackHandler):
             max_tokens = all_params.get("max_tokens")
             if max_tokens is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens, unpack=False
+                    span,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS,
+                    max_tokens,
+                    unpack=False,
                 )
 
             presence_penalty = all_params.get("presence_penalty")
             if presence_penalty is not None:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY,
                     presence_penalty,
                     unpack=False,
                 )
@@ -380,19 +385,22 @@ class SentryLangchainCallback(BaseCallbackHandler):
             temperature = all_params.get("temperature")
             if temperature is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature, unpack=False
+                    span,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE,
+                    temperature,
+                    unpack=False,
                 )
 
             top_k = all_params.get("top_k")
             if top_k is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_TOP_K, top_k, unpack=False
+                    span, ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_K, top_k, unpack=False
                 )
 
             top_p = all_params.get("top_p")
             if top_p is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p, unpack=False
+                    span, ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P, top_p, unpack=False
                 )
 
             _set_tools_on_span(span, all_params.get("tools"))
@@ -464,24 +472,24 @@ class SentryLangchainCallback(BaseCallbackHandler):
             )
             span = context.span
 
-            span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME, "chat")
             if model:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model)
 
             ai_system = _get_ai_system(all_params)
             if ai_system:
-                span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, ai_system)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME, ai_system)
 
             agent_metadata = kwargs.get("metadata")
             if isinstance(agent_metadata, dict) and "lc_agent_name" in agent_metadata:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
+                    ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
                 )
 
             run_name = kwargs.get("name")
             if run_name:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_FUNCTION_ID,
+                    ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID,
                     run_name,
                 )
 
@@ -491,7 +499,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if frequency_penalty is not None:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY,
                     frequency_penalty,
                     unpack=False,
                 )
@@ -499,14 +507,17 @@ class SentryLangchainCallback(BaseCallbackHandler):
             max_tokens = all_params.get("max_tokens")
             if max_tokens is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens, unpack=False
+                    span,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS,
+                    max_tokens,
+                    unpack=False,
                 )
 
             presence_penalty = all_params.get("presence_penalty")
             if presence_penalty is not None:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY,
                     presence_penalty,
                     unpack=False,
                 )
@@ -514,19 +525,22 @@ class SentryLangchainCallback(BaseCallbackHandler):
             temperature = all_params.get("temperature")
             if temperature is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature, unpack=False
+                    span,
+                    ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE,
+                    temperature,
+                    unpack=False,
                 )
 
             top_k = all_params.get("top_k")
             if top_k is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_TOP_K, top_k, unpack=False
+                    span, ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_K, top_k, unpack=False
                 )
 
             top_p = all_params.get("top_p")
             if top_p is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p, unpack=False
+                    span, ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P, top_p, unpack=False
                 )
 
             _set_tools_on_span(span, all_params.get("tools"))
@@ -555,7 +569,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             system_instructions = _get_system_instructions(messages)
             if len(system_instructions) > 0:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                    ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
                     json.dumps(_transform_system_instructions(system_instructions)),
                 )
 
@@ -635,14 +649,16 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 finish_reason = generation.generation_info.get("finish_reason")
                 if finish_reason is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS,
                         [finish_reason],
                     )
 
             if isinstance(generation, ChatGeneration):
                 response_model = generation.message.response_metadata.get("model_name")
                 if response_model is not None:
-                    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                    span.set_attribute(
+                        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response_model
+                    )
 
                 if client.options["data_collection"]["gen_ai"]["outputs"]:
                     tool_calls = getattr(generation.message, "tool_calls", None)
@@ -707,23 +723,25 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 origin=LangchainIntegration.origin,
             )
 
-            span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
-            span.set_attribute(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME, "execute_tool")
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME, tool_name)
 
             tool_description = serialized.get("description")
             if tool_description is not None:
-                span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_TOOL_DESCRIPTION, tool_description
+                )
 
             agent_metadata = kwargs.get("metadata")
             if isinstance(agent_metadata, dict) and "lc_agent_name" in agent_metadata:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
+                    ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
                 )
 
             run_name = kwargs.get("name")
             if run_name:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_FUNCTION_ID,
+                    ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID,
                     run_name,
                 )
 
@@ -734,7 +752,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             set_data_normalized(
                 span,
-                SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS,
+                ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS,
                 kwargs.get("inputs", [input_str]),
             )
 
@@ -754,7 +772,9 @@ class SentryLangchainCallback(BaseCallbackHandler):
             )
 
             if sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
-                set_data_normalized(span, SPANDATA.GEN_AI_TOOL_CALL_RESULT, output)
+                set_data_normalized(
+                    span, ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT, output
+                )
 
             self._exit_span(span, run_id)
 
@@ -908,26 +928,29 @@ def _record_token_usage(span: "Span", response: "LLMResult") -> None:
             reasoning = token_usage.reasoning
 
     if input_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
     if output_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if total_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+        span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
     if cache_read_tokens is not None:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens
         )
 
     if cache_creation_tokens is not None:
         span.set_attribute(
-            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation_tokens
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+            cache_creation_tokens,
         )
 
     if reasoning is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, reasoning)
+        span.set_attribute(
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, reasoning
+        )
 
 
 def _get_request_data(
@@ -1037,7 +1060,7 @@ def _set_tools_on_span(span: "Span", tools: "Any") -> None:
     if simplified_tools:
         set_data_normalized(
             span,
-            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS,
             simplified_tools,
             unpack=False,
         )
@@ -1133,13 +1156,13 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
         with sentry_sdk.start_span(
             name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
             attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": LangchainIntegration.origin,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_INVOKE_AGENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: LangchainIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "invoke_agent",
             },
         ) as span:
             if run_name:
-                span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID, run_name)
 
             # Run the agent
             result = f(self, *args, **kwargs)
@@ -1182,14 +1205,14 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         span = sentry_sdk.start_span(
             name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
             attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": LangchainIntegration.origin,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_INVOKE_AGENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: LangchainIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "invoke_agent",
             },
         )
 
         if run_name:
-            span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID, run_name)
 
         input = args[0].get("input") if len(args) >= 1 else None
         if input is not None and client.options["data_collection"]["gen_ai"]["inputs"]:

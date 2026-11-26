@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.traces import Span
 from sentry_sdk.utils import safe_serialize
 
@@ -32,16 +34,16 @@ def execute_tool_span(
     span = sentry_sdk.start_span(
         name=f"execute_tool {tool_name}",
         attributes={
-            "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
-            "sentry.origin": SPAN_ORIGIN,
-            SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-            SPANDATA.GEN_AI_TOOL_NAME: tool_name,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_EXECUTE_TOOL,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+            ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "execute_tool",
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME: tool_name,
         },
     )
 
     if tool_definition is not None and hasattr(tool_definition, "description"):
         span.set_attribute(
-            SPANDATA.GEN_AI_TOOL_DESCRIPTION,
+            ATTRIBUTE_NAMES.GEN_AI_TOOL_DESCRIPTION,
             tool_definition.description,
         )
 
@@ -53,7 +55,9 @@ def execute_tool_span(
     ):
         return span
 
-    span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_args))
+    span.set_attribute(
+        ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS, safe_serialize(tool_args)
+    )
 
     return span
 
@@ -69,4 +73,4 @@ def update_execute_tool_span(span: "Span", result: "Any") -> None:
     ):
         return
 
-    span.set_attribute(SPANDATA.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result))
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT, safe_serialize(result))

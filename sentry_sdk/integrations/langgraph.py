@@ -1,6 +1,8 @@
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
@@ -123,14 +125,14 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": LanggraphIntegration.origin,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_INVOKE_AGENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: LanggraphIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "invoke_agent",
             },
         ) as span:
             if graph_name:
-                span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
-                span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME, graph_name)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME, graph_name)
 
             # Store input messages to later compare with output
             input_messages = None
@@ -170,14 +172,14 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": LanggraphIntegration.origin,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_INVOKE_AGENT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: LanggraphIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "invoke_agent",
             },
         ) as span:
             if graph_name:
-                span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
-                span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_PIPELINE_NAME, graph_name)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME, graph_name)
 
             input_messages = None
             if len(args) > 0:

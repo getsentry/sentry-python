@@ -1,6 +1,8 @@
 import json
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
@@ -108,7 +110,7 @@ def _set_input_messages(span: "Span", messages: "list[ModelMessage]") -> None:
     permanent_instructions, current_instructions = _get_system_instructions(messages)
     if len(permanent_instructions) > 0 or len(current_instructions) > 0:
         span.set_attribute(
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             json.dumps(
                 _transform_system_instructions(
                     permanent_instructions, current_instructions
@@ -217,7 +219,7 @@ def _set_output_data(
     if not response:
         return
 
-    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
+    span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
 
     if not sentry_sdk.get_client().options["data_collection"]["gen_ai"]["outputs"]:
         return
@@ -254,7 +256,7 @@ def _set_output_data(
 
             if parts:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES,
                     json.dumps([{"role": "assistant", "parts": parts}]),
                 )
 
@@ -282,9 +284,9 @@ def ai_client_context(
     context = _AgentFrameworkChatGenerationContext(
         name=f"chat {model_name}",
         attributes={
-            "sentry.op": OP.GEN_AI_CHAT,
-            "sentry.origin": SPAN_ORIGIN,
-            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: SPAN_ORIGIN,
+            ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
         },
     )
 
@@ -298,12 +300,14 @@ def ai_client_context(
     if model_obj:
         # Set system from model
         if hasattr(model_obj, "system"):
-            context.span.set_attribute(SPANDATA.GEN_AI_PROVIDER_NAME, model_obj.system)
+            context.span.set_attribute(
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME, model_obj.system
+            )
 
         # Set model name
         model_name = _get_model_name(model_obj)
         if model_name:
-            context.span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            context.span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model_name)
 
     # Extract model settings
     settings = model_settings
@@ -312,11 +316,11 @@ def ai_client_context(
 
     if settings:
         settings_map = {
-            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            "max_tokens": ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS,
+            "temperature": ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P,
+            "frequency_penalty": ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            "presence_penalty": ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY,
         }
 
         # ModelSettings is a TypedDict (dict at runtime), so use dict access

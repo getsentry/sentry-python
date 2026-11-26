@@ -19,6 +19,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -112,19 +113,23 @@ async def test_agent_run_async(
     spans = [item.payload for item in items]
 
     assert spans[1]["name"] == "invoke_agent test_agent"
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
+    assert (
+        spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.pydantic_ai"
+    )
 
-    assert spans[1]["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.invoke_agent"
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
     # Check chat span
     chat_span = chat_spans[0]
     assert "chat" in chat_span["name"]
-    assert chat_span["attributes"]["gen_ai.operation.name"] == "chat"
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
     assert json.loads(chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
             "role": "user",
@@ -140,8 +145,8 @@ async def test_agent_run_async(
             ],
         }
     ]
-    assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
-    assert "gen_ai.usage.output_tokens" in chat_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS in chat_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -210,10 +215,14 @@ def test_agent_run_sync(
     spans = [item.payload for item in items]
 
     assert spans[1]["name"] == "invoke_agent test_agent"
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
+    assert (
+        spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.pydantic_ai"
+    )
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
@@ -284,10 +293,14 @@ async def test_agent_run_stream(
     spans = [item.payload for item in items]
 
     assert spans[1]["name"] == "invoke_agent test_agent"
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
+    assert (
+        spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.pydantic_ai"
+    )
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
@@ -308,11 +321,11 @@ async def test_agent_run_stream(
             ],
         }
     ]
-    assert "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[0]["attributes"]
     # Streaming responses should still have output data
     assert (
         "gen_ai.response.text" in chat_spans[0]["attributes"]
-        or "gen_ai.response.model" in chat_spans[0]["attributes"]
+        or ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL in chat_spans[0]["attributes"]
     )
 
 
@@ -358,7 +371,9 @@ async def test_agent_run_stream_events(
     assert spans[-1]["name"] == "invoke_agent test_agent"
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
@@ -401,12 +416,14 @@ async def test_agent_with_tools(
 
     # Find child span types (invoke_agent is the transaction, not a child span)
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     tool_spans = [
         s
         for s in spans
-        if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.execute_tool"
     ]
 
     # Should have tool spans
@@ -415,10 +432,12 @@ async def test_agent_with_tools(
     # Check tool span
     tool_span = tool_spans[0]
     assert "execute_tool" in tool_span["name"]
-    assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
+    assert (
+        tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "execute_tool"
+    )
+    assert tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "add_numbers"
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
 
     # Check chat spans have available_tools
     for chat_span in chat_spans:
@@ -485,12 +504,14 @@ async def test_agent_with_tool_model_retry(
     spans = [item.payload for item in items if item.type == "span"]
     # Find child span types (invoke_agent is the transaction, not a child span)
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     tool_spans = [
         s
         for s in spans
-        if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.execute_tool"
     ]
 
     # Should have tool spans
@@ -500,17 +521,26 @@ async def test_agent_with_tool_model_retry(
     model_retry_tool_span = tool_spans[0]
     assert "execute_tool" in model_retry_tool_span["name"]
     assert (
-        model_retry_tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
+        model_retry_tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME]
+        == "execute_tool"
     )
-    assert model_retry_tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in model_retry_tool_span["attributes"]
+    assert (
+        model_retry_tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME]
+        == "add_numbers"
+    )
+    assert (
+        ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS
+        in model_retry_tool_span["attributes"]
+    )
 
     tool_span = tool_spans[1]
     assert "execute_tool" in tool_span["name"]
-    assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["attributes"]["gen_ai.tool.name"] == "add_numbers"
-    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
+    assert (
+        tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "execute_tool"
+    )
+    assert tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "add_numbers"
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
 
     # Check chat spans have available_tools
     for chat_span in chat_spans:
@@ -575,7 +605,9 @@ async def test_agent_with_tool_validation_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
 
     # Check chat spans have available_tools
@@ -625,7 +657,7 @@ async def test_agent_with_tools_streaming(
     tool_spans = [
         s
         for s in spans
-        if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.execute_tool"
     ]
 
     # Should have tool spans
@@ -633,9 +665,9 @@ async def test_agent_with_tools_streaming(
 
     # Check tool span
     tool_span = tool_spans[0]
-    assert tool_span["attributes"]["gen_ai.tool.name"] == "multiply"
-    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
+    assert tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "multiply"
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS in tool_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT in tool_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -662,15 +694,19 @@ async def test_model_settings(
 
     # Find chat span
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
     chat_span = chat_spans[0]
     # Check that model settings are captured
-    assert chat_span["attributes"].get("gen_ai.request.temperature") == 0.7
-    assert chat_span["attributes"].get("gen_ai.request.max_tokens") == 100
-    assert chat_span["attributes"].get("gen_ai.request.top_p") == 0.9
+    assert (
+        chat_span["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE) == 0.7
+    )
+    assert chat_span["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS) == 100
+    assert chat_span["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P) == 0.9
 
 
 @pytest.mark.asyncio
@@ -706,13 +742,17 @@ async def test_system_prompt_attribute(
 
     # The transaction IS the invoke_agent span, check for messages in chat spans instead
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
     chat_span = chat_spans[0]
 
-    system_instructions = chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+    system_instructions = chat_span["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS
+    ]
     assert json.loads(system_instructions) == [
         {
             "type": "text",
@@ -754,13 +794,15 @@ async def test_system_prompt_attribute_no_sensitive_data(
 
     # The transaction IS the invoke_agent span, check for messages in chat spans instead
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
     chat_span = chat_spans[0]
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -820,7 +862,9 @@ async def test_no_sensitive_data(
 
     # Find child spans (invoke_agent is the transaction, not a child span)
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
 
     # Verify that messages and response text are not captured
@@ -864,13 +908,13 @@ async def test_tools_no_sensitive_data(
     tool_spans = [
         s
         for s in spans
-        if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.execute_tool"
     ]
 
     # If tool was executed, verify input/output are not captured
     for tool_span in tool_spans:
-        assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_span["attributes"]
-        assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_span["attributes"]
+        assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_span["attributes"]
+        assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in tool_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -953,7 +997,9 @@ async def test_message_history(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
 
     if chat_spans:
@@ -988,14 +1034,16 @@ async def test_gen_ai_system(
 
     # Find chat span
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
     chat_span = chat_spans[0]
     # gen_ai.system should be set from the model (TestModel -> 'test')
-    assert SPANDATA.GEN_AI_PROVIDER_NAME in chat_span["attributes"]
-    assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "test"
+    assert ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME in chat_span["attributes"]
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "test"
 
 
 @pytest.mark.asyncio
@@ -1232,13 +1280,17 @@ async def test_invoke_agent_with_instructions(
 
     # The transaction IS the invoke_agent span, check for messages in chat spans instead
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
     chat_span = chat_spans[0]
 
-    system_instructions = chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+    system_instructions = chat_span["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS
+    ]
     assert json.loads(system_instructions) == [
         {"type": "text", "content": "System prompt"},
         {
@@ -1284,13 +1336,15 @@ async def test_invoke_agent_with_instructions_no_sensitive_data(
 
     # The transaction IS the invoke_agent span, check for messages in chat spans instead
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
     chat_span = chat_spans[0]
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -1377,7 +1431,9 @@ async def test_usage_data_partial(
     spans = [item.payload for item in items]
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
 
     assert len(chat_spans) == 1
@@ -1446,7 +1502,9 @@ async def test_available_tools_without_description(
     spans = [item.payload for item in items]
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     if chat_spans:
         chat_span = chat_spans[0]
@@ -1490,7 +1548,9 @@ async def test_output_with_tool_calls(
     spans = [item.payload for item in items]
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
 
     # At least one chat span should exist
@@ -1499,7 +1559,7 @@ async def test_output_with_tool_calls(
     # Check if tool calls are captured in response
     # Tool calls may or may not be in response depending on TestModel behavior
     # Just verify the span was created and has basic data
-    assert "gen_ai.operation.name" in chat_spans[0]["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME in chat_spans[0]["attributes"]
 
 
 @pytest.mark.asyncio
@@ -1546,7 +1606,9 @@ async def test_message_formatting_with_different_parts(
     spans = [item.payload for item in items]
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
 
     # Should have chat spans
@@ -1793,7 +1855,9 @@ async def test_message_parts_with_tool_return(
     spans = [item.payload for item in items]
 
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
 
     # Should have chat spans
@@ -1888,16 +1952,20 @@ async def test_output_data_transformations(
     invoke_agent_span = next(
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.invoke_agent"
     )
     assert invoke_agent_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == (
         "The answer is 15."
     )
 
     chat_spans = [
-        span for span in spans if span["attributes"].get("sentry.op") == "gen_ai.chat"
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     ]
-    assert json.loads(chat_spans[0]["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]
+    ) == [
         {
             "role": "assistant",
             "parts": [
@@ -1909,7 +1977,9 @@ async def test_output_data_transformations(
             ],
         }
     ]
-    assert json.loads(chat_spans[1]["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]
+    ) == [
         {
             "role": "assistant",
             "parts": [
@@ -2549,7 +2619,7 @@ async def test_binary_content_encoding_image(
     items = capture_items("span")
 
     span = sentry_sdk.start_span(
-        name="custom span", attributes={"sentry.op": "test_span"}
+        name="custom span", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "test_span"}
     )
     binary_content = BinaryContent(
         data=b"fake_image_data_12345", media_type="image/png"
@@ -2589,7 +2659,7 @@ async def test_binary_content_encoding_mixed_content(
     items = capture_items("span")
 
     span = sentry_sdk.start_span(
-        name="custom span", attributes={"sentry.op": "test_span"}
+        name="custom span", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "test_span"}
     )
     binary_content = BinaryContent(data=b"fake_image_bytes", media_type="image/jpeg")
     user_part = UserPromptPart(
@@ -2648,7 +2718,9 @@ async def test_binary_content_in_agent_run(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
 
@@ -2672,7 +2744,7 @@ async def test_set_usage_data_with_cache_tokens(
     items = capture_items("span")
 
     span = sentry_sdk.start_span(
-        name="custom span", attributes={"sentry.op": "test_span"}
+        name="custom span", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "test_span"}
     )
     usage = RequestUsage(
         input_tokens=100,
@@ -2686,9 +2758,13 @@ async def test_set_usage_data_with_cache_tokens(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
     assert (
-        spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+        spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 80
+    )
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 20
     )
 
 
@@ -2768,7 +2844,9 @@ def test_image_url_base64_content_in_span(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     assert len(chat_spans) == 1
     messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
@@ -2844,7 +2922,9 @@ async def test_invoke_agent_image_url(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.chat"
     ]
     messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
     for msg in messages_data:
@@ -2898,18 +2978,20 @@ async def test_tool_description_in_execute_tool_span(
     tool_spans = [
         s
         for s in spans
-        if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "") == "gen_ai.execute_tool"
     ]
 
     assert len(tool_spans) >= 1
 
     tool_span = tool_spans[0]
 
-    assert tool_span["attributes"]["gen_ai.tool.name"] == "multiply_numbers"
-    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION in tool_span["attributes"]
+    assert (
+        tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "multiply_numbers"
+    )
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_DESCRIPTION in tool_span["attributes"]
     assert (
         "Multiply two numbers"
-        in tool_span["attributes"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
+        in tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_DESCRIPTION]
     )
 
 
@@ -2922,7 +3004,7 @@ def _spans_by_op(items):
     sentry_sdk.flush()
     return [
         (
-            item.payload["attributes"].get("sentry.op", ""),
+            item.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, ""),
             item.payload["attributes"],
         )
         for item in items
@@ -2979,7 +3061,9 @@ async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
 
     parts = []
     for chat_span in chat_spans:
-        for message in json.loads(chat_span.get(SPANDATA.GEN_AI_OUTPUT_MESSAGES, "[]")):
+        for message in json.loads(
+            chat_span.get(ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES, "[]")
+        ):
             parts.extend(message["parts"])
 
     part_types = {part["type"] for part in parts}
@@ -2995,10 +3079,10 @@ async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
         assert part_types == set()
 
     for chat_span in chat_spans:
-        assert SPANDATA.GEN_AI_RESPONSE_MODEL in chat_span
+        assert ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL in chat_span
 
         if not expect_outputs:
-            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in chat_span
+            assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in chat_span
 
 
 @pytest.mark.asyncio
@@ -3041,8 +3125,8 @@ async def test_data_collection_gen_ai_request_messages_keep_tool_returns_when_ou
     # Derive the expected return value from the arguments the model actually
     # sent, so the assertion does not depend on the test model's defaults.
     tool_span = tool_spans[0]
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_span
-    tool_input = json.loads(tool_span[SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS])
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in tool_span
+    tool_input = json.loads(tool_span[ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS])
     expected_tool_return = str(tool_input["a"] + tool_input["b"])
 
     tool_messages = [
