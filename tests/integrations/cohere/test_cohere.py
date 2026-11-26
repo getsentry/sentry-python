@@ -56,6 +56,7 @@ def test_nonstreaming_chat(
     span = items[0].payload
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert (
@@ -118,6 +119,7 @@ def test_nonstreaming_chat_no_sensitive_data(
     span = items[0].payload
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
@@ -188,6 +190,7 @@ def test_streaming_chat(
     span = items[0].payload
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert (
@@ -265,6 +268,7 @@ def test_streaming_chat_no_sensitive_data(
     span = items[0].payload
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
@@ -318,6 +322,7 @@ def test_embed(
     span = items[0].payload
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
     assert "hello" in span["attributes"][SPANDATA.AI_INPUT_MESSAGES]
 
     assert span["attributes"]["gen_ai.usage.input_tokens"] == 10
@@ -367,6 +372,7 @@ def test_embed_no_sensitive_data(
     span = items[0].payload
 
     assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
 
     assert span["attributes"]["gen_ai.usage.input_tokens"] == 10
