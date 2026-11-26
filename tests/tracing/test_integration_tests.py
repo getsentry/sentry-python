@@ -5,6 +5,7 @@ import weakref
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -32,17 +33,26 @@ def test_basic(sentry_init, capture_items, sample_rate):
         span1, span2, parent_span = [item.payload for item in items]
 
         assert parent_span["name"] == "hi"
-        assert parent_span["attributes"]["sentry.segment.name.source"] == "custom"
+        assert (
+            parent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+            == "custom"
+        )
 
         assert span1["status"] == "error"
         assert span1["name"] == "foo"
-        assert span1["attributes"]["sentry.segment.id"] == parent_span["span_id"]
-        assert span1["attributes"]["sentry.segment.name"] == "hi"
+        assert (
+            span1["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_ID]
+            == parent_span["span_id"]
+        )
+        assert span1["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "hi"
 
         assert span2["status"] == "ok"
         assert span2["name"] == "bar"
-        assert span2["attributes"]["sentry.segment.id"] == parent_span["span_id"]
-        assert span2["attributes"]["sentry.segment.name"] == "hi"
+        assert (
+            span2["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_ID]
+            == parent_span["span_id"]
+        )
+        assert span2["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "hi"
     else:
         assert not items
 
@@ -53,7 +63,9 @@ def test_error_event_linked_without_performance(sentry_init, capture_items):
 
     with sentry_sdk.start_span(
         name="no-op span",
-        attributes={"sentry.segment.name.source": "custom segment source"},
+        attributes={
+            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: "custom segment source"
+        },
     ):
         sentry_sdk.capture_message("hi")
 
@@ -159,7 +171,10 @@ def test_continue_trace(sentry_init, capture_items, parent_sampled, sample_rate)
         child_span_payload = spans[0].payload
         message_payload = messages[0].payload
 
-        assert child_span_payload["attributes"]["sentry.segment.name"] == "ho"
+        assert (
+            child_span_payload["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME]
+            == "ho"
+        )
 
         assert (
             child_span_payload["trace_id"]

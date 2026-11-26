@@ -25,6 +25,8 @@ skip_under_gevent = pytest.mark.skipif(
     running_under_gevent, reason="Async tests not compatible with gevent"
 )
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk import (
     Client,
@@ -711,19 +713,19 @@ def test_complex_limits_without_data_category(
                             ).timestamp(),
                             "trace_id": "00000000-0000-0000-0000-000000000000",
                             "attributes": {
-                                "sentry.environment": {
+                                ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: {
                                     "value": "production",
                                     "type": "string",
                                 },
-                                "sentry.release": {
+                                ATTRIBUTE_NAMES.SENTRY_RELEASE: {
                                     "value": "1.0.0",
                                     "type": "string",
                                 },
-                                "sentry.sdk.name": {
+                                ATTRIBUTE_NAMES.SENTRY_SDK_NAME: {
                                     "value": "sentry.python",
                                     "type": "string",
                                 },
-                                "sentry.sdk.version": {
+                                ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: {
                                     "value": "2.45.0",
                                     "type": "string",
                                 },
@@ -735,7 +737,7 @@ def test_complex_limits_without_data_category(
                                     "value": "info",
                                     "type": "string",
                                 },
-                                "server.address": {
+                                ATTRIBUTE_NAMES.SERVER_ADDRESS: {
                                     "value": "test-server",
                                     "type": "string",
                                 },
@@ -753,27 +755,27 @@ def test_complex_limits_without_data_category(
                                     "value": 2.0,
                                     "type": "double",
                                 },
-                                "sentry.message.template": {
+                                ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE: {
                                     "value": "The recorded value was '{float_var}'",
                                     "type": "string",
                                 },
-                                "sentry.sdk.name": {
+                                ATTRIBUTE_NAMES.SENTRY_SDK_NAME: {
                                     "value": "sentry.python",
                                     "type": "string",
                                 },
-                                "sentry.sdk.version": {
+                                ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: {
                                     "value": "2.45.0",
                                     "type": "string",
                                 },
-                                "server.address": {
+                                ATTRIBUTE_NAMES.SERVER_ADDRESS: {
                                     "value": "test-server",
                                     "type": "string",
                                 },
-                                "sentry.environment": {
+                                ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: {
                                     "value": "production",
                                     "type": "string",
                                 },
-                                "sentry.release": {
+                                ATTRIBUTE_NAMES.SENTRY_RELEASE: {
                                     "value": "1.0.0",
                                     "type": "string",
                                 },

@@ -1,4 +1,5 @@
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 
@@ -213,15 +214,15 @@ def test_user_attributes(sentry_init, capture_items):
 
     metric, span = [item.payload for item in items]
 
-    assert metric["attributes"]["user.id"] == "123456"
-    assert metric["attributes"]["user.name"] == "username"
-    assert metric["attributes"]["user.email"] == "username@example.com"
-    assert metric["attributes"]["user.ip_address"] == "127.0.0.1"
+    assert metric["attributes"][ATTRIBUTE_NAMES.USER_ID] == "123456"
+    assert metric["attributes"][ATTRIBUTE_NAMES.USER_NAME] == "username"
+    assert metric["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "username@example.com"
+    assert metric["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
 
-    assert span["attributes"]["user.id"] == "123456"
-    assert span["attributes"]["user.name"] == "username"
-    assert span["attributes"]["user.email"] == "username@example.com"
-    assert span["attributes"]["user.ip_address"] == "127.0.0.1"
+    assert span["attributes"][ATTRIBUTE_NAMES.USER_ID] == "123456"
+    assert span["attributes"][ATTRIBUTE_NAMES.USER_NAME] == "username"
+    assert span["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "username@example.com"
+    assert span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
 
 
 @pytest.mark.parametrize(

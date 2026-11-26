@@ -1,6 +1,7 @@
 import inspect
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 
@@ -36,7 +37,7 @@ def test_trace_decorator(sentry_init, capture_items):
     assert (
         span["name"] == "test_decorator.test_trace_decorator.<locals>.traced_function"
     )
-    assert span["attributes"]["sentry.op"] == "function"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
     assert span["status"] == "ok"
 
 
@@ -62,7 +63,7 @@ def test_trace_decorator_arguments(sentry_init, capture_items):
 
     assert span["name"] == "traced"
     assert span["attributes"]["traced.attribute"] == 123
-    assert span["attributes"]["sentry.op"] == "function"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
     assert span["status"] == "ok"
 
 
@@ -118,7 +119,7 @@ async def test_trace_decorator_async(sentry_init, capture_items):
         span["name"]
         == "test_decorator.test_trace_decorator_async.<locals>.traced_function"
     )
-    assert span["attributes"]["sentry.op"] == "function"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
     assert span["status"] == "ok"
 
 
@@ -145,7 +146,7 @@ async def test_trace_decorator_async_arguments(sentry_init, capture_items):
 
     assert span["name"] == "traced"
     assert span["attributes"]["traced.attribute"] == 123
-    assert span["attributes"]["sentry.op"] == "function"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
     assert span["status"] == "ok"
 
 

@@ -4,11 +4,12 @@ import time
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 import sentry_sdk.logger
 from sentry_sdk import get_client
-from sentry_sdk.consts import SPANDATA, VERSION
+from sentry_sdk.consts import VERSION
 
 
 def test_logs_enabled_by_default(sentry_init, capture_envelopes):
@@ -204,13 +205,15 @@ def test_logs_attributes(sentry_init, capture_items):
 
     for k, v in attrs.items():
         assert logs[0]["attributes"][k] == v
-    assert logs[0]["attributes"]["sentry.environment"] == "production"
+    assert logs[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT] == "production"
     if sentry_sdk.get_client().options.get("release") is not None:
-        assert "sentry.release" in logs[0]["attributes"]
+        assert ATTRIBUTE_NAMES.SENTRY_RELEASE in logs[0]["attributes"]
     assert logs[0]["attributes"]["sentry.message.parameter.my_var"] == "some value"
-    assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
-    assert logs[0]["attributes"]["sentry.sdk.name"].startswith("sentry.python")
-    assert logs[0]["attributes"]["sentry.sdk.version"] == VERSION
+    assert logs[0]["attributes"][ATTRIBUTE_NAMES.SERVER_ADDRESS] == "test-server"
+    assert logs[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SDK_NAME].startswith(
+        "sentry.python"
+    )
+    assert logs[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SDK_VERSION] == VERSION
 
 
 def test_logs_message_params(sentry_init, capture_items):
@@ -237,21 +240,21 @@ def test_logs_message_params(sentry_init, capture_items):
     assert logs[0]["body"] == "The recorded value was '1'"
     assert logs[0]["attributes"]["sentry.message.parameter.int_var"] == 1
     assert (
-        logs[0]["attributes"]["sentry.message.template"]
+        logs[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE]
         == "The recorded value was '{int_var}'"
     )
 
     assert logs[1]["body"] == "The recorded value was '2.0'"
     assert logs[1]["attributes"]["sentry.message.parameter.float_var"] == 2.0
     assert (
-        logs[1]["attributes"]["sentry.message.template"]
+        logs[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE]
         == "The recorded value was '{float_var}'"
     )
 
     assert logs[2]["body"] == "The recorded value was 'False'"
     assert logs[2]["attributes"]["sentry.message.parameter.bool_var"] is False
     assert (
-        logs[2]["attributes"]["sentry.message.template"]
+        logs[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE]
         == "The recorded value was '{bool_var}'"
     )
 
@@ -261,7 +264,7 @@ def test_logs_message_params(sentry_init, capture_items):
         == "some string value"
     )
     assert (
-        logs[3]["attributes"]["sentry.message.template"]
+        logs[3]["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE]
         == "The recorded value was '{string_var}'"
     )
 
@@ -271,12 +274,12 @@ def test_logs_message_params(sentry_init, capture_items):
         == "Exception('some error')"
     )
     assert (
-        logs[4]["attributes"]["sentry.message.template"]
+        logs[4]["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE]
         == "The recorded error was '{error}'"
     )
 
     assert logs[5]["body"] == "The recorded value was hardcoded."
-    assert "sentry.message.template" not in logs[5]["attributes"]
+    assert ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE not in logs[5]["attributes"]
 
 
 def test_logs_tied_to_segments(sentry_init, capture_items):
@@ -363,9 +366,9 @@ def test_log_user_attributes(sentry_init, capture_items):
 
     # Check that all expected user attributes are present.
     assert log["attributes"].items() >= {
-        ("user.id", "1"),
-        ("user.email", "test@example.com"),
-        ("user.name", "test"),
+        (ATTRIBUTE_NAMES.USER_ID, "1"),
+        (ATTRIBUTE_NAMES.USER_EMAIL, "test@example.com"),
+        (ATTRIBUTE_NAMES.USER_NAME, "test"),
     }
 
 
@@ -383,9 +386,9 @@ def test_log_no_user_attributes_if_no_pii(sentry_init, capture_items):
     logs = [item.payload for item in items]
     (log,) = logs
 
-    assert "user.id" not in log["attributes"]
-    assert "user.email" not in log["attributes"]
-    assert "user.name" not in log["attributes"]
+    assert ATTRIBUTE_NAMES.USER_ID not in log["attributes"]
+    assert ATTRIBUTE_NAMES.USER_EMAIL not in log["attributes"]
+    assert ATTRIBUTE_NAMES.USER_NAME not in log["attributes"]
 
 
 def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
@@ -448,9 +451,9 @@ def test_logs_with_literal_braces(
 
     # Verify template is only stored when there are parameters
     if params:
-        assert logs[0]["attributes"]["sentry.message.template"] == message
+        assert logs[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE] == message
     else:
-        assert "sentry.message.template" not in logs[0]["attributes"]
+        assert ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE not in logs[0]["attributes"]
 
 
 def test_transport_format(sentry_init, capture_envelopes):
@@ -481,19 +484,19 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "timestamp": mock.ANY,
                 "trace_id": mock.ANY,
                 "attributes": {
-                    "sentry.environment": {
+                    ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: {
                         "type": "string",
                         "value": "production",
                     },
-                    "sentry.release": {
+                    ATTRIBUTE_NAMES.SENTRY_RELEASE: {
                         "type": "string",
                         "value": "1.0.0",
                     },
-                    "sentry.sdk.name": {
+                    ATTRIBUTE_NAMES.SENTRY_SDK_NAME: {
                         "type": "string",
                         "value": mock.ANY,
                     },
-                    "sentry.sdk.version": {
+                    ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: {
                         "type": "string",
                         "value": VERSION,
                     },
@@ -501,11 +504,11 @@ def test_transport_format(sentry_init, capture_envelopes):
                         "type": "integer",
                         "value": 13,
                     },
-                    "process.runtime.name": {
+                    ATTRIBUTE_NAMES.PROCESS_RUNTIME_NAME: {
                         "type": "string",
                         "value": mock.ANY,
                     },
-                    "process.runtime.version": {
+                    ATTRIBUTE_NAMES.PROCESS_RUNTIME_VERSION: {
                         "type": "string",
                         "value": mock.ANY,
                     },
@@ -513,7 +516,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                         "type": "string",
                         "value": "warn",
                     },
-                    "server.address": {
+                    ATTRIBUTE_NAMES.SERVER_ADDRESS: {
                         "type": "string",
                         "value": "test-server",
                     },
@@ -566,19 +569,19 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                     "timestamp": mock.ANY,
                     "trace_id": mock.ANY,
                     "attributes": {
-                        "sentry.environment": {
+                        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: {
                             "type": "string",
                             "value": "production",
                         },
-                        "sentry.release": {
+                        ATTRIBUTE_NAMES.SENTRY_RELEASE: {
                             "type": "string",
                             "value": "1.0.0",
                         },
-                        "sentry.sdk.name": {
+                        ATTRIBUTE_NAMES.SENTRY_SDK_NAME: {
                             "type": "string",
                             "value": mock.ANY,
                         },
-                        "sentry.sdk.version": {
+                        ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: {
                             "type": "string",
                             "value": VERSION,
                         },
@@ -586,11 +589,11 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                             "type": "integer",
                             "value": 9,
                         },
-                        "process.runtime.name": {
+                        ATTRIBUTE_NAMES.PROCESS_RUNTIME_NAME: {
                             "type": "string",
                             "value": mock.ANY,
                         },
-                        "process.runtime.version": {
+                        ATTRIBUTE_NAMES.PROCESS_RUNTIME_VERSION: {
                             "type": "string",
                             "value": mock.ANY,
                         },
@@ -598,7 +601,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                             "type": "string",
                             "value": "info",
                         },
-                        "server.address": {
+                        ATTRIBUTE_NAMES.SERVER_ADDRESS: {
                             "type": "string",
                             "value": "test-server",
                         },

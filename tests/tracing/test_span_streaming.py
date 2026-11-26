@@ -4,6 +4,7 @@ import time
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
@@ -38,9 +39,9 @@ def test_start_span(sentry_init, capture_items):
     child, segment = spans
 
     assert segment["name"] == "segment"
-    assert segment["attributes"]["sentry.segment.name"] == "segment"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
     assert child["name"] == "child"
-    assert child["attributes"]["sentry.segment.name"] == "segment"
+    assert child["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
 
     assert segment["is_segment"] is True
     assert "parent_span_id" not in segment
@@ -77,9 +78,9 @@ def test_start_span_no_context_manager(sentry_init, capture_items):
     child, segment = spans
 
     assert segment["name"] == "segment"
-    assert segment["attributes"]["sentry.segment.name"] == "segment"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
     assert child["name"] == "child"
-    assert child["attributes"]["sentry.segment.name"] == "segment"
+    assert child["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
 
     assert segment["is_segment"] is True
     assert child["is_segment"] is False
@@ -449,7 +450,7 @@ def test_span_links(sentry_init, capture_envelopes):
         "trace_id": "627a2885119dcc8184fae7eef09438cb",
         "span_id": "6c71fc6b09b8b716",
         "sampled": True,
-        "attributes": {"sentry.link.type": "previous_trace"},
+        "attributes": {ATTRIBUTE_NAMES.SENTRY_LINK_TYPE: "previous_trace"},
     }
     with sentry_sdk.start_span(name="parent", links=[previous_trace]) as span:
         span.add_link({"trace_id": "a" * 32, "span_id": "b" * 16})
@@ -459,14 +460,17 @@ def test_span_links(sentry_init, capture_envelopes):
                     "trace_id": "c" * 32,
                     "span_id": "d" * 16,
                     "sampled": False,
-                    "attributes": {"messaging.message.id": "1", "retries": 2},
+                    "attributes": {
+                        ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID: "1",
+                        "retries": 2,
+                    },
                 }
             ]
         )
         with sentry_sdk.start_span(name="child"):
             ...
         # span keeps its own copy.
-        previous_trace["attributes"]["sentry.link.type"] = "changed"
+        previous_trace["attributes"][ATTRIBUTE_NAMES.SENTRY_LINK_TYPE] = "changed"
 
     sentry_sdk.flush()
     child, span = envelopes[0].items[0].payload.json["items"]
@@ -479,7 +483,10 @@ def test_span_links(sentry_init, capture_envelopes):
             "span_id": "6c71fc6b09b8b716",
             "sampled": True,
             "attributes": {
-                "sentry.link.type": {"type": "string", "value": "previous_trace"}
+                ATTRIBUTE_NAMES.SENTRY_LINK_TYPE: {
+                    "type": "string",
+                    "value": "previous_trace",
+                }
             },
         },
         {"trace_id": "a" * 32, "span_id": "b" * 16},
@@ -488,7 +495,7 @@ def test_span_links(sentry_init, capture_envelopes):
             "span_id": "d" * 16,
             "sampled": False,
             "attributes": {
-                "messaging.message.id": {"type": "string", "value": "1"},
+                ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID: {"type": "string", "value": "1"},
                 "retries": {"type": "integer", "value": 2},
             },
         },
@@ -611,17 +618,17 @@ def test_start_inactive_span(sentry_init, capture_items):
 
     assert segment["is_segment"] is True
     assert segment["name"] == "segment"
-    assert segment["attributes"]["sentry.segment.name"] == "segment"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
 
     assert child1["is_segment"] is False
     assert child1["name"] == "child1"
-    assert child1["attributes"]["sentry.segment.name"] == "segment"
+    assert child1["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
     assert child1["parent_span_id"] == segment["span_id"]
     assert child1["trace_id"] == segment["trace_id"]
 
     assert child2["is_segment"] is False
     assert child2["name"] == "child2"
-    assert child2["attributes"]["sentry.segment.name"] == "segment"
+    assert child2["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
     assert child2["parent_span_id"] == segment["span_id"]
     assert child2["trace_id"] == segment["trace_id"]
 
@@ -645,13 +652,13 @@ def test_start_span_override_parent(sentry_init, capture_items):
     child2, child1, segment = spans
 
     assert segment["name"] == "segment"
-    assert segment["attributes"]["sentry.segment.name"] == "segment"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
 
     assert child1["name"] == "child1"
-    assert child1["attributes"]["sentry.segment.name"] == "segment"
+    assert child1["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
 
     assert child2["name"] == "child2"
-    assert child2["attributes"]["sentry.segment.name"] == "segment"
+    assert child2["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment"
 
     assert segment["is_segment"] is True
 
@@ -684,12 +691,12 @@ def test_sibling_segments(sentry_init, capture_items):
     segment1, segment2 = spans
 
     assert segment1["name"] == "segment1"
-    assert segment1["attributes"]["sentry.segment.name"] == "segment1"
+    assert segment1["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment1"
     assert segment1["is_segment"] is True
     assert "parent_span_id" not in segment1
 
     assert segment2["name"] == "segment2"
-    assert segment2["attributes"]["sentry.segment.name"] == "segment2"
+    assert segment2["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment2"
     assert segment2["is_segment"] is True
     assert "parent_span_id" not in segment2
 
@@ -717,12 +724,12 @@ def test_sibling_segments_new_trace(sentry_init, capture_items):
     assert len(spans) == 2
 
     (segment1,) = (span for span in spans if span["name"] == "segment1")
-    assert segment1["attributes"]["sentry.segment.name"] == "segment1"
+    assert segment1["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment1"
     assert segment1["is_segment"] is True
     assert "parent_span_id" not in segment1
 
     (segment2,) = (span for span in spans if span["name"] == "segment2")
-    assert segment2["attributes"]["sentry.segment.name"] == "segment2"
+    assert segment2["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME] == "segment2"
     assert segment2["is_segment"] is True
     assert "parent_span_id" not in segment2
 
@@ -1671,7 +1678,7 @@ def test_segment_span_has_profiler_id(
 
     spans = [item.payload for item in items]
     assert len(spans) == 1
-    assert "sentry.profiler_id" in spans[0]["attributes"]
+    assert ATTRIBUTE_NAMES.SENTRY_PROFILER_ID in spans[0]["attributes"]
 
     profile_chunks = [
         item
@@ -1705,7 +1712,7 @@ def test_segment_span_no_profiler_id_when_unsampled(
 
     spans = [item.payload for item in items]
     assert len(spans) == 1
-    assert "sentry.profiler_id" not in spans[0]["attributes"]
+    assert ATTRIBUTE_NAMES.SENTRY_PROFILER_ID not in spans[0]["attributes"]
 
     profile_chunks = [
         item
@@ -1768,27 +1775,30 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "content_type": "application/vnd.sentry.items.span.v2+json",
     }
     assert item.payload.json["items"][0]["attributes"] == {
-        "thread.id": {"value": mock.ANY, "type": "string"},
-        "thread.name": {"value": "MainThread", "type": "string"},
-        "process.command_args": {"value": mock.ANY, "type": "array"},
-        "sentry.segment.id": {"value": mock.ANY, "type": "string"},
-        "sentry.segment.name": {"value": "test", "type": "string"},
-        "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
-        "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
-        "server.address": {"value": "test-server", "type": "string"},
-        "sentry.environment": {"value": "production", "type": "string"},
-        "sentry.platform": {"value": "python", "type": "string"},
-        "sentry.release": {"value": "1.0.0", "type": "string"},
-        "sentry.dist": {"value": "1.0", "type": "string"},
-        "sentry.origin": {"value": "manual", "type": "string"},
-        "sentry.sdk.integrations": {"value": mock.ANY, "type": "array"},
-        "sentry.trace_lifecycle": {"value": "stream", "type": "string"},
-        "sentry.segment.name.source": {"value": "custom", "type": "string"},
-        "process.runtime.name": {
+        ATTRIBUTE_NAMES.THREAD_ID: {"value": mock.ANY, "type": "string"},
+        ATTRIBUTE_NAMES.THREAD_NAME: {"value": "MainThread", "type": "string"},
+        ATTRIBUTE_NAMES.PROCESS_COMMAND_ARGS: {"value": mock.ANY, "type": "array"},
+        ATTRIBUTE_NAMES.SENTRY_SEGMENT_ID: {"value": mock.ANY, "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME: {"value": "test", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_SDK_NAME: {"value": "sentry.python", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: {"value": mock.ANY, "type": "string"},
+        ATTRIBUTE_NAMES.SERVER_ADDRESS: {"value": "test-server", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: {"value": "production", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_PLATFORM: {"value": "python", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_RELEASE: {"value": "1.0.0", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_DIST: {"value": "1.0", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: {"value": "manual", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_SDK_INTEGRATIONS: {"value": mock.ANY, "type": "array"},
+        ATTRIBUTE_NAMES.SENTRY_TRACE_LIFECYCLE: {"value": "stream", "type": "string"},
+        ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: {
+            "value": "custom",
+            "type": "string",
+        },
+        ATTRIBUTE_NAMES.PROCESS_RUNTIME_NAME: {
             "type": "string",
             "value": mock.ANY,
         },
-        "process.runtime.version": {
+        ATTRIBUTE_NAMES.PROCESS_RUNTIME_VERSION: {
             "type": "string",
             "value": mock.ANY,
         },

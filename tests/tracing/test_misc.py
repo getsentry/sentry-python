@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import MATCH_ALL
@@ -121,7 +122,7 @@ def test_start_span_segment_updates_scope_name(sentry_init):
     scope = sentry_sdk.get_current_scope()
 
     with sentry_sdk.start_span(
-        name="foobar", attributes={"sentry.segment.name.source": "test"}
+        name="foobar", attributes={ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: "test"}
     ):
         assert scope._transaction == "foobar"
         assert scope._transaction_info == {"source": "test"}

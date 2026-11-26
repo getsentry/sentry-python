@@ -1,3 +1,5 @@
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 
 
@@ -13,9 +15,9 @@ def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
 
     with sentry_sdk.start_span(name="test-sg"):
         with sentry_sdk.start_span(
-            name="client", attributes={"sentry.op": "http.client"}
+            name="client", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "http.client"}
         ) as span:
-            span.set_attribute("gen_ai.operation.name", "chat")
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME, "chat")
 
     sentry_sdk.flush()
 
@@ -23,8 +25,11 @@ def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
         span,
         segment,
     ) = [item.payload for item in items]
-    assert span["attributes"].get("gen_ai.conversation.id") == "conv-op-name-test"
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert (
+        span["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID)
+        == "conv-op-name-test"
+    )
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
 
 
 def test_conversation_id_propagates_to_span_with_ai_op(sentry_init, capture_items):
@@ -37,7 +42,8 @@ def test_conversation_id_propagates_to_span_with_ai_op(sentry_init, capture_item
 
     with sentry_sdk.start_span(name="test-tx"):
         with sentry_sdk.start_span(
-            name="completion", attributes={"sentry.op": "ai.chat.completions"}
+            name="completion",
+            attributes={ATTRIBUTE_NAMES.SENTRY_OP: "ai.chat.completions"},
         ):
             pass
 
@@ -47,8 +53,11 @@ def test_conversation_id_propagates_to_span_with_ai_op(sentry_init, capture_item
         span,
         segment,
     ) = [item.payload for item in items]
-    assert span["attributes"].get("gen_ai.conversation.id") == "conv-ai-op-test"
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert (
+        span["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID)
+        == "conv-ai-op-test"
+    )
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
 
 
 def test_conversation_id_propagates_to_span_with_gen_ai_op(
@@ -67,7 +76,7 @@ def test_conversation_id_propagates_to_span_with_gen_ai_op(
 
     with sentry_sdk.start_span(name="test-tx"):
         with sentry_sdk.start_span(
-            name="invoke", attributes={"sentry.op": "gen_ai.invoke_agent"}
+            name="invoke", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.invoke_agent"}
         ):
             pass
 
@@ -75,8 +84,11 @@ def test_conversation_id_propagates_to_span_with_gen_ai_op(
 
     span, segment = [item.payload for item in items]
 
-    assert span["attributes"].get("gen_ai.conversation.id") == "conv-gen-ai-op-test"
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert (
+        span["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID)
+        == "conv-gen-ai-op-test"
+    )
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
 
 
 def test_conversation_id_not_propagated_to_non_ai_span(sentry_init, capture_items):
@@ -89,7 +101,7 @@ def test_conversation_id_not_propagated_to_non_ai_span(sentry_init, capture_item
 
     with sentry_sdk.start_span(name="test-sg"):
         with sentry_sdk.start_span(
-            name="client", attributes={"sentry.op": "http.client"}
+            name="client", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "http.client"}
         ) as span:
             span.set_attribute("some.other.data", "value")
 
@@ -99,8 +111,8 @@ def test_conversation_id_not_propagated_to_non_ai_span(sentry_init, capture_item
         span,
         segment,
     ) = [item.payload for item in items]
-    assert "gen_ai.conversation.id" not in span["attributes"]
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
 
 
 def test_conversation_id_not_propagated_when_not_set(sentry_init, capture_items):
@@ -113,7 +125,8 @@ def test_conversation_id_not_propagated_when_not_set(sentry_init, capture_items)
 
     with sentry_sdk.start_span(name="test-sg"):
         with sentry_sdk.start_span(
-            name="completion", attributes={"sentry.op": "ai.chat.completions"}
+            name="completion",
+            attributes={ATTRIBUTE_NAMES.SENTRY_OP: "ai.chat.completions"},
         ):
             pass
 
@@ -123,8 +136,8 @@ def test_conversation_id_not_propagated_when_not_set(sentry_init, capture_items)
         span,
         segment,
     ) = [item.payload for item in items]
-    assert "gen_ai.conversation.id" not in span["attributes"]
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
 
 
 def test_conversation_id_not_propagated_to_span_without_op(sentry_init, capture_items):
@@ -145,8 +158,8 @@ def test_conversation_id_not_propagated_to_span_without_op(sentry_init, capture_
         span,
         segment,
     ) = [item.payload for item in items]
-    assert "gen_ai.conversation.id" not in span["attributes"]
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
 
 
 def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
@@ -161,7 +174,7 @@ def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
 
     with sentry_sdk.start_span(name="test-sg"):
         with sentry_sdk.start_span(name="unnamed-span") as span:
-            span.set_attribute("gen_ai.operation.name", "embedding")
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME, "embedding")
 
     sentry_sdk.flush()
 
@@ -170,9 +183,10 @@ def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
         segment,
     ) = [item.payload for item in items]
     assert (
-        span["attributes"].get("gen_ai.conversation.id") == "conv-no-op-but-data-test"
+        span["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID)
+        == "conv-no-op-but-data-test"
     )
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
 
 
 def test_conversation_id_propagates_to_segment_with_ai_op(sentry_init, capture_items):
@@ -184,14 +198,17 @@ def test_conversation_id_propagates_to_segment_with_ai_op(sentry_init, capture_i
     scope.set_conversation_id("conv-tx-ai-op-test")
 
     with sentry_sdk.start_span(
-        name="AI Workflow", attributes={"sentry.op": "ai.workflow"}
+        name="AI Workflow", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "ai.workflow"}
     ):
         pass
 
     sentry_sdk.flush()
 
     (segment,) = [item.payload for item in items]
-    assert segment["attributes"].get("gen_ai.conversation.id") == "conv-tx-ai-op-test"
+    assert (
+        segment["attributes"].get(ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID)
+        == "conv-tx-ai-op-test"
+    )
 
 
 def test_conversation_id_not_propagated_to_non_ai_segment(sentry_init, capture_items):
@@ -203,11 +220,11 @@ def test_conversation_id_not_propagated_to_non_ai_segment(sentry_init, capture_i
     scope.set_conversation_id("conv-tx-should-not-appear")
 
     with sentry_sdk.start_span(
-        name="HTTP Request", attributes={"sentry.op": "http.server"}
+        name="HTTP Request", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "http.server"}
     ):
         pass
 
     sentry_sdk.flush()
 
     (segment,) = [item.payload for item in items]
-    assert "gen_ai.conversation.id" not in segment["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_CONVERSATION_ID not in segment["attributes"]
