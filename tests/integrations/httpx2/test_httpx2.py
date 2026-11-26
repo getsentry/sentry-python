@@ -3,6 +3,7 @@ from unittest import mock
 
 import httpx2
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -15,7 +16,8 @@ def _get_http_client_span(items):
     return next(
         item.payload
         for item in items
-        if item.payload.get("attributes", {}).get("sentry.op") == OP.HTTP_CLIENT
+        if item.payload.get("attributes", {}).get(ATTRIBUTE_NAMES.SENTRY_OP)
+        == OP.HTTP_CLIENT
     )
 
 
@@ -645,10 +647,10 @@ def test_request_source_disabled_sync(sentry_init, capture_items, httpx2_mock):
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" not in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
-    assert "code.file.path" not in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in http_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -673,10 +675,10 @@ async def test_request_source_disabled_async(sentry_init, capture_items, httpx2_
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" not in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
-    assert "code.file.path" not in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in http_span["attributes"]
 
 
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
@@ -709,10 +711,10 @@ def test_request_source_enabled_sync(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -746,10 +748,10 @@ async def test_request_source_enabled_async(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
 
 def test_request_source_sync(sentry_init, capture_items, httpx2_mock):
@@ -773,25 +775,30 @@ def test_request_source_sync(sentry_init, capture_items, httpx2_mock):
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
-    assert type(http_span["attributes"]["code.line.number"]) == int
-    assert http_span["attributes"]["code.line.number"] > 0
+    assert type(http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
     assert (
-        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
         == "tests.integrations.httpx2.test_httpx2"
     )
-    assert http_span["attributes"]["code.file.path"].endswith(
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH].endswith(
         "tests/integrations/httpx2/test_httpx2.py"
     )
 
-    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
+    )
     assert is_relative_path
 
-    assert http_span["attributes"][SPANDATA.CODE_FUNCTION] == "test_request_source_sync"
+    assert (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
+        == "test_request_source_sync"
+    )
 
 
 @pytest.mark.asyncio
@@ -816,26 +823,29 @@ async def test_request_source_async(sentry_init, capture_items, httpx2_mock):
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
-    assert type(http_span["attributes"]["code.line.number"]) == int
-    assert http_span["attributes"]["code.line.number"] > 0
+    assert type(http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
     assert (
-        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
         == "tests.integrations.httpx2.test_httpx2"
     )
-    assert http_span["attributes"]["code.file.path"].endswith(
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH].endswith(
         "tests/integrations/httpx2/test_httpx2.py"
     )
 
-    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
+    )
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION] == "test_request_source_async"
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
+        == "test_request_source_async"
     )
 
 
@@ -867,20 +877,31 @@ def test_request_source_with_module_in_search_path_sync(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
-    assert type(http_span["attributes"]["code.line.number"]) == int
-    assert http_span["attributes"]["code.line.number"] > 0
-    assert http_span["attributes"][SPANDATA.CODE_NAMESPACE] == "httpx2_helpers.helpers"
-    assert http_span["attributes"]["code.file.path"] == "httpx2_helpers/helpers.py"
+    assert type(http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
+    assert (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
+        == "httpx2_helpers.helpers"
+    )
+    assert (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH]
+        == "httpx2_helpers/helpers.py"
+    )
 
-    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
+    )
     assert is_relative_path
 
-    assert http_span["attributes"][SPANDATA.CODE_FUNCTION] == "get_request_with_client"
+    assert (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
+        == "get_request_with_client"
+    )
 
 
 @pytest.mark.asyncio
@@ -912,21 +933,29 @@ async def test_request_source_with_module_in_search_path_async(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
-    assert type(http_span["attributes"]["code.line.number"]) == int
-    assert http_span["attributes"]["code.line.number"] > 0
-    assert http_span["attributes"][SPANDATA.CODE_NAMESPACE] == "httpx2_helpers.helpers"
-    assert http_span["attributes"]["code.file.path"] == "httpx2_helpers/helpers.py"
+    assert type(http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
+    assert (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
+        == "httpx2_helpers.helpers"
+    )
+    assert (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH]
+        == "httpx2_helpers/helpers.py"
+    )
 
-    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
+    )
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
         == "async_get_request_with_client"
     )
 
@@ -955,10 +984,10 @@ def test_no_request_source_if_duration_too_short_sync(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" not in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
-    assert "code.file.path" not in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in http_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -986,10 +1015,10 @@ async def test_no_request_source_if_duration_too_short_async(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" not in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
-    assert "code.file.path" not in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in http_span["attributes"]
 
 
 def test_request_source_if_duration_over_threshold_sync(
@@ -1016,26 +1045,28 @@ def test_request_source_if_duration_over_threshold_sync(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
-    assert type(http_span["attributes"]["code.line.number"]) == int
-    assert http_span["attributes"]["code.line.number"] > 0
+    assert type(http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
     assert (
-        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
         == "tests.integrations.httpx2.test_httpx2"
     )
-    assert http_span["attributes"]["code.file.path"].endswith(
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH].endswith(
         "tests/integrations/httpx2/test_httpx2.py"
     )
 
-    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
+    )
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
         == "test_request_source_if_duration_over_threshold_sync"
     )
 
@@ -1065,26 +1096,28 @@ async def test_request_source_if_duration_over_threshold_async(
 
     http_span = _get_http_client_span(items)
 
-    assert "code.line.number" in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert "code.file.path" in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in http_span["attributes"]
 
-    assert type(http_span["attributes"]["code.line.number"]) == int
-    assert http_span["attributes"]["code.line.number"] > 0
+    assert type(http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
     assert (
-        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
         == "tests.integrations.httpx2.test_httpx2"
     )
-    assert http_span["attributes"]["code.file.path"].endswith(
+    assert http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH].endswith(
         "tests/integrations/httpx2/test_httpx2.py"
     )
 
-    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = (
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
+    )
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
+        http_span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
         == "test_request_source_if_duration_over_threshold_async"
     )
 
@@ -1108,7 +1141,7 @@ def test_span_origin_sync(sentry_init, capture_items, httpx2_mock):
 
     http_span = _get_http_client_span(items)
 
-    assert http_span["attributes"]["sentry.origin"] == "auto.http.httpx2"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.httpx2"
 
 
 @pytest.mark.asyncio
@@ -1131,7 +1164,7 @@ async def test_span_origin_async(sentry_init, capture_items, httpx2_mock):
 
     http_span = _get_http_client_span(items)
 
-    assert http_span["attributes"]["sentry.origin"] == "auto.http.httpx2"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.httpx2"
 
 
 @pytest.mark.parametrize(
@@ -1178,14 +1211,14 @@ def test_http_url_attributes_sync(
 
     http_span = _get_http_client_span(items)
 
-    assert http_span["attributes"]["http.request.method"] == "GET"
-    assert http_span["attributes"]["url.full"] == expected_url_full
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == expected_url_full
     if expected_query is not None:
-        assert http_span["attributes"]["url.query"] == expected_query
+        assert http_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
     else:
-        assert "url.query" not in http_span["attributes"]
-    assert http_span["attributes"]["url.fragment"] == "frag"
-    assert http_span["attributes"]["http.response.status_code"] == 200
+        assert ATTRIBUTE_NAMES.URL_QUERY not in http_span["attributes"]
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FRAGMENT] == "frag"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
 
 
 @pytest.mark.asyncio
@@ -1233,14 +1266,14 @@ async def test_http_url_attributes_async(
 
     http_span = _get_http_client_span(items)
 
-    assert http_span["attributes"]["http.request.method"] == "GET"
-    assert http_span["attributes"]["url.full"] == expected_url_full
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == expected_url_full
     if expected_query is not None:
-        assert http_span["attributes"]["url.query"] == expected_query
+        assert http_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
     else:
-        assert "url.query" not in http_span["attributes"]
-    assert http_span["attributes"]["url.fragment"] == "frag"
-    assert http_span["attributes"]["http.response.status_code"] == 200
+        assert ATTRIBUTE_NAMES.URL_QUERY not in http_span["attributes"]
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FRAGMENT] == "frag"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
 
 
 def test_http_url_attributes_no_query_or_fragment_sync(
@@ -1264,11 +1297,11 @@ def test_http_url_attributes_no_query_or_fragment_sync(
 
     http_span = _get_http_client_span(items)
 
-    assert http_span["attributes"]["http.request.method"] == "GET"
-    assert http_span["attributes"]["url.full"] == "http://example.com/"
-    assert "url.query" not in http_span["attributes"]
-    assert "url.fragment" not in http_span["attributes"]
-    assert http_span["attributes"]["http.response.status_code"] == 200
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == "http://example.com/"
+    assert ATTRIBUTE_NAMES.URL_QUERY not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_FRAGMENT not in http_span["attributes"]
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
 
 
 @pytest.mark.asyncio
@@ -1293,11 +1326,11 @@ async def test_http_url_attributes_no_query_or_fragment_async(
 
     http_span = _get_http_client_span(items)
 
-    assert http_span["attributes"]["http.request.method"] == "GET"
-    assert http_span["attributes"]["url.full"] == "http://example.com/"
-    assert "url.query" not in http_span["attributes"]
-    assert "url.fragment" not in http_span["attributes"]
-    assert http_span["attributes"]["http.response.status_code"] == 200
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == "http://example.com/"
+    assert ATTRIBUTE_NAMES.URL_QUERY not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_FRAGMENT not in http_span["attributes"]
+    assert http_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
 
 
 @pytest.mark.parametrize(
@@ -1363,11 +1396,11 @@ def test_url_query_data_collection_sync(
     http_span = _get_http_client_span(items)
 
     if expected_query is None:
-        assert "url.query" not in http_span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in http_span["attributes"]
     else:
-        assert http_span["attributes"]["url.query"] == expected_query
+        assert http_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
 
-    assert http_span["attributes"]["url.full"] == expected_url_full
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == expected_url_full
 
 
 @pytest.mark.asyncio
@@ -1434,11 +1467,11 @@ async def test_url_query_data_collection_async(
     http_span = _get_http_client_span(items)
 
     if expected_query is None:
-        assert "url.query" not in http_span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in http_span["attributes"]
     else:
-        assert http_span["attributes"]["url.query"] == expected_query
+        assert http_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
 
-    assert http_span["attributes"]["url.full"] == expected_url_full
+    assert http_span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == expected_url_full
 
 
 @pytest.mark.parametrize(
@@ -1592,9 +1625,9 @@ def test_omit_url_data_if_parsing_fails(
 
     http_span = _get_http_client_span(items)
 
-    assert "url.full" not in http_span["attributes"]
-    assert "url.query" not in http_span["attributes"]
-    assert "url.fragment" not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_FULL not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_QUERY not in http_span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_FRAGMENT not in http_span["attributes"]
 
     crumb = event["breadcrumbs"]["values"][0]
 

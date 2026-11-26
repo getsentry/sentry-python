@@ -5,10 +5,10 @@ import sys
 from typing import Any, Mapping
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from tests.conftest import ApproxDict
 
@@ -132,9 +132,9 @@ def test_subprocess_basic(
     ) = (item.payload for item in items if item.type == "span")
 
     assert (
-        subprocess_init_span["attributes"]["sentry.op"],
-        subprocess_wait_span["attributes"]["sentry.op"],
-        subprocess_communicate_span["attributes"]["sentry.op"],
+        subprocess_init_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP],
+        subprocess_wait_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP],
+        subprocess_communicate_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP],
     ) == ("subprocess", "subprocess.wait", "subprocess.communicate")
 
     # span hierarchy
@@ -149,9 +149,9 @@ def test_subprocess_basic(
     )
 
     assert (
-        subprocess_init_span["attributes"][SPANDATA.PROCESS_PID]
-        == subprocess_wait_span["attributes"][SPANDATA.PROCESS_PID]
-        == subprocess_communicate_span["attributes"][SPANDATA.PROCESS_PID]
+        subprocess_init_span["attributes"][ATTRIBUTE_NAMES.PROCESS_PID]
+        == subprocess_wait_span["attributes"][ATTRIBUTE_NAMES.PROCESS_PID]
+        == subprocess_communicate_span["attributes"][ATTRIBUTE_NAMES.PROCESS_PID]
     )
 
     # data of init span
@@ -221,19 +221,22 @@ def test_subprocess_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[3]["attributes"]["sentry.origin"] == "manual"
+    assert spans[3]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
-    assert spans[0]["attributes"]["sentry.op"] == "subprocess"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "subprocess"
     assert (
-        spans[0]["attributes"]["sentry.origin"] == "auto.subprocess.stdlib.subprocess"
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.subprocess.stdlib.subprocess"
     )
 
-    assert spans[1]["attributes"]["sentry.op"] == "subprocess.wait"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "subprocess.wait"
     assert (
-        spans[1]["attributes"]["sentry.origin"] == "auto.subprocess.stdlib.subprocess"
+        spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.subprocess.stdlib.subprocess"
     )
 
-    assert spans[2]["attributes"]["sentry.op"] == "subprocess.communicate"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "subprocess.communicate"
     assert (
-        spans[2]["attributes"]["sentry.origin"] == "auto.subprocess.stdlib.subprocess"
+        spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.subprocess.stdlib.subprocess"
     )
