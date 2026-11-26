@@ -2,10 +2,11 @@ from unittest import mock
 
 import pytest
 from fakeredis import FakeRedis
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis import RedisIntegration
 
 MOCK_CONNECTION_POOL = mock.MagicMock()
@@ -69,10 +70,14 @@ def test_pii_data_redacted(
 
     assert parent["name"] == "custom parent"
     assert set1["name"] == "SET 'somekey1' [Filtered]"
-    assert set1["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey1' [Filtered]"
-    assert set1["attributes"]["sentry.op"] == OP.DB_QUERY
+    assert (
+        set1["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT] == "SET 'somekey1' [Filtered]"
+    )
+    assert set1["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
     assert set2["name"] == "SET 'somekey2' [Filtered]"
-    assert set2["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey2' [Filtered]"
+    assert (
+        set2["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT] == "SET 'somekey2' [Filtered]"
+    )
     assert get["name"] == "GET 'somekey2'"
     assert delete["name"] == "DEL 'somekey1' [Filtered]"
 
@@ -116,8 +121,8 @@ def test_data_collection_database_query_data(
 
     assert parent["name"] == "custom parent"
     assert set_span["name"] == expected_description
-    assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == expected_description
-    assert set_span["attributes"]["sentry.op"] == OP.DB_QUERY
+    assert set_span["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT] == expected_description
+    assert set_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
 
 
 def test_no_data_truncation_by_default(sentry_init, capture_items):
@@ -145,12 +150,14 @@ def test_no_data_truncation_by_default(sentry_init, capture_items):
     assert parent["name"] == "custom parent"
     assert set1["name"] == f"SET 'somekey1' '{long_string}'"
     assert (
-        set1["attributes"][SPANDATA.DB_QUERY_TEXT] == f"SET 'somekey1' '{long_string}'"
+        set1["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT]
+        == f"SET 'somekey1' '{long_string}'"
     )
-    assert set1["attributes"]["sentry.op"] == OP.DB_QUERY
+    assert set1["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
     assert set2["name"] == f"SET 'somekey2' '{short_string}'"
     assert (
-        set2["attributes"][SPANDATA.DB_QUERY_TEXT] == f"SET 'somekey2' '{short_string}'"
+        set2["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT]
+        == f"SET 'somekey2' '{short_string}'"
     )
 
 
@@ -219,13 +226,13 @@ def test_db_connection_attributes_client(sentry_init, capture_items):
     assert parent_span["name"] == "custom parent"
     assert redis_span["name"] == "GET 'foobar'"
     attrs = redis_span["attributes"]
-    assert attrs["sentry.op"] == OP.DB_QUERY
-    assert attrs[SPANDATA.DB_QUERY_TEXT] == "GET 'foobar'"
-    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
-    assert attrs[SPANDATA.DB_NAMESPACE] == "1"
-    assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
-    assert attrs[SPANDATA.SERVER_PORT] == 63791
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
+    assert attrs[ATTRIBUTE_NAMES.DB_QUERY_TEXT] == "GET 'foobar'"
+    assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "redis-py"
+    assert attrs[ATTRIBUTE_NAMES.DB_NAMESPACE] == "1"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == 63791
 
 
 def test_db_connection_attributes_pipeline(sentry_init, capture_items):
@@ -252,12 +259,12 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_items):
     assert parent_span["name"] == "custom parent"
     assert pipeline_span["name"] == "redis.pipeline.execute"
     attrs = pipeline_span["attributes"]
-    assert attrs["sentry.op"] == OP.DB_QUERY
-    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
-    assert attrs[SPANDATA.DB_NAMESPACE] == "1"
-    assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
-    assert attrs[SPANDATA.SERVER_PORT] == 63791
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
+    assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "redis-py"
+    assert attrs[ATTRIBUTE_NAMES.DB_NAMESPACE] == "1"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == 63791
 
 
 def test_span_origin(sentry_init, capture_items):
@@ -286,7 +293,10 @@ def test_span_origin(sentry_init, capture_items):
     set_span, pipeline_span, parent_span = [item.payload for item in items]
 
     assert parent_span["name"] == "custom parent"
-    assert parent_span["attributes"]["sentry.origin"] == "manual"
-    assert set_span["attributes"]["sentry.origin"] == "auto.db.redis"
-    assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey' 'somevalue'"
-    assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"
+    assert parent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert set_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"
+    assert (
+        set_span["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT]
+        == "SET 'somekey' 'somevalue'"
+    )
+    assert pipeline_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"

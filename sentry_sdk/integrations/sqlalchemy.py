@@ -1,4 +1,5 @@
-from sentry_sdk.consts import SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import Span, SpanStatus
 from sentry_sdk.tracing_utils import (
@@ -148,12 +149,12 @@ def _set_db_data(span: "Span", conn: "Any") -> None:
     db_system = _get_db_system(conn.engine.name)
 
     if db_system is not None:
-        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, db_system)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_SYSTEM_NAME, db_system)
 
     try:
         driver = conn.dialect.driver
         if driver:
-            span.set_attribute(SPANDATA.DB_DRIVER_NAME, driver)
+            span.set_attribute(ATTRIBUTE_NAMES.DB_DRIVER_NAME, driver)
     except Exception:
         pass
 
@@ -162,12 +163,12 @@ def _set_db_data(span: "Span", conn: "Any") -> None:
 
     db_name = conn.engine.url.database
     if db_name is not None:
-        span.set_attribute(SPANDATA.DB_NAMESPACE, db_name)
+        span.set_attribute(ATTRIBUTE_NAMES.DB_NAMESPACE, db_name)
 
     server_address = conn.engine.url.host
     if server_address is not None:
-        span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, server_address)
 
     server_port = conn.engine.url.port
     if server_port is not None:
-        span.set_attribute(SPANDATA.SERVER_PORT, server_port)
+        span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, server_port)

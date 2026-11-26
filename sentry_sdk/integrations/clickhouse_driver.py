@@ -1,6 +1,8 @@
 import functools
 from typing import TYPE_CHECKING, TypeVar
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -82,9 +84,9 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
             span = sentry_sdk.start_span(
                 name=query,
                 attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": ClickhouseDriverIntegration.origin,
-                    SPANDATA.DB_QUERY_TEXT: str(query),
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.DB,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: ClickhouseDriverIntegration.origin,
+                    ATTRIBUTE_NAMES.DB_QUERY_TEXT: str(query),
                 },
             )
 
@@ -164,9 +166,9 @@ def _set_db_data(span: "Optional[Span]", connection: "Connection") -> None:
     if span is None:
         return
 
-    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "clickhouse")
-    span.set_attribute(SPANDATA.DB_NAMESPACE, connection.database)
-    span.set_attribute(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
-    span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
-    span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
-    span.set_attribute(SPANDATA.DB_USER, connection.user)
+    span.set_attribute(ATTRIBUTE_NAMES.DB_SYSTEM_NAME, "clickhouse")
+    span.set_attribute(ATTRIBUTE_NAMES.DB_NAMESPACE, connection.database)
+    span.set_attribute(ATTRIBUTE_NAMES.DB_DRIVER_NAME, "clickhouse-driver")
+    span.set_attribute(ATTRIBUTE_NAMES.SERVER_ADDRESS, connection.host)
+    span.set_attribute(ATTRIBUTE_NAMES.SERVER_PORT, connection.port)
+    span.set_attribute(ATTRIBUTE_NAMES.DB_USER, connection.user)

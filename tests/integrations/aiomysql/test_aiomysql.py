@@ -18,10 +18,10 @@ from unittest import mock
 import aiomysql
 import pytest
 import pytest_asyncio
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
@@ -528,10 +528,10 @@ async def test_query_source_disabled(sentry_init, capture_items):
 
     data = insert_span.get("attributes", {})
 
-    assert "code.line.number" not in data
-    assert "code.namespace" not in data
-    assert "code.file.path" not in data
-    assert "code.function" not in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in data
 
 
 @pytest.mark.asyncio
@@ -575,10 +575,10 @@ async def test_query_source_enabled(sentry_init, capture_items, enable_db_query_
 
     data = insert_span.get("attributes", {})
 
-    assert "code.line.number" in data
-    assert "code.namespace" in data
-    assert "code.file.path" in data
-    assert "code.function" in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in data
 
 
 @pytest.mark.asyncio
@@ -618,22 +618,25 @@ async def test_query_source(sentry_init, capture_items):
 
     data = insert_span.get("attributes", {})
 
-    assert "code.line.number" in data
-    assert "code.namespace" in data
-    assert "code.file.path" in data
-    assert "code.function" in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in data
 
-    assert type(data.get("code.line.number")) == int
-    assert data.get("code.line.number") > 0
-    assert data.get("code.namespace") == "tests.integrations.aiomysql.test_aiomysql"
-    assert data.get("code.file.path").endswith(
+    assert type(data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
+    assert (
+        data.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
+        == "tests.integrations.aiomysql.test_aiomysql"
+    )
+    assert data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
         "tests/integrations/aiomysql/test_aiomysql.py"
     )
 
-    is_relative_path = data.get("code.file.path")[0] != os.sep
+    is_relative_path = data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
-    assert data.get("code.function") == "test_query_source"
+    assert data.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "test_query_source"
 
 
 @pytest.mark.asyncio
@@ -684,10 +687,10 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_items)
     assert connect_span["name"] == "connect"
     data = insert_span.get("attributes", {})
 
-    assert "code.line.number" not in data
-    assert "code.namespace" not in data
-    assert "code.file.path" not in data
-    assert "code.function" not in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in data
 
 
 @pytest.mark.asyncio
@@ -739,22 +742,28 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_item
 
     data = insert_span.get("attributes", {})
 
-    assert "code.line.number" in data
-    assert "code.namespace" in data
-    assert "code.file.path" in data
-    assert "code.function" in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in data
 
-    assert type(data.get("code.line.number")) == int
-    assert data.get("code.line.number") > 0
-    assert data.get("code.namespace") == "tests.integrations.aiomysql.test_aiomysql"
-    assert data.get("code.file.path").endswith(
+    assert type(data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
+    assert (
+        data.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
+        == "tests.integrations.aiomysql.test_aiomysql"
+    )
+    assert data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
         "tests/integrations/aiomysql/test_aiomysql.py"
     )
 
-    is_relative_path = data.get("code.file.path")[0] != os.sep
+    is_relative_path = data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
-    assert data.get("code.function") == "test_query_source_if_duration_over_threshold"
+    assert (
+        data.get(ATTRIBUTE_NAMES.CODE_FUNCTION)
+        == "test_query_source_if_duration_over_threshold"
+    )
 
 
 @pytest.mark.asyncio
@@ -783,11 +792,11 @@ async def test_span_origin(sentry_init, capture_items):
     segment_spans = [s for s in spans if s.get("is_segment")]
 
     assert len(segment_spans) == 1
-    assert segment_spans[0]["attributes"]["sentry.origin"] == "manual"
+    assert segment_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
     assert len(non_segment_spans) == 3
     for span in non_segment_spans:
-        assert span["attributes"]["sentry.origin"] == "auto.db.aiomysql"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.aiomysql"
 
 
 @pytest.mark.asyncio
@@ -854,8 +863,8 @@ async def test_db_data_on_spans(sentry_init, capture_items):
         s for s in spans if not s.get("is_segment") and "SELECT" in s.get("name", "")
     ][0]
     data = query_span.get("attributes", {})
-    assert data.get(SPANDATA.DB_SYSTEM_NAME) == "mysql"
-    assert data.get(SPANDATA.SERVER_ADDRESS) == MYSQL_HOST
-    assert data.get(SPANDATA.SERVER_PORT) == MYSQL_PORT
-    assert data.get(SPANDATA.DB_NAMESPACE) == MYSQL_DB
-    assert data.get(SPANDATA.DB_USER) == MYSQL_USER
+    assert data.get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "mysql"
+    assert data.get(ATTRIBUTE_NAMES.SERVER_ADDRESS) == MYSQL_HOST
+    assert data.get(ATTRIBUTE_NAMES.SERVER_PORT) == MYSQL_PORT
+    assert data.get(ATTRIBUTE_NAMES.DB_NAMESPACE) == MYSQL_DB
+    assert data.get(ATTRIBUTE_NAMES.DB_USER) == MYSQL_USER

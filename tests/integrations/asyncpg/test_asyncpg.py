@@ -19,6 +19,7 @@ import asyncpg
 import pytest
 import pytest_asyncio
 from asyncpg import Connection, connect
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -536,9 +537,9 @@ async def test_query_source_disabled(
     data = insert_span.get("attributes", {})
 
     assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in data
     assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in data
 
 
 @pytest.mark.asyncio
@@ -627,20 +628,20 @@ async def test_query_source_with_module_in_search_path(
     assert connect_span["name"] == "connect"
     data = insert_span.get("attributes", {})
 
-    assert "code.line.number" in data
-    assert "code.file.path" in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in data
 
-    assert type(data.get("code.line.number")) == int
-    assert data.get("code.line.number") > 0
-    assert data.get("code.file.path") == "asyncpg_helpers/helpers.py"
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
+    assert type(data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
+    assert data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH) == "asyncpg_helpers/helpers.py"
+    assert data.get(ATTRIBUTE_NAMES.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
 
-    is_relative_path = data.get("code.file.path")[0] != os.sep
+    is_relative_path = data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "execute_query_in_connection"
+    assert data.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "execute_query_in_connection"
 
 
 @pytest.mark.asyncio
@@ -682,9 +683,9 @@ async def test_no_query_source_if_duration_too_short(
     data = insert_span.get("attributes", {})
 
     assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in data
     assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in data
 
 
 @pytest.mark.asyncio
@@ -766,10 +767,16 @@ async def test_span_origin(sentry_init, capture_items):
     assert select1_span["name"] == "SELECT 1"
     assert select2_span["name"] == "SELECT 2"
 
-    assert segment["attributes"]["sentry.origin"] == "manual"
-    assert connect_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
-    assert select1_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
-    assert select2_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert (
+        connect_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.asyncpg"
+    )
+    assert (
+        select1_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.asyncpg"
+    )
+    assert (
+        select2_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.asyncpg"
+    )
 
 
 @pytest.mark.asyncio
@@ -816,19 +823,22 @@ async def test_multiline_query_description_normalized(
 def _assert_query_source(span, expected_function):
     data = span.get("attributes", {})
 
-    assert "code.line.number" in data
-    assert "code.file.path" in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in data
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in data
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in data
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in data
 
-    assert type(data.get("code.line.number")) == int
-    assert data.get("code.line.number") > 0
-    assert data[SPANDATA.CODE_NAMESPACE] == "tests.integrations.asyncpg.test_asyncpg"
-    assert data.get("code.file.path").endswith(
+    assert type(data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+    assert data.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
+    assert (
+        data[ATTRIBUTE_NAMES.CODE_NAMESPACE]
+        == "tests.integrations.asyncpg.test_asyncpg"
+    )
+    assert data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
         "tests/integrations/asyncpg/test_asyncpg.py"
     )
-    assert data.get("code.file.path")[0] != os.sep
-    assert data[SPANDATA.CODE_FUNCTION] == expected_function
+    assert data.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
+    assert data[ATTRIBUTE_NAMES.CODE_FUNCTION] == expected_function
 
 
 @pytest.mark.asyncio
@@ -936,7 +946,7 @@ async def test_query_source_prepare(
     assert segment["name"] == "test_segment"
 
     assert (
-        query_span["attributes"][SPANDATA.DB_QUERY_TEXT]
+        query_span["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT]
         == "SELECT * FROM users WHERE name = $1"
     )
 
@@ -991,8 +1001,10 @@ async def test_cursor_iteration_creates_db_cursor_iter_spans(
 
     assert len(cursor_iter_spans) == 5
     for span in cursor_iter_spans:
-        assert span["attributes"]["sentry.op"] == OP.DB_CURSOR_ITERATOR
-        assert span["attributes"][SPANDATA.DB_QUERY_TEXT] == "SELECT * FROM users"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_CURSOR_ITERATOR
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT] == "SELECT * FROM users"
+        )
 
 
 @pytest.mark.asyncio
@@ -1055,19 +1067,19 @@ async def test_cursor_fetch_methods_create_spans(
     assert commit_span["name"] == "COMMIT;"
 
     assert (
-        fetchrow_span_1["attributes"][SPANDATA.DB_QUERY_TEXT]
+        fetchrow_span_1["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT]
         == "SELECT * FROM users WHERE dob > $1"
     )
     assert (
-        fetchrow_span_2["attributes"][SPANDATA.DB_QUERY_TEXT]
+        fetchrow_span_2["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT]
         == "SELECT * FROM users WHERE dob > $1"
     )
 
     for span in (fetchrow_span_1, fetchrow_span_2):
-        assert span["attributes"][SPANDATA.DB_SYSTEM_NAME] == "postgresql"
-        assert span["attributes"][SPANDATA.DB_DRIVER_NAME] == "asyncpg"
-        assert span["attributes"]["sentry.op"] == OP.DB_CURSOR_FETCH
-        assert span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "postgresql"
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "asyncpg"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_CURSOR_FETCH
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.asyncpg"
 
         _assert_query_source(
             span,
