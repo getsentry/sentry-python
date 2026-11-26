@@ -2,6 +2,7 @@ from collections import Counter
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from werkzeug.test import Client
 
 import sentry_sdk
@@ -216,22 +217,25 @@ def test_transaction_no_error(
 
     assert span["is_segment"] is True
     assert span["name"] == "generic WSGI request"
-    assert span["attributes"]["sentry.op"] == "http.server"
-    assert span["attributes"]["sentry.segment.name.source"] == "route"
-    assert span["attributes"]["http.request.method"] == "GET"
-    assert span["attributes"]["http.response.status_code"] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "route"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
     assert span["status"] == "ok"
 
-    assert span["attributes"]["url.path"] == "/dogs/are/great"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/dogs/are/great"
     if expect_query:
         assert (
-            span["attributes"]["url.full"]
+            span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
             == "http://localhost/dogs/are/great?toy=tennisball"
         )
-        assert span["attributes"]["http.query"] == "toy=tennisball"
+        assert span["attributes"][ATTRIBUTE_NAMES.HTTP_QUERY] == "toy=tennisball"
     else:
-        assert span["attributes"]["url.full"] == "http://localhost/dogs/are/great"
-        assert "http.query" not in span["attributes"]
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
+            == "http://localhost/dogs/are/great"
+        )
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in span["attributes"]
 
 
 def test_has_trace_if_performance_enabled(
@@ -516,7 +520,7 @@ def test_span_origin_manual(sentry_init, capture_items):
     sentry_sdk.flush()
 
     assert len(items) == 1
-    assert items[0].payload["attributes"]["sentry.origin"] == "manual"
+    assert items[0].payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
 
 def test_span_origin_custom(sentry_init, capture_items):
@@ -540,7 +544,10 @@ def test_span_origin_custom(sentry_init, capture_items):
     sentry_sdk.flush()
 
     assert len(items) == 1
-    assert items[0].payload["attributes"]["sentry.origin"] == "auto.dogpark.deluxe"
+    assert (
+        items[0].payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.dogpark.deluxe"
+    )
 
 
 @pytest.mark.parametrize(
@@ -905,15 +912,18 @@ def test_span_http_query_data_collection(
     (span,) = [item.payload for item in items]
 
     if expected_query is None:
-        assert "http.query" not in span["attributes"]
-        assert span["attributes"]["url.full"] == "http://localhost/dogs/are/great"
-    else:
-        assert span["attributes"]["http.query"] == expected_query
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in span["attributes"]
         assert (
-            span["attributes"]["url.full"]
+            span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
+            == "http://localhost/dogs/are/great"
+        )
+    else:
+        assert span["attributes"][ATTRIBUTE_NAMES.HTTP_QUERY] == expected_query
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
             == f"http://localhost/dogs/are/great?{expected_query}"
         )
-    assert span["attributes"]["url.path"] == "/dogs/are/great"
+    assert span["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/dogs/are/great"
 
 
 @pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -942,13 +952,13 @@ def test_user_info_span_attributes_data_collection(
     child_span, server_span = [item.payload for item in items]
 
     if expect_ip:
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
-        assert server_span["attributes"]["client.address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert child_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.CLIENT_ADDRESS] == "127.0.0.1"
     else:
-        assert "user.ip_address" not in server_span["attributes"]
-        assert "user.ip_address" not in child_span["attributes"]
-        assert "client.address" not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in child_span["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in server_span["attributes"]
 
 
 @pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -1037,8 +1047,10 @@ def test_is_localhost_attribute(
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
-    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST] is is_localhost
+    )
+    assert child_span["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST] is is_localhost
 
 
 def test_user_agent_attribute(sentry_init, capture_items):
@@ -1063,5 +1075,11 @@ def test_user_agent_attribute(sentry_init, capture_items):
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
-    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
+    )
+    assert (
+        child_span["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
+    )

@@ -8,10 +8,11 @@ import sys
 import django
 import pytest
 from channels.testing import HttpCommunicator
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
@@ -154,7 +155,7 @@ async def test_http_route(
 
     sentry_sdk.flush()
     (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/async_message"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == "/async_message"
 
 
 @pytest.mark.asyncio
@@ -271,7 +272,11 @@ async def test_async_middleware_spans(
 
     # Filter out signal-receiver spans — their ordering depends on Django
     # module import order and is not what this middleware test verifies.
-    spans = [s for s in spans if s["attributes"].get("sentry.op") != OP.FUNCTION]
+    spans = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) != OP.FUNCTION
+    ]
 
     assert (
         render_span_tree(spans)
@@ -784,7 +789,7 @@ async def test_transaction_http_method_default(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[5]["attributes"]["http.request.method"] == "GET"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
 
 
 @pytest.mark.parametrize("application", APPS)
@@ -825,8 +830,8 @@ async def test_transaction_http_method_custom(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
-    assert spans[11]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "OPTIONS"
+    assert spans[11]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "HEAD"
 
 
 @pytest.mark.asyncio

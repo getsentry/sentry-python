@@ -1,8 +1,8 @@
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from werkzeug.test import Client
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.conftest import unpack_werkzeug_response, werkzeug_set_cookie
 from tests.integrations.django.myapp.wsgi import application
@@ -201,9 +201,9 @@ def test_span_http_query_data_collection(
     (root_span,) = (span for span in spans if span["name"] == "/message")
 
     if expected_query is None:
-        assert SPANDATA.HTTP_QUERY not in root_span["attributes"]
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in root_span["attributes"]
     else:
-        assert root_span["attributes"][SPANDATA.HTTP_QUERY] == expected_query
+        assert root_span["attributes"][ATTRIBUTE_NAMES.HTTP_QUERY] == expected_query
 
 
 @pytest.mark.forked
@@ -248,11 +248,11 @@ def test_user_info_span_attributes_data_collection(
     root_span = spans[-1]
 
     if expect_ip:
-        assert root_span["attributes"][SPANDATA.USER_IP_ADDRESS] == "127.0.0.1"
-        assert root_span["attributes"]["client.address"] == "127.0.0.1"
+        assert root_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert root_span["attributes"][ATTRIBUTE_NAMES.CLIENT_ADDRESS] == "127.0.0.1"
     else:
-        assert SPANDATA.USER_IP_ADDRESS not in root_span["attributes"]
-        assert "client.address" not in root_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in root_span["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in root_span["attributes"]
 
 
 @pytest.mark.forked
@@ -279,13 +279,13 @@ def test_user_identity_span_attributes_data_collection(
     (span,) = (s for s in spans if s["name"] == "/template-test")
 
     if expect_user:
-        assert span["attributes"][SPANDATA.USER_ID] == "1"
-        assert span["attributes"][SPANDATA.USER_EMAIL] == "lennon@thebeatles.com"
-        assert span["attributes"][SPANDATA.USER_NAME] == "john"
+        assert span["attributes"][ATTRIBUTE_NAMES.USER_ID] == "1"
+        assert span["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "lennon@thebeatles.com"
+        assert span["attributes"][ATTRIBUTE_NAMES.USER_NAME] == "john"
     else:
-        assert SPANDATA.USER_ID not in span["attributes"]
-        assert SPANDATA.USER_EMAIL not in span["attributes"]
-        assert SPANDATA.USER_NAME not in span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_ID not in span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_EMAIL not in span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_NAME not in span["attributes"]
 
 
 @pytest.mark.forked

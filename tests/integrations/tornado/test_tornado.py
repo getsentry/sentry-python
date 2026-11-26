@@ -1,13 +1,13 @@
 import json
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application, HTTPError, RequestHandler
 
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.tornado import TornadoIntegration
 from tests.integrations.utils import (
     DATA_COLLECTION_REMOTE_ADDR_CASES,
@@ -230,14 +230,16 @@ def test_url_query_data_collection(
     (server_span,) = [item.payload for item in items]
 
     if expected_query is None:
-        assert "url.query" not in server_span["attributes"]
-        assert server_span["attributes"]["url.full"].endswith("/hi")
-        assert server_span["attributes"]["url.path"] == "/hi"
+        assert ATTRIBUTE_NAMES.URL_QUERY not in server_span["attributes"]
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL].endswith("/hi")
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/hi"
     else:
-        assert server_span["attributes"]["url.query"] == expected_query
-        assert server_span["attributes"]["url.full"].endswith(f"/hi?{expected_query}")
-        assert server_span["attributes"]["url.full"].startswith("http://")
-        assert server_span["attributes"]["url.path"] == "/hi"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL].endswith(
+            f"/hi?{expected_query}"
+        )
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL].startswith("http://")
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/hi"
 
 
 def test_url_query_data_collection_no_query_string(
@@ -258,9 +260,9 @@ def test_url_query_data_collection_no_query_string(
 
     (server_span,) = [item.payload for item in items]
 
-    assert "url.query" not in server_span["attributes"]
-    assert server_span["attributes"]["url.full"].endswith("/hi")
-    assert server_span["attributes"]["url.path"] == "/hi"
+    assert ATTRIBUTE_NAMES.URL_QUERY not in server_span["attributes"]
+    assert server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL].endswith("/hi")
+    assert server_span["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/hi"
 
 
 def test_url_query_data_collection_repeated_and_blank_params(
@@ -281,7 +283,7 @@ def test_url_query_data_collection_repeated_and_blank_params(
 
     (server_span,) = [item.payload for item in items]
 
-    assert server_span["attributes"]["url.query"] == "a=1&a=2&b="
+    assert server_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == "a=1&a=2&b="
 
 
 @pytest.mark.parametrize(
@@ -323,9 +325,11 @@ def test_request_body_data_collection(
     (server_span,) = [item.payload for item in items]
 
     if expect_body:
-        assert server_span["attributes"]["http.request.body.data"] == "heyoo"
+        assert (
+            server_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA] == "heyoo"
+        )
     else:
-        assert "http.request.body.data" not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
 
 
 def test_oversized_request_body_not_annotated_data_collection(
@@ -352,7 +356,7 @@ def test_oversized_request_body_not_annotated_data_collection(
 
     (server_span,) = [item.payload for item in items]
 
-    assert "http.request.body.data" not in server_span["attributes"]
+    assert ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -475,21 +479,32 @@ def test_transactions(
         else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
     )
     assert server_segment["name"] == expected_handler
-    assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
-    assert server_segment["attributes"]["http.request.method"] == "POST"
-    assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
-    assert server_segment["attributes"]["http.response.status_code"] == code
+    assert (
+        server_segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "component"
+    )
+    assert server_segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "POST"
+    assert (
+        server_segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA] == "heyoo"
+    )
+    assert (
+        server_segment["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == code
+    )
     assert server_segment["status"] == ("ok" if code == 200 else "error")
     assert client_segment["trace_id"] == server_segment["trace_id"]
 
-    assert server_segment["attributes"]["url.path"] == "/hi"
+    assert server_segment["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/hi"
     if expect_query:
-        assert server_segment["attributes"]["url.query"] == "foo=bar"
-        assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
-        assert server_segment["attributes"]["url.full"].startswith("http://")
+        assert server_segment["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == "foo=bar"
+        assert server_segment["attributes"][ATTRIBUTE_NAMES.URL_FULL].endswith(
+            "/hi?foo=bar"
+        )
+        assert server_segment["attributes"][ATTRIBUTE_NAMES.URL_FULL].startswith(
+            "http://"
+        )
     else:
-        assert "url.query" not in server_segment["attributes"]
-        assert server_segment["attributes"]["url.full"].endswith("/hi")
+        assert ATTRIBUTE_NAMES.URL_QUERY not in server_segment["attributes"]
+        assert server_segment["attributes"][ATTRIBUTE_NAMES.URL_FULL].endswith("/hi")
 
 
 def test_400_not_logged(tornado_testcase, sentry_init, capture_events):
@@ -794,7 +809,7 @@ def test_span_origin(
     sentry_sdk.flush()
 
     (segment,) = [i.payload for i in items]
-    assert segment["attributes"]["sentry.origin"] == "auto.http.tornado"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.tornado"
 
 
 @pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -817,11 +832,11 @@ def test_user_ip_address_on_all_spans(
     child_span, server_span = [item.payload for item in items]
 
     if expect_ip:
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert child_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
     else:
-        assert "user.ip_address" not in server_span["attributes"]
-        assert "user.ip_address" not in child_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in child_span["attributes"]
 
 
 @pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -844,13 +859,14 @@ def test_client_address_span_attribute_data_collection(
     (server_span,) = [
         item.payload
         for item in items
-        if item.payload["attributes"].get("sentry.origin") == "auto.http.tornado"
+        if item.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.tornado"
     ]
 
     if expect_ip:
-        assert server_span["attributes"]["client.address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.CLIENT_ADDRESS] == "127.0.0.1"
     else:
-        assert "client.address" not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in server_span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -894,8 +910,14 @@ def test_is_localhost_span_attribute(
     assert len(server_spans) == 1
     assert len(child_spans) == 1
 
-    assert server_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
-    assert child_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
+    assert (
+        server_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST]
+        == is_localhost
+    )
+    assert (
+        child_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST]
+        == is_localhost
+    )
 
 
 def test_user_agent_attribute(tornado_testcase, sentry_init, capture_items):
@@ -918,10 +940,12 @@ def test_user_agent_attribute(tornado_testcase, sentry_init, capture_items):
     assert len(child_spans) == 1
 
     assert (
-        server_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+        server_spans[0]["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
     )
     assert (
-        child_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+        child_spans[0]["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
     )
 
 

@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from flask import Flask, jsonify, request
 from graphene import ObjectType, Schema, String
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -211,14 +212,17 @@ def test_graphql_span_holds_query_information(sentry_init, capture_items):
     graphql_span, flask_segment = spans
 
     assert graphql_span["name"] == query["operationName"]
-    assert graphql_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert graphql_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
     assert (
-        graphql_span["attributes"]["graphql.operation.name"] == query["operationName"]
+        graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME]
+        == query["operationName"]
     )
-    assert graphql_span["attributes"]["graphql.operation.type"] == "query"
+    assert graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE] == "query"
     assert graphql_span["is_segment"] is False
 
-    assert graphql_span["attributes"]["graphql.document"] == query["query"]
+    assert (
+        graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] == query["query"]
+    )
 
     assert flask_segment["is_segment"] is True
     assert graphql_span["parent_span_id"] == flask_segment["span_id"]
@@ -265,17 +269,21 @@ def test_graphql_span_data_collection_sync(
     graphql_span, flask_segment = spans
 
     assert graphql_span["name"] == query["operationName"]
-    assert graphql_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert graphql_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
     assert (
-        graphql_span["attributes"]["graphql.operation.name"] == query["operationName"]
+        graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME]
+        == query["operationName"]
     )
-    assert graphql_span["attributes"]["graphql.operation.type"] == "query"
+    assert graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE] == "query"
     assert graphql_span["is_segment"] is False
 
     if expect_document:
-        assert graphql_span["attributes"]["graphql.document"] == query["query"]
+        assert (
+            graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT]
+            == query["query"]
+        )
     else:
-        assert "graphql.document" not in graphql_span["attributes"]
+        assert ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT not in graphql_span["attributes"]
 
     assert flask_segment["is_segment"] is True
     assert graphql_span["parent_span_id"] == flask_segment["span_id"]
@@ -328,17 +336,21 @@ def test_graphql_span_data_collection_async(
     graphql_span, segment = spans
 
     assert graphql_span["name"] == query["operationName"]
-    assert graphql_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert graphql_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
     assert (
-        graphql_span["attributes"]["graphql.operation.name"] == query["operationName"]
+        graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME]
+        == query["operationName"]
     )
-    assert graphql_span["attributes"]["graphql.operation.type"] == "query"
+    assert graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE] == "query"
     assert graphql_span["is_segment"] is False
 
     if expect_document:
-        assert graphql_span["attributes"]["graphql.document"] == query["query"]
+        assert (
+            graphql_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT]
+            == query["query"]
+        )
     else:
-        assert "graphql.document" not in graphql_span["attributes"]
+        assert ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT not in graphql_span["attributes"]
 
     assert segment["is_segment"] is True
     assert graphql_span["parent_span_id"] == segment["span_id"]

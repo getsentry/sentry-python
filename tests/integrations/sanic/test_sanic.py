@@ -10,6 +10,7 @@ from sanic import Sanic, request, response
 from sanic import __version__ as SANIC_VERSION_RAW
 from sanic.exceptions import SanicException
 from sanic.response import HTTPResponse
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -440,7 +441,8 @@ def test_transactions(
     segments = [
         i.payload
         for i in items
-        if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+        if i.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.sanic"
         and i.payload["is_segment"]
     ]
     assert len(segments) <= 1
@@ -451,20 +453,23 @@ def test_transactions(
     if segment is not None:
         assert segment["name"] == test_config.expected_transaction_name
         assert (
-            segment["attributes"]["sentry.segment.name.source"]
+            segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
             == test_config.expected_source
         )
 
         attrs = segment["attributes"]
-        assert attrs["http.request.method"] == "GET"
-        assert attrs["network.protocol.name"] == "http"
+        assert attrs[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+        assert attrs[ATTRIBUTE_NAMES.NETWORK_PROTOCOL_NAME] == "http"
         header_keys = {
             key[len("http.request.header.") :]
             for key in attrs
             if key.startswith("http.request.header.")
         }
         assert header_keys >= {"accept", "accept-encoding", "host", "user-agent"}
-        assert attrs["http.response.status_code"] == test_config.expected_status
+        assert (
+            attrs[ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE]
+            == test_config.expected_status
+        )
         assert segment["status"] == (
             "error" if test_config.expected_status >= 400 else "ok"
         )
@@ -472,13 +477,16 @@ def test_transactions(
         expected_url = (
             test_config.url if expect_query else test_config.url.split("?", 1)[0]
         )
-        assert attrs["url.full"].endswith(expected_url)
-        assert attrs["url.path"] == test_config.url.split("?")[0]
+        assert attrs[ATTRIBUTE_NAMES.URL_FULL].endswith(expected_url)
+        assert attrs[ATTRIBUTE_NAMES.URL_PATH] == test_config.url.split("?")[0]
         if "?" in test_config.url:
             if expect_query:
-                assert attrs["http.query"] == test_config.url.split("?", 1)[1]
+                assert (
+                    attrs[ATTRIBUTE_NAMES.HTTP_QUERY]
+                    == test_config.url.split("?", 1)[1]
+                )
             else:
-                assert "http.query" not in attrs
+                assert ATTRIBUTE_NAMES.HTTP_QUERY not in attrs
 
 
 def test_span_origin(sentry_init, app, capture_items):
@@ -498,9 +506,10 @@ def test_span_origin(sentry_init, app, capture_items):
     (segment,) = [
         i.payload
         for i in items
-        if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+        if i.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.sanic"
     ]
-    assert segment["attributes"]["sentry.origin"] == "auto.http.sanic"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.sanic"
 
 
 @pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -536,11 +545,11 @@ def test_user_ip_address_on_all_spans(
     child_span, server_span = [item.payload for item in items]
 
     if expect_ip:
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert child_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
     else:
-        assert "user.ip_address" not in server_span["attributes"]
-        assert "user.ip_address" not in child_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in child_span["attributes"]
 
 
 @pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -570,13 +579,14 @@ def test_client_address_span_attribute_data_collection(
     (server_span,) = [
         item.payload
         for item in items
-        if item.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+        if item.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.sanic"
     ]
 
     if expect_ip:
-        assert server_span["attributes"]["client.address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.CLIENT_ADDRESS] == "127.0.0.1"
     else:
-        assert "client.address" not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in server_span["attributes"]
 
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
@@ -632,20 +642,21 @@ def test_url_query_data_collection(
     (server_span,) = [
         i.payload
         for i in items
-        if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+        if i.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == "auto.http.sanic"
         and i.payload["is_segment"]
     ]
 
     if expected_query is None:
-        assert "http.query" not in server_span["attributes"]
-        assert server_span["attributes"]["url.full"].endswith("/message")
-        assert server_span["attributes"]["url.path"].endswith("/message")
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in server_span["attributes"]
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL].endswith("/message")
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_PATH].endswith("/message")
     else:
-        assert server_span["attributes"]["http.query"] == expected_query
-        assert server_span["attributes"]["url.full"].endswith(
+        assert server_span["attributes"][ATTRIBUTE_NAMES.HTTP_QUERY] == expected_query
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL].endswith(
             f"/message?{expected_query}"
         )
-        assert server_span["attributes"]["url.path"].endswith("/message")
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_PATH].endswith("/message")
 
 
 @pytest.mark.parametrize(
@@ -820,8 +831,10 @@ def test_is_localhost_span_attribute(
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
-    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST] is is_localhost
+    )
+    assert child_span["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST] is is_localhost
 
 
 def test_user_agent_attribute(sentry_init, app, capture_items):
@@ -850,5 +863,11 @@ def test_user_agent_attribute(sentry_init, app, capture_items):
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
-    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
+    )
+    assert (
+        child_span["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
+    )

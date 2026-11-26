@@ -11,10 +11,10 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from werkzeug.test import Client
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import (
     record_sql_queries,
@@ -61,15 +61,15 @@ def test_query_source_disabled(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER not in attributes
-            assert SPANDATA.CODE_NAMESPACE not in attributes
-            assert SPANDATA.CODE_FILE_PATH not in attributes
-            assert SPANDATA.CODE_FUNCTION not in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION not in attributes
             break
     else:
         raise AssertionError("No db span found")
@@ -111,15 +111,15 @@ def test_query_source_enabled(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
             break
     else:
         raise AssertionError("No db span found")
@@ -154,31 +154,35 @@ def test_query_source(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
 
             assert (
-                attributes.get(SPANDATA.CODE_NAMESPACE)
+                attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
                 == "tests.integrations.django.myapp.views"
             )
-            assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
                 "tests/integrations/django/myapp/views.py"
             )
 
-            is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+            is_relative_path = (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
+            )
             assert is_relative_path
 
-            assert attributes.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "postgres_select_orm"
+            )
             break
     else:
         raise AssertionError("No db span found")
@@ -220,25 +224,34 @@ def test_query_source_with_module_in_search_path(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
-            assert attributes.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
-            assert attributes.get(SPANDATA.CODE_FILE_PATH) == "django_helpers/views.py"
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
+            assert (
+                attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE) == "django_helpers.views"
+            )
+            assert (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)
+                == "django_helpers/views.py"
+            )
 
-            is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+            is_relative_path = (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
+            )
             assert is_relative_path
 
-            assert attributes.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "postgres_select_orm"
+            )
             break
     else:
         raise AssertionError("No db span found")
@@ -274,38 +287,38 @@ def test_query_source_with_in_app_exclude(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
 
             if DJANGO_VERSION >= (1, 11):
                 assert (
-                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
                     == "tests.integrations.django.myapp.settings"
                 )
-                assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+                assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
                     "tests/integrations/django/myapp/settings.py"
                 )
-                assert attributes.get(SPANDATA.CODE_FUNCTION) == "middleware"
+                assert attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "middleware"
             else:
                 assert (
-                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
                     == "tests.integrations.django.test_db_query_data"
                 )
-                assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+                assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
                     "tests/integrations/django/test_db_query_data.py"
                 )
                 assert (
-                    attributes.get(SPANDATA.CODE_FUNCTION)
+                    attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION)
                     == "test_query_source_with_in_app_exclude"
                 )
             break
@@ -343,27 +356,27 @@ def test_query_source_with_in_app_include(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
 
             assert (
-                attributes.get(SPANDATA.CODE_NAMESPACE)
+                attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
                 == "django.db.models.sql.compiler"
             )
-            assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
                 "django/db/models/sql/compiler.py"
             )
-            assert attributes.get(SPANDATA.CODE_FUNCTION) == "execute_sql"
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "execute_sql"
             break
     else:
         raise AssertionError("No db span found")
@@ -423,15 +436,15 @@ def test_no_query_source_if_duration_too_short(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER not in attributes
-            assert SPANDATA.CODE_NAMESPACE not in attributes
-            assert SPANDATA.CODE_FILE_PATH not in attributes
-            assert SPANDATA.CODE_FUNCTION not in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION not in attributes
             break
     else:
         raise AssertionError("No db span found")
@@ -491,31 +504,35 @@ def test_query_source_if_duration_over_threshold(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
-            "name"
-        ):
+        if span["attributes"].get(
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ) == "db" and "auth_user" in span.get("name"):
             attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
 
             assert (
-                attributes.get(SPANDATA.CODE_NAMESPACE)
+                attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
                 == "tests.integrations.django.myapp.views"
             )
-            assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
                 "tests/integrations/django/myapp/views.py"
             )
 
-            is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+            is_relative_path = (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
+            )
             assert is_relative_path
 
-            assert attributes.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "postgres_select_orm"
+            )
             break
     else:
         raise AssertionError("No db span found")
@@ -546,13 +563,15 @@ def test_db_span_origin_execute(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
 
     for span in spans:
-        if span["attributes"]["sentry.op"] == "db":
-            assert span["attributes"]["sentry.origin"] == "auto.db.django"
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "db":
+            assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
         else:
-            assert span["attributes"]["sentry.origin"] == "auto.http.django"
+            assert (
+                span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
+            )
 
 
 @pytest.mark.forked
@@ -593,5 +612,5 @@ def test_db_span_origin_executemany(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.db.django"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"

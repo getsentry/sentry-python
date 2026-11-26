@@ -1,6 +1,7 @@
 from typing import AsyncGenerator, Optional
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 
@@ -512,24 +513,26 @@ def test_capture_segment_on_error(
 
     assert segment["is_segment"] is True
     assert segment["name"] == "ErrorQuery"
-    assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
 
-    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert query_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
     assert query_span["name"] == "query ErrorQuery"
-    assert query_span["attributes"]["graphql.operation.type"] == "query"
-    assert query_span["attributes"]["graphql.operation.name"] == "ErrorQuery"
+    assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE] == "query"
+    assert (
+        query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME] == "ErrorQuery"
+    )
 
-    assert query_span["attributes"]["graphql.document"] == query
+    assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] == query
 
-    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
     assert parse_span["parent_span_id"] == query_span["span_id"]
 
-    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_VALIDATE
     assert validate_span["name"] == "validation"
     assert validate_span["parent_span_id"] == query_span["span_id"]
 
-    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_RESOLVE
     assert resolve_span["name"] == "resolving Query.error"
     assert resolve_span["parent_span_id"] == query_span["span_id"]
 
@@ -569,24 +572,27 @@ def test_capture_segment_on_success(
 
     assert segment["is_segment"] is True
     assert segment["name"] == "GreetingQuery"
-    assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
 
-    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert query_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
     assert query_span["name"] == "query GreetingQuery"
-    assert query_span["attributes"]["graphql.operation.type"] == "query"
-    assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
+    assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE] == "query"
+    assert (
+        query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME]
+        == "GreetingQuery"
+    )
 
-    assert query_span["attributes"]["graphql.document"] == query
+    assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] == query
 
-    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
     assert parse_span["parent_span_id"] == query_span["span_id"]
 
-    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_VALIDATE
     assert validate_span["name"] == "validation"
     assert validate_span["parent_span_id"] == query_span["span_id"]
 
-    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_RESOLVE
     assert resolve_span["name"] == "resolving Query.hello"
     assert resolve_span["parent_span_id"] == query_span["span_id"]
 
@@ -627,22 +633,22 @@ def test_segment_no_operation_name(
     assert segment["is_segment"] is True
     assert segment["name"] == "/graphql"
 
-    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+    assert query_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
     assert query_span["name"] == "query"
-    assert query_span["attributes"]["graphql.operation.type"] == "query"
-    assert "graphql.operation.name" not in query_span["attributes"]
+    assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE] == "query"
+    assert ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME not in query_span["attributes"]
 
-    assert query_span["attributes"]["graphql.document"] == query
+    assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] == query
 
-    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
     assert parse_span["parent_span_id"] == query_span["span_id"]
 
-    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_VALIDATE
     assert validate_span["name"] == "validation"
     assert validate_span["parent_span_id"] == query_span["span_id"]
 
-    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_RESOLVE
     assert resolve_span["name"] == "resolving Query.hello"
     assert resolve_span["parent_span_id"] == query_span["span_id"]
 
@@ -682,24 +688,27 @@ def test_segment_mutation(
 
     assert segment["is_segment"] is True
     assert segment["name"] == "Change"
-    assert segment["attributes"]["sentry.op"] == OP.GRAPHQL_MUTATION
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_MUTATION
 
-    assert mutation_span["attributes"]["sentry.op"] == OP.GRAPHQL_MUTATION
+    assert mutation_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_MUTATION
     assert mutation_span["name"] == "mutation"
-    assert mutation_span["attributes"]["graphql.operation.type"] == "mutation"
-    assert "graphql.operation.name" not in mutation_span["attributes"]
+    assert (
+        mutation_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE]
+        == "mutation"
+    )
+    assert ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME not in mutation_span["attributes"]
 
-    assert mutation_span["attributes"]["graphql.document"] == query
+    assert mutation_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] == query
 
-    assert parse_span["attributes"]["sentry.op"] == OP.GRAPHQL_PARSE
+    assert parse_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_PARSE
     assert parse_span["name"] == "parsing"
     assert parse_span["parent_span_id"] == mutation_span["span_id"]
 
-    assert validate_span["attributes"]["sentry.op"] == OP.GRAPHQL_VALIDATE
+    assert validate_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_VALIDATE
     assert validate_span["name"] == "validation"
     assert validate_span["parent_span_id"] == mutation_span["span_id"]
 
-    assert resolve_span["attributes"]["sentry.op"] == OP.GRAPHQL_RESOLVE
+    assert resolve_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_RESOLVE
     assert resolve_span["name"] == "resolving Mutation.change"
     assert resolve_span["parent_span_id"] == mutation_span["span_id"]
 
@@ -754,15 +763,18 @@ def test_graphql_span_data_collection(
     assert len(spans) == 5
     query_span = spans[3]
 
-    assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
-    assert query_span["attributes"]["graphql.operation.type"] == "query"
+    assert query_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GRAPHQL_QUERY
+    assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE] == "query"
     # operation.name is always set when an operation name is present
-    assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
+    assert (
+        query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME]
+        == "GreetingQuery"
+    )
 
     if expect_document:
-        assert query_span["attributes"]["graphql.document"] == query
+        assert query_span["attributes"][ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] == query
     else:
-        assert "graphql.document" not in query_span["attributes"]
+        assert ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT not in query_span["attributes"]
 
 
 @parameterize_strawberry_test
@@ -844,12 +856,18 @@ def test_span_origin_for_gql_mutations_and_related_ops(
 
     assert segment["is_segment"] is True
     if is_flask:
-        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
+        assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.flask"
     else:
-        assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
+        assert (
+            segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.http.starlette"
+        )
 
     for span in (parse_span, validate_span, resolve_span, mutation_span):
-        assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.graphql.strawberry"
+        )
 
 
 @parameterize_strawberry_test
@@ -892,12 +910,18 @@ def test_span_origin_for_gql_query_ops(
 
     assert segment["is_segment"] is True
     if is_flask:
-        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
+        assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.flask"
     else:
-        assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
+        assert (
+            segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.http.starlette"
+        )
 
     for span in (parse_span, validate_span, resolve_span, query_span):
-        assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.graphql.strawberry"
+        )
 
 
 @parameterize_strawberry_test
@@ -940,9 +964,15 @@ def test_span_origin3(
 
     assert segment["is_segment"] is True
     if is_flask:
-        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
+        assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.flask"
     else:
-        assert segment["attributes"]["sentry.origin"] == "auto.http.starlette"
+        assert (
+            segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.http.starlette"
+        )
 
     for span in (parse_span, validate_span, resolve_span, subscription_span):
-        assert span["attributes"]["sentry.origin"] == "auto.graphql.strawberry"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.graphql.strawberry"
+        )

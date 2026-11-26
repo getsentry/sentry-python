@@ -14,6 +14,7 @@ from flask import (
 )
 from flask.views import View
 from flask_login import LoginManager, login_user
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 from sentry_sdk.traces import SpanStatus
 
@@ -29,7 +30,6 @@ from sentry_sdk import (
     capture_message,
     set_tag,
 )
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
@@ -129,7 +129,10 @@ def test_segment_name_and_source(
     assert len(spans) == 1
     (segment,) = spans
     assert segment["name"] == expected_transaction
-    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == expected_source
+    )
 
 
 def test_http_route(
@@ -149,7 +152,9 @@ def test_http_route(
     sentry_sdk.flush()
 
     (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<int:message_id>"
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == "/message/<int:message_id>"
+    )
 
 
 @pytest.mark.parametrize("debug", (True, False))
@@ -294,11 +299,11 @@ def test_flask_login_configured(
     segment = next(s for s in spans if s["name"] == "/message")
 
     if expect_user and user_id is not None:
-        assert segment["attributes"]["user.id"] == str(user_id)
-        assert segment["attributes"]["user.email"] == "user@example.com"
-        assert segment["attributes"]["user.name"] == "testuser"
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_ID] == str(user_id)
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "user@example.com"
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_NAME] == "testuser"
     else:
-        assert "user.id" not in segment.get("attributes", {})
+        assert ATTRIBUTE_NAMES.USER_ID not in segment.get("attributes", {})
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])
@@ -827,7 +832,7 @@ def test_tracing_success(
 
     assert segment["name"] == "/message_tx"
     assert segment["status"] == SpanStatus.OK
-    assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.flask"
 
     assert message_event["message"] == "hi"
     assert message_event["transaction"] == "/message_tx"
@@ -1013,7 +1018,7 @@ def test_span_origin(sentry_init, app, capture_items):
     spans = [i.payload for i in items]
     assert len(spans) == 1
     (segment,) = spans
-    assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.flask"
 
 
 def test_segment_http_method_default(
@@ -1046,7 +1051,7 @@ def test_segment_http_method_default(
     spans = [i.payload for i in items]
     assert len(spans) == 1
     (segment,) = spans
-    assert segment["attributes"]["http.request.method"] == "GET"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
 
 
 def test_segment_http_method_custom(
@@ -1082,7 +1087,9 @@ def test_segment_http_method_custom(
 
     spans = [i.payload for i in items]
     (options_segment,) = spans
-    assert options_segment["attributes"]["http.request.method"] == "OPTIONS"
+    assert (
+        options_segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "OPTIONS"
+    )
 
     response = client.head("/nomessage")
     assert response.status_code == 200
@@ -1092,7 +1099,7 @@ def test_segment_http_method_custom(
     assert len(spans) == 2
     (_, head_segment) = spans
 
-    assert head_segment["attributes"]["http.request.method"] == "HEAD"
+    assert head_segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "HEAD"
 
 
 @pytest.mark.parametrize(
@@ -1187,9 +1194,9 @@ def test_span_http_query_data_collection(
     (segment,) = spans
 
     if expected_query is None:
-        assert SPANDATA.HTTP_QUERY not in segment["attributes"]
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in segment["attributes"]
     else:
-        assert segment["attributes"][SPANDATA.HTTP_QUERY] == expected_query
+        assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_QUERY] == expected_query
 
 
 def test_empty_query_string_is_dropped_with_data_collection(
@@ -1231,11 +1238,11 @@ def test_user_info_span_attributes_data_collection(
     (segment,) = spans
 
     if expect_ip:
-        assert segment["attributes"][SPANDATA.USER_IP_ADDRESS] == "127.0.0.1"
-        assert segment["attributes"]["client.address"] == "127.0.0.1"
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert segment["attributes"][ATTRIBUTE_NAMES.CLIENT_ADDRESS] == "127.0.0.1"
     else:
-        assert SPANDATA.USER_IP_ADDRESS not in segment["attributes"]
-        assert "client.address" not in segment["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in segment["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in segment["attributes"]
 
 
 @pytest.mark.parametrize("data_collection, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -1385,13 +1392,13 @@ def test_flask_login_user_identity_span_attributes_data_collection(
     segment = next(s for s in spans if s["name"] == "/message")
 
     if expect_user:
-        assert segment["attributes"]["user.id"] == "42"
-        assert segment["attributes"]["user.email"] == "user@example.com"
-        assert segment["attributes"]["user.name"] == "testuser"
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_ID] == "42"
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "user@example.com"
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_NAME] == "testuser"
     else:
-        assert "user.id" not in segment.get("attributes", {})
-        assert "user.email" not in segment.get("attributes", {})
-        assert "user.name" not in segment.get("attributes", {})
+        assert ATTRIBUTE_NAMES.USER_ID not in segment.get("attributes", {})
+        assert ATTRIBUTE_NAMES.USER_EMAIL not in segment.get("attributes", {})
+        assert ATTRIBUTE_NAMES.USER_NAME not in segment.get("attributes", {})
 
 
 @pytest.mark.parametrize(

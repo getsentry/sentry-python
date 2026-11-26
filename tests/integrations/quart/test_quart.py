@@ -4,6 +4,7 @@ import sys
 import threading
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 import sentry_sdk.integrations.quart as quart_sentry
@@ -12,7 +13,6 @@ from sentry_sdk import (
     capture_message,
     set_tag,
 )
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
 from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
@@ -168,7 +168,7 @@ async def test_http_route(
     sentry_sdk.flush()
 
     (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<message_id>"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == "/message/<message_id>"
 
 
 @pytest.mark.asyncio
@@ -626,7 +626,7 @@ async def test_span_origin(sentry_init, capture_items):
 
     (span,) = [item.payload for item in items]
 
-    assert span["attributes"]["sentry.origin"] == "auto.http.quart"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.quart"
 
 
 @pytest.mark.asyncio
@@ -651,9 +651,9 @@ async def test_basic(sentry_init, capture_items):
     assert segment["is_segment"] is True
     assert "parent_span_id" not in segment
     assert segment["status"] == "ok"
-    assert segment["attributes"]["sentry.op"] == "http.server"
-    assert segment["attributes"]["sentry.origin"] == "auto.http.quart"
-    assert segment["attributes"]["http.request.method"] == "GET"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.quart"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
     assert segment["name"] == "/message"
 
 
@@ -691,7 +691,10 @@ async def test_segment_name_and_source(
     segment = spans[0]
     assert segment["is_segment"] is True
     assert segment["name"] == expected_name
-    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == expected_source
+    )
 
 
 @pytest.mark.asyncio
@@ -759,21 +762,22 @@ async def test_request_attributes(
     assert len(spans) == 1
 
     segment = spans[0]
-    assert segment["attributes"]["http.request.method"] == "GET"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
     assert "http.request.header.host" in segment["attributes"]
 
     assert (
-        segment["attributes"]["url.full"] == "http://localhost/message?foo=bar&baz=qux"
+        segment["attributes"][ATTRIBUTE_NAMES.URL_FULL]
+        == "http://localhost/message?foo=bar&baz=qux"
     )
-    assert segment["attributes"]["url.path"] == "/message"
-    assert segment["attributes"]["url.query"] == "foo=bar&baz=qux"
+    assert segment["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/message"
+    assert segment["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == "foo=bar&baz=qux"
 
     if expect_user_info:
-        assert "client.address" in segment["attributes"]
-        assert "user.ip_address" in segment["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS in segment["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS in segment["attributes"]
     else:
-        assert "client.address" not in segment["attributes"]
-        assert "user.ip_address" not in segment["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in segment["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in segment["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -926,9 +930,9 @@ async def test_quart_auth_user_id(
 
     segment = next(s for s in spans if s["name"] == "/message")
     if expect_user_info and user_id is not None:
-        assert segment["attributes"]["user.id"] == user_id
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_ID] == user_id
     else:
-        assert "user.id" not in segment.get("attributes", {})
+        assert ATTRIBUTE_NAMES.USER_ID not in segment.get("attributes", {})
 
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
@@ -985,13 +989,16 @@ async def test_url_query(sentry_init, capture_items, data_collection, expected_q
     segment = spans[0]
 
     if expected_query is None:
-        assert "url.query" not in segment["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in segment["attributes"]
         # When the filtered query string is empty, url.full carries the
         # base URL only (no query).
-        assert segment["attributes"]["url.full"] == "http://localhost/message"
+        assert (
+            segment["attributes"][ATTRIBUTE_NAMES.URL_FULL]
+            == "http://localhost/message"
+        )
     else:
-        assert segment["attributes"]["url.query"] == expected_query
-        assert segment["attributes"]["url.full"] == (
+        assert segment["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
+        assert segment["attributes"][ATTRIBUTE_NAMES.URL_FULL] == (
             f"http://localhost/message?{expected_query}"
         )
 
@@ -1015,10 +1022,13 @@ async def test_url_query_multi_and_blank_values(sentry_init, capture_items):
     assert len(spans) == 1
 
     segment = spans[0]
-    query = segment["attributes"]["url.query"]
+    query = segment["attributes"][ATTRIBUTE_NAMES.URL_QUERY]
     # Repeated keys are preserved and blank values are kept.
     assert "foo=1" in query
     assert "foo=2" in query
     assert "empty=" in query
     # url.full carries the same filtered query string.
-    assert segment["attributes"]["url.full"] == f"http://localhost/message?{query}"
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.URL_FULL]
+        == f"http://localhost/message?{query}"
+    )

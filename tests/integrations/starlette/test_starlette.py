@@ -10,6 +10,7 @@ import warnings
 
 import pytest
 import starlette
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from starlette.authentication import (
     AuthCredentials,
     AuthenticationBackend,
@@ -25,7 +26,7 @@ from starlette.testclient import TestClient
 import sentry_sdk
 from sentry_sdk import capture_message, get_baggage, get_traceparent
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.starlette import (
@@ -318,10 +319,14 @@ async def test_request_info_json_body(sentry_init, capture_items):
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     server_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
     )
 
-    assert json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]) == {
+    assert json.loads(
+        server_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA]
+    ) == {
         "some": "json",
         "for": "testing",
         "nested": {"numbers": 123},
@@ -358,13 +363,15 @@ async def test_formdata_request_body(sentry_init, capture_items):
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     server_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
     )
 
     # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
     # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
     parsed_form_attribute = json.loads(
-        server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+        server_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA]
     )
     assert parsed_form_attribute.keys() == PARSED_FORM.keys()
     assert parsed_form_attribute["username"] == PARSED_FORM["username"]
@@ -404,12 +411,14 @@ async def test_request_body_too_big(sentry_init, capture_items):
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     server_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
     )
 
     # Because request is too big only the AnnotatedValue is extracted.
     assert (
-        server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+        server_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA]
         == "[Exceeds maximum size]"
     )
 
@@ -440,9 +449,11 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     server_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
     )
-    assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
+    assert ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -484,18 +495,22 @@ async def test_request_body_data_collection(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     server_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
     )
 
     if expect_body:
         assert event["request"]["data"] == BODY_JSON
         assert (
-            json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA])
+            json.loads(
+                server_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA]
+            )
             == BODY_JSON
         )
     else:
         assert "data" not in event["request"]
-        assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -526,10 +541,12 @@ async def test_request_info_cookies_off(sentry_init, capture_items):
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     server_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
     )
     assert (
-        json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA])
+        json.loads(server_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA])
         == BODY_JSON
     )
 
@@ -677,10 +694,13 @@ def test_query_string_data_collection(
 
     if expected_query_string is None:
         assert "query_string" not in event["request"]
-        assert SPANDATA.HTTP_QUERY not in segments[0]["attributes"]
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in segments[0]["attributes"]
     else:
         assert event["request"]["query_string"] == expected_query_string
-        assert segments[0]["attributes"][SPANDATA.HTTP_QUERY] == expected_query_string
+        assert (
+            segments[0]["attributes"][ATTRIBUTE_NAMES.HTTP_QUERY]
+            == expected_query_string
+        )
 
 
 @pytest.mark.parametrize(
@@ -722,18 +742,18 @@ def test_span_http_query_data_collection(
         item.payload
         for item in items
         if item.payload.get("is_segment")
-        and item.payload["attributes"].get("sentry.op") == "http.server"
+        and item.payload["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "http.server"
     ]
     (segment,) = segments
     attributes = segment["attributes"]
 
     if expected_query is None:
-        assert SPANDATA.HTTP_QUERY not in attributes
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in attributes
     else:
-        assert attributes[SPANDATA.HTTP_QUERY] == expected_query
+        assert attributes[ATTRIBUTE_NAMES.HTTP_QUERY] == expected_query
 
-    assert attributes["url.full"] == expected_url_full
-    assert attributes["url.path"] == "/message"
+    assert attributes[ATTRIBUTE_NAMES.URL_FULL] == expected_url_full
+    assert attributes[ATTRIBUTE_NAMES.URL_PATH] == "/message"
 
 
 # TestClient provides ("testclient", 50000) as the scope's client.
@@ -782,9 +802,9 @@ def test_user_info_data_collection(
     attributes = items[0].payload["attributes"]
 
     if expected_ip is NO_USER_INFO:
-        assert SPANDATA.CLIENT_ADDRESS not in attributes
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in attributes
     else:
-        assert attributes[SPANDATA.CLIENT_ADDRESS] == expected_ip
+        assert attributes[ATTRIBUTE_NAMES.CLIENT_ADDRESS] == expected_ip
 
 
 @pytest.mark.parametrize(
@@ -857,10 +877,16 @@ def test_hosted_route_transaction_info(sentry_init, capture_items):
     # Starlette starting setting scope["route"] with https://github.com/Kludex/starlette/commit/9c594b56e8da9c3d8c35baa40f357e7bc94f6d02
     if STARLETTE_VERSION >= (1, 7):
         assert segments[0]["name"].endswith("/users/{user_id}")
-        assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+        assert (
+            segments[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+            == "route"
+        )
     else:
         assert segments[0]["name"].endswith("/users/123456")
-        assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
+        assert (
+            segments[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+            == "url"
+        )
 
 
 @pytest.mark.parametrize(
@@ -1052,11 +1078,14 @@ def test_middleware_spans(sentry_init, capture_items):
     assert len(middleware_spans) == len(expected_middleware_spans)
 
     assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.server"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
 
     idx = 0
     for idx, span in enumerate(middleware_spans):
-        assert span["attributes"]["middleware.name"] == expected_middleware_spans[idx]
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.MIDDLEWARE_NAME]
+            == expected_middleware_spans[idx]
+        )
 
 
 def test_middleware_spans_disabled(sentry_init, capture_items):
@@ -1085,7 +1114,7 @@ def test_middleware_spans_disabled(sentry_init, capture_items):
     assert len(middleware_spans) == 0
 
     assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.server"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
 
 
 def test_middleware_callback_spans(sentry_init, capture_items):
@@ -1164,12 +1193,15 @@ def test_middleware_callback_spans(sentry_init, capture_items):
     assert len(middleware_spans) == len(expected)
 
     assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.server"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
 
     for span, exp in zip(middleware_spans, expected):
-        assert span["attributes"]["sentry.op"] == exp["op"]
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == exp["op"]
         assert span["name"] == exp["description"]
-        assert span["attributes"]["middleware.name"] == exp["middleware_name"]
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.MIDDLEWARE_NAME]
+            == exp["middleware_name"]
+        )
 
 
 def test_middleware_receive_send(sentry_init):
@@ -1251,10 +1283,10 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     ]
 
     assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.server"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
 
     for span, exp in zip(middleware_spans, expected):
-        assert span["attributes"]["sentry.op"] == exp["op"]
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == exp["op"]
         assert span["name"].startswith(exp["description"])
 
 
@@ -1315,7 +1347,7 @@ def test_active_thread_id(sentry_init, capture_items, endpoint):
 
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
-    assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
+    assert str(data["active"]) == segments[0]["attributes"][ATTRIBUTE_NAMES.THREAD_ID]
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
@@ -1338,8 +1370,10 @@ def test_http_route(sentry_init, capture_items, endpoint):
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert segments[0]["name"] == endpoint
-    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
-    assert segments[0]["attributes"]["http.route"] == endpoint
+    assert (
+        segments[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "route"
+    )
+    assert segments[0]["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == endpoint
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
@@ -1362,7 +1396,9 @@ def test_segment_name_is_route_resolved_name_static(
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert segments[0]["name"] == endpoint
-    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+    assert (
+        segments[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "route"
+    )
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):
@@ -1460,7 +1496,9 @@ def test_transaction_name(
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert segments[0]["name"] == "/message/{message_id}"
-    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+    assert (
+        segments[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "route"
+    )
 
 
 def test_transaction_name_in_traces_sampler(
@@ -1525,7 +1563,9 @@ def test_transaction_name_in_middleware(
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert segments[0]["name"] == "http://testserver/message/123456"
-    assert segments[0]["attributes"]["sentry.segment.name.source"] == "url"
+    assert (
+        segments[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "url"
+    )
 
 
 def test_span_origin(sentry_init, capture_items):
@@ -1550,7 +1590,10 @@ def test_span_origin(sentry_init, capture_items):
 
     assert len(items) > 0
     for item in items:
-        assert item.payload["attributes"]["sentry.origin"] == "auto.http.starlette"
+        assert (
+            item.payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.http.starlette"
+        )
 
 
 @pytest.mark.skipif(
@@ -1581,7 +1624,7 @@ def test_segment_http_method_default(sentry_init, capture_items):
 
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
-    assert segments[0]["attributes"]["http.request.method"] == "GET"
+    assert segments[0]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
 
 
 def test_request_url(sentry_init, capture_items):
@@ -1603,12 +1646,14 @@ def test_request_url(sentry_init, capture_items):
     spans = [item.payload for item in items]
 
     (server_span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == "http.server"
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "http.server"
     )
-    assert server_span["attributes"][SPANDATA.URL_FULL] == (
+    assert server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL] == (
         "http://testserver/root/nomessage"
     )
-    assert server_span["attributes"][SPANDATA.URL_PATH] == "/root/nomessage"
+    assert server_span["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/root/nomessage"
 
 
 @pytest.mark.skipif(
@@ -1642,8 +1687,8 @@ def test_segment_http_method_custom(sentry_init, capture_items):
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 2
 
-    assert segments[0]["attributes"]["http.request.method"] == "OPTIONS"
-    assert segments[1]["attributes"]["http.request.method"] == "HEAD"
+    assert segments[0]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "OPTIONS"
+    assert segments[1]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "HEAD"
 
 
 @parametrize_test_configurable_status_codes

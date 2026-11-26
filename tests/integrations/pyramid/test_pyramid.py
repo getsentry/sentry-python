@@ -6,11 +6,11 @@ import pyramid.testing
 import pytest
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from werkzeug.test import Client
 
 import sentry_sdk
 from sentry_sdk import add_breadcrumb, capture_message
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.traces import SpanStatus
@@ -146,7 +146,10 @@ def test_segment_name_and_source(
     assert len(spans) == 1
     (segment,) = spans
     assert segment["name"] == expected_transaction
-    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == expected_source
+    )
 
 
 def test_http_route(
@@ -167,7 +170,7 @@ def test_http_route(
     sentry_sdk.flush()
 
     (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/{message_id}"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == "/message/{message_id}"
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])
@@ -499,7 +502,7 @@ def test_tracing_error(
 
     assert segment["name"] == "/tracing-error"
     assert segment["status"] == SpanStatus.ERROR
-    assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.pyramid"
 
     assert error_event["exception"]["values"][-1]["type"] == "ZeroDivisionError"
     assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "pyramid"
@@ -526,7 +529,7 @@ def test_span_origin(
     spans = [i.payload for i in items if i.type == "span"]
     assert len(spans) == 1
     (segment,) = spans
-    assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.pyramid"
 
 
 @pytest.mark.parametrize(
@@ -565,9 +568,9 @@ def test_span_sets_user_id_on_segment(
     (segment,) = spans
 
     if expect_user:
-        assert segment["attributes"]["user.id"] == "123-abc"
+        assert segment["attributes"][ATTRIBUTE_NAMES.USER_ID] == "123-abc"
     else:
-        assert "user.id" not in segment["attributes"]
+        assert ATTRIBUTE_NAMES.USER_ID not in segment["attributes"]
 
 
 @pytest.mark.parametrize(
