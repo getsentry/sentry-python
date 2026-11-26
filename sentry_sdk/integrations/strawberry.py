@@ -1,6 +1,8 @@
 import functools
 from inspect import isawaitable
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -167,17 +169,21 @@ class SentryAsyncExtension(SchemaExtension):
 
         additional_attributes: "dict[str, Any]" = {}
         if client.options["data_collection"]["graphql"]["document"]:
-            additional_attributes["graphql.document"] = self.execution_context.query
+            additional_attributes[ATTRIBUTE_NAMES.GRAPHQL_DOCUMENT] = (
+                self.execution_context.query
+            )
 
         if operation_name:
-            additional_attributes["graphql.operation.name"] = operation_name
+            additional_attributes[ATTRIBUTE_NAMES.GRAPHQL_OPERATION_NAME] = (
+                operation_name
+            )
 
         graphql_span = sentry_sdk.start_span(
             name=description,
             attributes={
-                "sentry.origin": StrawberryIntegration.origin,
-                "sentry.op": op,
-                "graphql.operation.type": operation_type,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: StrawberryIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: op,
+                ATTRIBUTE_NAMES.GRAPHQL_OPERATION_TYPE: operation_type,
                 **additional_attributes,
             },
         )
@@ -187,9 +193,9 @@ class SentryAsyncExtension(SchemaExtension):
         if self.execution_context.operation_name:
             segment = graphql_span._segment
             segment.set_attribute(
-                "sentry.segment.name.source", SegmentNameSource.COMPONENT
+                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE, SegmentNameSource.COMPONENT
             )
-            segment.set_attribute("sentry.op", op)
+            segment.set_attribute(ATTRIBUTE_NAMES.SENTRY_OP, op)
             segment.name = self.execution_context.operation_name
 
         graphql_span.end()
@@ -202,8 +208,8 @@ class SentryAsyncExtension(SchemaExtension):
         validation_span = sentry_sdk.start_span(
             name="validation",
             attributes={
-                "sentry.op": OP.GRAPHQL_VALIDATE,
-                "sentry.origin": StrawberryIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRAPHQL_VALIDATE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: StrawberryIntegration.origin,
             },
         )
 
@@ -221,8 +227,8 @@ class SentryAsyncExtension(SchemaExtension):
         parsing_span = sentry_sdk.start_span(
             name="parsing",
             attributes={
-                "sentry.op": OP.GRAPHQL_PARSE,
-                "sentry.origin": StrawberryIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRAPHQL_PARSE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: StrawberryIntegration.origin,
             },
         )
 
@@ -273,8 +279,8 @@ class SentryAsyncExtension(SchemaExtension):
         with sentry_sdk.start_span(
             name=f"resolving {field_path}",
             attributes={
-                "sentry.origin": StrawberryIntegration.origin,
-                "sentry.op": OP.GRAPHQL_RESOLVE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: StrawberryIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRAPHQL_RESOLVE,
             },
         ):
             return await self._resolve(_next, root, info, *args, **kwargs)
@@ -300,8 +306,8 @@ class SentrySyncExtension(SentryAsyncExtension):
         with sentry_sdk.start_span(
             name=f"resolving {field_path}",
             attributes={
-                "sentry.origin": StrawberryIntegration.origin,
-                "sentry.op": OP.GRAPHQL_RESOLVE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: StrawberryIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GRAPHQL_RESOLVE,
             },
         ):
             return _next(root, info, *args, **kwargs)

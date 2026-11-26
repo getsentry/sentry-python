@@ -1,6 +1,8 @@
 import contextlib
 import weakref
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
@@ -98,7 +100,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         scope.set_custom_sampling_context({"tornado_request": self.request})
 
         scope.set_attribute(
-            SPANDATA.SENTRY_IS_LOCALHOST,
+            ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST,
             _is_localhost(
                 client_ip=_get_client_ip(self.request),
                 host_header=self.request.headers.get("Host"),
@@ -107,18 +109,18 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         )
 
         if self.request.remote_ip and client.options["data_collection"]["user_info"]:
-            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
+            scope.set_attribute(ATTRIBUTE_NAMES.USER_IP_ADDRESS, self.request.remote_ip)
 
         user_agent = headers.get("User-Agent")
         if user_agent:
-            scope.set_attribute(SPANDATA.USER_AGENT_ORIGINAL, user_agent)
+            scope.set_attribute(ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL, user_agent)
 
         with sentry_sdk.start_span(
             name=_DEFAULT_ROOT_SPAN_NAME,
             attributes={
-                "sentry.op": OP.HTTP_SERVER,
-                "sentry.origin": TornadoIntegration.origin,
-                "sentry.segment.name.source": SegmentNameSource.ROUTE,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_SERVER,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: TornadoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.ROUTE,
             },
             parent_span=None,
         ) as span:
@@ -136,13 +138,15 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                         if span_name:
                             span.name = span_name
                             span.set_attribute(
-                                "sentry.segment.name.source",
+                                ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE,
                                 SegmentNameSource.COMPONENT,
                             )
 
                 with capture_internal_exceptions():
                     status_int = self.get_status()
-                    span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
+                    span.set_attribute(
+                        ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE, status_int
+                    )
                     span.status = "error" if status_int >= 400 else "ok"
 
 
@@ -162,13 +166,13 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     client_options = sentry_sdk.get_client().options
 
     if request.method:
-        attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
+        attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] = request.method.upper()
 
     headers = _filter_headers(dict(request.headers))
     for header, value in headers.items():
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = [value]
 
-    attributes["url.path"] = request.path
+    attributes[ATTRIBUTE_NAMES.URL_PATH] = request.path
 
     filtered_query = None
     if request.query:
@@ -177,18 +181,18 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
             behaviour=client_options["data_collection"]["url_query_params"],
         )
         if filtered_query:
-            attributes[SPANDATA.URL_QUERY] = filtered_query
+            attributes[ATTRIBUTE_NAMES.URL_QUERY] = filtered_query
 
     parsed_url = parse_url(request.full_url())
-    attributes[SPANDATA.URL_FULL] = (
+    attributes[ATTRIBUTE_NAMES.URL_FULL] = (
         f"{parsed_url.url}?{filtered_query}" if filtered_query else parsed_url.url
     )
 
     if request.remote_ip and client_options["data_collection"]["user_info"]:
-        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+        attributes[ATTRIBUTE_NAMES.CLIENT_ADDRESS] = request.remote_ip
 
     if request.protocol:
-        attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
+        attributes[ATTRIBUTE_NAMES.NETWORK_PROTOCOL_NAME] = request.protocol
 
     record_incoming_request_data = (
         "incoming_request" in client_options["data_collection"]["http_bodies"]
@@ -201,7 +205,7 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
                 raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
             )
             if body_data is not None:
-                attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
+                attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA] = body_data
 
     return attributes
 

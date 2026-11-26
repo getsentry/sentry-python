@@ -10,10 +10,11 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from werkzeug.test import Client
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA, SPANNAME
+from sentry_sdk.consts import SPANNAME
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
@@ -142,16 +143,24 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     # Ensure operation is persisted
     assert User.objects.using("postgres").exists()
 
-    assert postgres_rollback["attributes"]["sentry.origin"] == "auto.http.django"
-    assert postgres_commit["attributes"]["sentry.origin"] == "auto.http.django"
-    assert sqlite_rollback["attributes"]["sentry.origin"] == "manual"
-    assert sqlite_commit["attributes"]["sentry.origin"] == "manual"
+    assert (
+        postgres_rollback["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.http.django"
+    )
+    assert (
+        postgres_commit["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.http.django"
+    )
+    assert sqlite_rollback["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert sqlite_commit["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
     commit_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_COMMIT
-        or span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_COMMIT
+        or span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
     assert len(commit_spans) == 0
 
@@ -269,8 +278,10 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     commit_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_COMMIT
-        or span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_COMMIT
+        or span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
     assert len(commit_spans) == 0
 
@@ -303,30 +314,31 @@ def test_db_no_autocommit_execute(
     # Ensure operation is persisted
     assert User.objects.using("postgres").exists()
 
-    assert spans[5]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
 
     commit_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_COMMIT
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_COMMIT
     ]
 
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
 
-    assert commit_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert commit_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "postgresql"
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "postgresql"
     conn_params = connections["postgres"].get_connection_params()
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
-    assert commit_span["attributes"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
-    )
-    assert commit_span["attributes"].get(SPANDATA.SERVER_PORT) == os.environ.get(
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert commit_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
+    assert commit_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_ADDRESS
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.SERVER_PORT) == os.environ.get(
         "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
     )
 
@@ -396,27 +408,28 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     # Ensure operation is persisted
     assert User.objects.exists()
 
-    assert spans[2]["attributes"]["sentry.origin"] == "manual"
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.db.django"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
 
     commit_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_COMMIT
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_COMMIT
     ]
 
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
 
-    assert commit_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert commit_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "sqlite"
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "sqlite"
     conn_params = connection.get_connection_params()
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert commit_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
 
@@ -453,32 +466,37 @@ def test_db_no_autocommit_rollback_execute(
     # Ensure operation is rolled back
     assert not User.objects.using("postgres").exists()
 
-    assert spans[5]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
 
     rollback_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
 
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
 
-    assert rollback_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert (
+        rollback_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
+    )
 
     # Verify other database attributes
-    assert rollback_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "postgresql"
+    assert (
+        rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "postgresql"
+    )
     conn_params = connections["postgres"].get_connection_params()
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
-    assert rollback_span["attributes"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
-    )
-    assert rollback_span["attributes"].get(SPANDATA.SERVER_PORT) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
-    )
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_ADDRESS
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_PORT
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
     assert len(insert_spans) == 1
@@ -546,26 +564,29 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     # Ensure operation is rolled back
     assert not User.objects.exists()
 
-    assert spans[2]["attributes"]["sentry.origin"] == "manual"
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.db.django"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
 
     rollback_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
 
-    assert rollback_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert (
+        rollback_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
+    )
 
     # Verify other database attributes
-    assert rollback_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "sqlite"
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "sqlite"
     conn_params = connection.get_connection_params()
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
 
@@ -602,30 +623,31 @@ def test_db_atomic_execute(
     # Ensure operation is persisted
     assert User.objects.using("postgres").exists()
 
-    assert spans[5]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
 
     commit_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_COMMIT
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_COMMIT
     ]
 
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
 
-    assert commit_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert commit_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "postgresql"
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "postgresql"
     conn_params = connections["postgres"].get_connection_params()
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
-    assert commit_span["attributes"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
-    )
-    assert commit_span["attributes"].get(SPANDATA.SERVER_PORT) == os.environ.get(
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert commit_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
+    assert commit_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_ADDRESS
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.SERVER_PORT) == os.environ.get(
         "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
     )
 
@@ -692,25 +714,26 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     # Ensure operation is persisted
     assert User.objects.exists()
 
-    assert spans[3]["attributes"]["sentry.origin"] == "manual"
+    assert spans[3]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
     commit_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_COMMIT
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
 
-    assert commit_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert commit_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "sqlite"
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "sqlite"
     conn_params = connection.get_connection_params()
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert commit_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
+    assert commit_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert commit_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
 
@@ -747,32 +770,37 @@ def test_db_atomic_rollback_execute(
     # Ensure operation is rolled back
     assert not User.objects.using("postgres").exists()
 
-    assert spans[5]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
 
     rollback_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
 
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
 
-    assert rollback_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert (
+        rollback_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
+    )
 
     # Verify other database attributes
-    assert rollback_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "postgresql"
+    assert (
+        rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "postgresql"
+    )
     conn_params = connections["postgres"].get_connection_params()
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
-    assert rollback_span["attributes"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
-    )
-    assert rollback_span["attributes"].get(SPANDATA.SERVER_PORT) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
-    )
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_ADDRESS
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_PORT
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
 
@@ -839,26 +867,29 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     # Ensure operation is rolled back
     assert not User.objects.exists()
 
-    assert spans[3]["attributes"]["sentry.origin"] == "manual"
+    assert spans[3]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
     rollback_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
 
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
 
-    assert rollback_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert (
+        rollback_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
+    )
 
     # Verify other database attributes
-    assert rollback_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "sqlite"
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "sqlite"
     conn_params = connection.get_connection_params()
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
 
@@ -895,32 +926,37 @@ def test_db_atomic_execute_exception(
     # Ensure operation is rolled back
     assert not User.objects.using("postgres").exists()
 
-    assert spans[5]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
 
     rollback_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
 
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
 
-    assert rollback_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert (
+        rollback_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
+    )
 
     # Verify other database attributes
-    assert rollback_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "postgresql"
+    assert (
+        rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "postgresql"
+    )
     conn_params = connections["postgres"].get_connection_params()
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
-    assert rollback_span["attributes"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
-    )
-    assert rollback_span["attributes"].get(SPANDATA.SERVER_PORT) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
-    )
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_ADDRESS
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.SERVER_PORT
+    ) == os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
     assert len(insert_spans) == 1
@@ -989,25 +1025,28 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     # Ensure operation is rolled back
     assert not User.objects.exists()
 
-    assert spans[3]["attributes"]["sentry.origin"] == "manual"
+    assert spans[3]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
     rollback_spans = [
         span
         for span in spans
-        if span["attributes"].get(SPANDATA.DB_OPERATION_NAME) == SPANNAME.DB_ROLLBACK
+        if span["attributes"].get(ATTRIBUTE_NAMES.DB_OPERATION_NAME)
+        == SPANNAME.DB_ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
 
-    assert rollback_span["attributes"]["sentry.origin"] == "auto.db.django"
+    assert (
+        rollback_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.django"
+    )
 
     # Verify other database attributes
-    assert rollback_span["attributes"].get(SPANDATA.DB_SYSTEM_NAME) == "sqlite"
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "sqlite"
     conn_params = connection.get_connection_params()
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) is not None
-    assert rollback_span["attributes"].get(SPANDATA.DB_NAMESPACE) == conn_params.get(
-        "database"
-    ) or conn_params.get("dbname")
+    assert rollback_span["attributes"].get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+    assert rollback_span["attributes"].get(
+        ATTRIBUTE_NAMES.DB_NAMESPACE
+    ) == conn_params.get("database") or conn_params.get("dbname")
 
     insert_spans = [span for span in spans if span["name"].startswith("INSERT INTO")]
 

@@ -15,6 +15,7 @@ from aiohttp.web_exceptions import (
     HTTPUnavailableForLegalReasons,
 )
 from aiohttp.web_request import Request
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -686,7 +687,7 @@ async def test_outgoing_trace_headers_adds_missing_unsigned_propagation_headers(
     with sentry_sdk.start_span(
         name="/interactions/other-dogs/new-dog",
         attributes={
-            "sentry.op": "greeting.sniff",
+            ATTRIBUTE_NAMES.SENTRY_OP: "greeting.sniff",
         },
     ):
         client = await aiohttp_client(raw_server)
@@ -695,7 +696,9 @@ async def test_outgoing_trace_headers_adds_missing_unsigned_propagation_headers(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (request_span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == "http.client"
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "http.client"
     )
 
     assert resp.request_info.headers[
@@ -868,9 +871,9 @@ async def test_request_source_disabled(
     assert span["name"].startswith("GET")
 
     assert SPANDATA.CODE_LINENO not in span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in span["attributes"]
     assert SPANDATA.CODE_FILEPATH not in span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -918,10 +921,10 @@ async def test_request_source_enabled(
 
     assert span["name"].startswith("GET")
 
-    assert "code.line.number" in span["attributes"]
-    assert "code.namespace" in span["attributes"]
-    assert "code.file.path" in span["attributes"]
-    assert "code.function" in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -960,25 +963,28 @@ async def test_request_source(
 
     assert span["name"].startswith("GET")
 
-    assert "code.line.number" in span["attributes"]
-    assert "code.namespace" in span["attributes"]
-    assert "code.file.path" in span["attributes"]
-    assert "code.function" in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in span["attributes"]
 
-    assert type(span["attributes"]["code.line.number"]) == int
-    assert span["attributes"]["code.line.number"] > 0
+    assert type(span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
     assert (
-        span["attributes"]["code.namespace"]
+        span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
         == "tests.integrations.aiohttp.test_aiohttp"
     )
-    assert span["attributes"]["code.file.path"].endswith(
+    assert span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH].endswith(
         "tests/integrations/aiohttp/test_aiohttp.py"
     )
 
-    is_relative_path = span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
     assert is_relative_path
 
-    assert span["attributes"]["code.function"] == "handler_with_outgoing_request"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
+        == "handler_with_outgoing_request"
+    )
 
 
 @pytest.mark.asyncio
@@ -1022,20 +1028,27 @@ async def test_request_source_with_module_in_search_path(
 
     assert span["name"].startswith("GET")
 
-    assert "code.line.number" in span["attributes"]
-    assert "code.namespace" in span["attributes"]
-    assert "code.file.path" in span["attributes"]
-    assert "code.function" in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in span["attributes"]
 
-    assert type(span["attributes"]["code.line.number"]) == int
-    assert span["attributes"]["code.line.number"] > 0
-    assert span["attributes"]["code.namespace"] == "aiohttp_helpers.helpers"
-    assert span["attributes"]["code.file.path"] == "aiohttp_helpers/helpers.py"
+    assert type(span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE] == "aiohttp_helpers.helpers"
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH]
+        == "aiohttp_helpers/helpers.py"
+    )
 
-    is_relative_path = span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
     assert is_relative_path
 
-    assert span["attributes"]["code.function"] == "get_request_with_client"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION] == "get_request_with_client"
+    )
 
 
 @pytest.mark.asyncio
@@ -1078,9 +1091,9 @@ async def test_no_request_source_if_duration_too_short(
     assert span["name"].startswith("GET")
 
     assert SPANDATA.CODE_LINENO not in span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in span["attributes"]
     assert SPANDATA.CODE_FILEPATH not in span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION not in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -1119,25 +1132,28 @@ async def test_request_source_if_duration_over_threshold(
 
     assert span["name"].startswith("GET")
 
-    assert "code.line.number" in span["attributes"]
-    assert "code.namespace" in span["attributes"]
-    assert "code.file.path" in span["attributes"]
-    assert "code.function" in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_NAMESPACE in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in span["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION in span["attributes"]
 
-    assert type(span["attributes"]["code.line.number"]) == int
-    assert span["attributes"]["code.line.number"] > 0
+    assert type(span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER]) == int
+    assert span["attributes"][ATTRIBUTE_NAMES.CODE_LINE_NUMBER] > 0
     assert (
-        span["attributes"]["code.namespace"]
+        span["attributes"][ATTRIBUTE_NAMES.CODE_NAMESPACE]
         == "tests.integrations.aiohttp.test_aiohttp"
     )
-    assert span["attributes"]["code.file.path"].endswith(
+    assert span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH].endswith(
         "tests/integrations/aiohttp/test_aiohttp.py"
     )
 
-    is_relative_path = span["attributes"]["code.file.path"][0] != os.sep
+    is_relative_path = span["attributes"][ATTRIBUTE_NAMES.CODE_FILE_PATH][0] != os.sep
     assert is_relative_path
 
-    assert span["attributes"]["code.function"] == "handler_with_outgoing_request"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION]
+        == "handler_with_outgoing_request"
+    )
 
 
 @pytest.mark.asyncio
@@ -1174,8 +1190,8 @@ async def test_span_origin(
     sentry_sdk.flush()
 
     (span, segment) = [item.payload for item in items]
-    assert span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
-    assert segment["attributes"]["sentry.origin"] == "auto.http.aiohttp"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.aiohttp"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.aiohttp"
 
 
 @pytest.mark.parametrize(
@@ -1327,25 +1343,29 @@ async def test_tracing(sentry_init, aiohttp_client, capture_items):
 
     assert server_span["is_segment"] is True
     assert server_span["name"] == "/"
-    assert server_span["attributes"]["sentry.op"] == "http.server"
-    assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
-    assert server_span["attributes"]["http.response.status_code"] == 200
-    assert server_span["attributes"]["sentry.segment.name.source"] == "route"
+    assert server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.aiohttp"
+    )
+    assert server_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "route"
+    )
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
-    assert "url.query" not in server_span["attributes"]
+    assert ATTRIBUTE_NAMES.URL_QUERY not in server_span["attributes"]
 
     # Request attributes derived directly from the aiohttp request.
-    assert server_span["attributes"]["http.request.method"] == "GET"
+    assert server_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
 
-    assert "client.address" in server_span["attributes"]
-    assert "user.ip_address" in server_span["attributes"]
+    assert ATTRIBUTE_NAMES.CLIENT_ADDRESS in server_span["attributes"]
+    assert ATTRIBUTE_NAMES.USER_IP_ADDRESS in server_span["attributes"]
 
-    url_full = server_span["attributes"]["url.full"]
+    url_full = server_span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
     assert url_full.startswith("http://127.0.0.1:")
     assert url_full.endswith("/")
 
-    url_path = server_span["attributes"]["url.path"]
+    url_path = server_span["attributes"][ATTRIBUTE_NAMES.URL_PATH]
     assert url_path == "/"
 
     # aiohttp's test client always sends a Host header; we assert it propagates
@@ -1379,14 +1399,16 @@ async def test_user_address_with_data_collection(
     sentry_sdk.flush()
 
     (server_span,) = [item.payload for item in items]
-    assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.aiohttp"
+    )
 
     if expect_ip:
-        assert server_span["attributes"]["client.address"] == "127.0.0.1"
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.CLIENT_ADDRESS] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
     else:
-        assert "client.address" not in server_span["attributes"]
-        assert "user.ip_address" not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in server_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -1459,7 +1481,10 @@ async def test_transaction_style(
 
     assert server_segment["name"] == "/{var}"
     assert server_segment["is_segment"]
-    assert server_segment["attributes"]["sentry.segment.name.source"] == "route"
+    assert (
+        server_segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "route"
+    )
 
 
 @pytest.mark.asyncio
@@ -1494,7 +1519,7 @@ async def test_http_route(
 
     sentry_sdk.flush()
     (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == expected_route
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == expected_route
 
 
 @pytest.mark.asyncio
@@ -1530,8 +1555,8 @@ async def test_server_error(sentry_init, aiohttp_client, capture_items):
     # The integration's generic Exception path reraises without recording
     # http.response.status_code on the server span. Span.__exit__
     # observes the propagating exception and sets status to "error".
-    assert server_span["attributes"]["sentry.op"] == "http.server"
-    assert "http.response.status_code" not in server_span["attributes"]
+    assert server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
+    assert ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE not in server_span["attributes"]
     assert server_span["status"] == "error"
 
 
@@ -1559,8 +1584,8 @@ async def test_http_exception(sentry_init, aiohttp_client, capture_items):
     assert len(items) == 1
     (server_span,) = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.op"] == "http.server"
-    assert server_span["attributes"]["http.response.status_code"] == 403
+    assert server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
+    assert server_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 403
     assert server_span["status"] == "error"
 
 
@@ -1590,8 +1615,8 @@ async def test_http_exception_ok_status_not_overridden(
     assert len(items) == 1
     (server_span,) = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.op"] == "http.server"
-    assert server_span["attributes"]["http.response.status_code"] == 302
+    assert server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
+    assert server_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 302
     assert server_span["status"] == "ok"
 
 
@@ -1647,25 +1672,31 @@ async def test_outgoing_client_span(
     inner_client_span = items[0].payload
     server_span = items[1].payload
 
-    assert server_span["attributes"]["sentry.op"] == "http.server"
+    assert server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
 
     assert inner_client_span["is_segment"] is False
     assert inner_client_span["name"].startswith("GET ")
-    assert inner_client_span["attributes"]["sentry.op"] == "http.client"
-    assert inner_client_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
-    assert inner_client_span["attributes"]["http.request.method"] == "GET"
-    assert inner_client_span["attributes"]["http.response.status_code"] == 200
+    assert inner_client_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
+    assert (
+        inner_client_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.http.aiohttp"
+    )
+    assert inner_client_span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert (
+        inner_client_span["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE]
+        == 200
+    )
     assert inner_client_span["status"] == "ok"
 
     if expect_query:
-        assert inner_client_span["attributes"]["url.query"] == "foo=bar"
+        assert inner_client_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == "foo=bar"
     else:
-        assert "url.query" not in inner_client_span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in inner_client_span["attributes"]
 
-    url_full = inner_client_span["attributes"]["url.full"]
+    url_full = inner_client_span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
     assert url_full.startswith("http://127.0.0.1:")
     assert ("?foo=bar" in url_full) == expect_query
-    assert inner_client_span["attributes"]["url.path"] == "/"
+    assert inner_client_span["attributes"][ATTRIBUTE_NAMES.URL_PATH] == "/"
 
 
 @pytest.mark.asyncio
@@ -1733,15 +1764,17 @@ async def test_user_ip_address_on_all_spans(
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.segment.name.source"] == "route"
-    assert "sentry.segment.name.source" not in child_span["attributes"]
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "route"
+    )
+    assert ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE not in child_span["attributes"]
 
     if expect_user_info:
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert child_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
     else:
-        assert "user.ip_address" not in server_span["attributes"]
-        assert "user.ip_address" not in child_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in child_span["attributes"]
 
 
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
@@ -1803,9 +1836,9 @@ async def test_server_url_query_data_collection(
     (server_span,) = [item.payload for item in items]
 
     if expected_query is None:
-        assert "url.query" not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in server_span["attributes"]
     else:
-        assert server_span["attributes"]["url.query"] == expected_query
+        assert server_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
 
 
 @pytest.mark.asyncio
@@ -1849,9 +1882,11 @@ async def test_client_url_query_data_collection(
     inner_client_span = items[0].payload
 
     if expected_query is None:
-        assert "url.query" not in inner_client_span["attributes"]
+        assert ATTRIBUTE_NAMES.URL_QUERY not in inner_client_span["attributes"]
     else:
-        assert inner_client_span["attributes"]["url.query"] == expected_query
+        assert (
+            inner_client_span["attributes"][ATTRIBUTE_NAMES.URL_QUERY] == expected_query
+        )
 
 
 @pytest.mark.asyncio
@@ -1967,8 +2002,14 @@ async def test_is_localhost_attribute(
     assert len(server_spans) == 1
     assert len(child_spans) == 1
 
-    assert server_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
-    assert child_spans[0]["attributes"][SPANDATA.SENTRY_IS_LOCALHOST] == is_localhost
+    assert (
+        server_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST]
+        == is_localhost
+    )
+    assert (
+        child_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST]
+        == is_localhost
+    )
 
 
 @pytest.mark.asyncio
@@ -2001,8 +2042,10 @@ async def test_user_agent_attribute(sentry_init, aiohttp_client, capture_items):
     assert len(child_spans) == 1
 
     assert (
-        server_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+        server_spans[0]["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
     )
     assert (
-        child_spans[0]["attributes"][SPANDATA.USER_AGENT_ORIGINAL] == "TestBrowser/1.0"
+        child_spans[0]["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
     )

@@ -1,6 +1,8 @@
 import functools
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.traces import Span
@@ -27,8 +29,8 @@ def patch_views() -> None:
         with sentry_sdk.start_span(
             name="serialize response",
             attributes={
-                "sentry.op": OP.VIEW_RENDER,
-                "sentry.origin": DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.VIEW_RENDER,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
             },
         ):
             return old_render(self)
@@ -77,8 +79,8 @@ def _wrap_sync_view(callback: "Any") -> "Any":
         with sentry_sdk.start_span(
             name=request.resolver_match.view_name,
             attributes={
-                "sentry.op": OP.VIEW_RENDER,
-                "sentry.origin": DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.VIEW_RENDER,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
             },
         ):
             return callback(request, *args, **kwargs)

@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -73,14 +74,17 @@ def test_task_span_is_created(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PUBLISH
     ]
     assert len(queue_submit_spans) == 1
     assert (
         queue_submit_spans[0]["name"]
         == "tests.integrations.django.test_tasks.simple_task"
     )
-    assert queue_submit_spans[0]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert (
+        queue_submit_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.http.django"
+    )
 
 
 def test_task_enqueue_returns_result(sentry_init, immediate_backend):
@@ -119,7 +123,7 @@ def test_task_enqueue_with_kwargs(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PUBLISH
     ]
     assert len(queue_submit_spans) == 1
     assert queue_submit_spans[0]["name"] == "tests.integrations.django.test_tasks.greet"
@@ -152,7 +156,7 @@ def test_task_error_reporting(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PUBLISH
     ]
 
     assert len(queue_submit_spans) == 1
@@ -185,7 +189,7 @@ def test_multiple_task_enqueues_create_multiple_spans(
     queue_submit_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PUBLISH
     ]
     assert len(queue_submit_spans) == 3
 

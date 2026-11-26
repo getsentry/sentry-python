@@ -12,8 +12,10 @@ from copy import deepcopy
 from functools import partial
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_ip,
@@ -188,7 +190,7 @@ class SentryAsgiMiddleware:
 
                     headers = _get_headers(scope)
                     sentry_scope.set_attribute(
-                        SPANDATA.SENTRY_IS_LOCALHOST,
+                        ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST,
                         _is_localhost(
                             client_ip=_get_ip(scope),
                             url_host=scope.get("server")[0]
@@ -201,7 +203,7 @@ class SentryAsgiMiddleware:
 
                     if headers.get("user-agent"):
                         sentry_scope.set_attribute(
-                            SPANDATA.USER_AGENT_ORIGINAL, headers["user-agent"]
+                            ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL, headers["user-agent"]
                         )
 
                     ty = scope["type"]
@@ -214,18 +216,20 @@ class SentryAsgiMiddleware:
 
                     span: "Optional[ContextManager[Optional[Span]]]" = None
                     attributes: "Attributes" = {
-                        "sentry.segment.name.source": getattr(
+                        ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: getattr(
                             transaction_source, "value", transaction_source
                         ),
-                        "sentry.origin": self.span_origin,
-                        "network.protocol.name": ty,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: self.span_origin,
+                        ATTRIBUTE_NAMES.NETWORK_PROTOCOL_NAME: ty,
                     }
 
                     ip = _get_ip(scope)
                     if ip:
                         client_options = sentry_sdk.get_client().options
                         if client_options["data_collection"]["user_info"]:
-                            sentry_scope.set_attribute(SPANDATA.USER_IP_ADDRESS, ip)
+                            sentry_scope.set_attribute(
+                                ATTRIBUTE_NAMES.USER_IP_ADDRESS, ip
+                            )
 
                     if ty in ("http", "websocket"):
                         if ty == "websocket" or method in self.http_methods_to_capture:
@@ -233,7 +237,7 @@ class SentryAsgiMiddleware:
 
                             Scope.set_custom_sampling_context({"asgi_scope": scope})
 
-                            attributes["sentry.op"] = f"{ty}.server"
+                            attributes[ATTRIBUTE_NAMES.SENTRY_OP] = f"{ty}.server"
                             span = sentry_sdk.start_span(
                                 name=transaction_name,
                                 attributes=attributes,
@@ -245,7 +249,7 @@ class SentryAsgiMiddleware:
 
                         Scope.set_custom_sampling_context({"asgi_scope": scope})
 
-                        attributes["sentry.op"] = OP.HTTP_SERVER
+                        attributes[ATTRIBUTE_NAMES.SENTRY_OP] = OP.HTTP_SERVER
                         span = sentry_sdk.start_span(
                             name=transaction_name,
                             attributes=attributes,
@@ -276,7 +280,7 @@ class SentryAsgiMiddleware:
                                             "error" if event["status"] >= 400 else "ok"
                                         )
                                         span.set_attribute(
-                                            "http.response.status_code",
+                                            ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE,
                                             event["status"],
                                         )
 
@@ -303,7 +307,7 @@ class SentryAsgiMiddleware:
                                     span is not None
                                     and span.name != _DEFAULT_TRANSACTION_NAME
                                     and span.get_attributes().get(
-                                        "sentry.segment.name.source"
+                                        ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE
                                     )
                                     in [
                                         SegmentNameSource.COMPONENT.value,
@@ -318,7 +322,8 @@ class SentryAsgiMiddleware:
                                         )
                                         span.name = name
                                         span.set_attribute(
-                                            "sentry.segment.name.source", source
+                                            ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE,
+                                            source,
                                         )
         finally:
             _asgi_middleware_applied.set(False)

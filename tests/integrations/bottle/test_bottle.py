@@ -5,12 +5,12 @@ from io import BytesIO
 import pytest
 from bottle import Bottle, HTTPResponse, abort, redirect
 from bottle import debug as set_debug
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.bottle import BottleIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -453,7 +453,7 @@ def test_span_origin(
     spans = [item.payload for item in items]
     segment = spans[-1]
     assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.bottle"
 
 
 def test_basic(sentry_init, capture_items):
@@ -483,10 +483,10 @@ def test_basic(sentry_init, capture_items):
     assert segment["is_segment"] is True
     assert "parent_span_id" not in segment
     assert segment["status"] == "ok"
-    assert segment["attributes"]["sentry.op"] == "http.server"
-    assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
-    assert segment["attributes"]["http.request.method"] == "GET"
-    assert segment["attributes"]["http.response.status_code"] == 200
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.bottle"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == 200
     assert segment["name"] == "/message"
 
 
@@ -537,7 +537,10 @@ def test_segment_name_and_source(
     assert segment["is_segment"] is True
 
     assert segment["name"].endswith(expected_name)
-    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == expected_source
+    )
 
 
 def test_http_route(
@@ -562,7 +565,7 @@ def test_http_route(
     sentry_sdk.flush()
 
     (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<message_id>"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == "/message/<message_id>"
 
 
 @pytest.mark.parametrize("debug", (True, False), ids=["debug", "nodebug"])
@@ -656,7 +659,9 @@ def test_http_error_status(
     assert segment["is_segment"] is True
 
     assert segment["status"] == expected_span_status
-    assert segment["attributes"]["http.response.status_code"] == status_code
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] == status_code
+    )
 
 
 @pytest.mark.parametrize("raise_error", [True, False])

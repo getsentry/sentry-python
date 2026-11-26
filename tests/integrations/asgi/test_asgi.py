@@ -2,6 +2,7 @@ from collections import Counter
 
 import pytest
 from async_asgi_testclient import TestClient
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -207,14 +208,17 @@ async def test_capture_transaction(
     assert span["is_segment"] is True
     assert span["name"] == "/some_url"
 
-    assert span["attributes"]["sentry.segment.name.source"] == "url"
-    assert span["attributes"]["sentry.op"] == "http.server"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "url"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.server"
 
-    assert span["attributes"]["network.protocol.name"] == "http"
-    assert span["attributes"]["http.request.method"] == "GET"
+    assert span["attributes"][ATTRIBUTE_NAMES.NETWORK_PROTOCOL_NAME] == "http"
+    assert span["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
     assert span["attributes"]["http.request.header.host"] == ["localhost"]
     assert span["attributes"]["http.request.header.user-agent"] == ["ASGI-Test-Client"]
-    assert span["attributes"]["url.full"] == "http://localhost/some_url?somevalue=123"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.URL_FULL]
+        == "http://localhost/some_url?somevalue=123"
+    )
 
 
 @pytest.mark.asyncio
@@ -433,7 +437,7 @@ async def test_websocket(
     assert span.type == "span"
     span = span.payload
     assert span["name"] == request_url
-    assert span["attributes"]["sentry.segment.name.source"] == "url"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "url"
 
 
 @pytest.mark.asyncio
@@ -506,7 +510,7 @@ async def test_fallback_segment_name_and_source(
     span = items[0].payload
 
     assert span["name"] == "generic ASGI request"
-    assert span["attributes"]["sentry.segment.name.source"] == "route"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "route"
 
 
 def mock_asgi2_app():
@@ -781,7 +785,9 @@ async def test_get_request_attributes_url_with_filtered_host(
     attributes = items[0].payload["attributes"]
 
     assert attributes["http.request.header.host"] == ["[Filtered]"]
-    assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
+    assert (
+        attributes[ATTRIBUTE_NAMES.URL_FULL] == "http://example.com/foo?somevalue=123"
+    )
 
 
 @pytest.mark.asyncio
@@ -807,7 +813,9 @@ async def test_get_request_attributes_url_with_headers_off(
     attributes = items[0].payload["attributes"]
 
     assert not any(key.startswith("http.request.header.") for key in attributes)
-    assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
+    assert (
+        attributes[ATTRIBUTE_NAMES.URL_FULL] == "http://example.com/foo?somevalue=123"
+    )
 
 
 QUERY_STRING = "token=abc&theme=dark&lang=en&session=xyz"
@@ -880,16 +888,16 @@ async def test_get_request_attributes_query_data_collection(
     attributes = items[0].payload["attributes"]
 
     if expected_query is None:
-        assert "http.query" not in attributes
+        assert ATTRIBUTE_NAMES.HTTP_QUERY not in attributes
     else:
-        assert attributes["http.query"] == expected_query
+        assert attributes[ATTRIBUTE_NAMES.HTTP_QUERY] == expected_query
 
     if expected_url_full is None:
-        assert "url.full" not in attributes
-        assert "url.path" not in attributes
+        assert ATTRIBUTE_NAMES.URL_FULL not in attributes
+        assert ATTRIBUTE_NAMES.URL_PATH not in attributes
     else:
-        assert attributes["url.full"] == expected_url_full
-        assert attributes["url.path"] == "/foo"
+        assert attributes[ATTRIBUTE_NAMES.URL_FULL] == expected_url_full
+        assert attributes[ATTRIBUTE_NAMES.URL_PATH] == "/foo"
 
 
 USER_INFO_CASES = [
@@ -939,9 +947,9 @@ async def test_get_request_attributes_client_address_user_info(
     attributes = items[0].payload["attributes"]
 
     if expect_ip:
-        assert attributes["client.address"] == "127.0.0.1"
+        assert attributes[ATTRIBUTE_NAMES.CLIENT_ADDRESS] == "127.0.0.1"
     else:
-        assert "client.address" not in attributes
+        assert ATTRIBUTE_NAMES.CLIENT_ADDRESS not in attributes
 
 
 @pytest.mark.asyncio
@@ -970,7 +978,7 @@ async def test_segment_name_and_source(
     span = items[0].payload
 
     assert span["name"] == "/message/123456"
-    assert span["attributes"]["sentry.segment.name.source"] == "url"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "url"
 
 
 @pytest.mark.asyncio
@@ -1020,7 +1028,7 @@ async def test_custom_transaction_name(
 
     assert span["is_segment"] is True
     assert span["name"] == "foobar"
-    assert span["attributes"]["sentry.segment.name.source"] == "custom"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE] == "custom"
 
 
 @pytest.mark.asyncio
@@ -1052,11 +1060,11 @@ async def test_user_ip_address_on_all_spans(
     child_span, server_span = [item.payload for item in items]
 
     if expect_ip:
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert server_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
+        assert child_span["attributes"][ATTRIBUTE_NAMES.USER_IP_ADDRESS] == "127.0.0.1"
     else:
-        assert "user.ip_address" not in server_span["attributes"]
-        assert "user.ip_address" not in child_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in server_span["attributes"]
+        assert ATTRIBUTE_NAMES.USER_IP_ADDRESS not in child_span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -1110,8 +1118,10 @@ async def test_is_localhost_attribute(
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["sentry.is_localhost"] is is_localhost
-    assert child_span["attributes"]["sentry.is_localhost"] is is_localhost
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST] is is_localhost
+    )
+    assert child_span["attributes"][ATTRIBUTE_NAMES.SENTRY_IS_LOCALHOST] is is_localhost
 
 
 @pytest.mark.asyncio
@@ -1134,5 +1144,11 @@ async def test_user_agent_original_attribute(
 
     child_span, server_span = [item.payload for item in items]
 
-    assert server_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
-    assert child_span["attributes"]["user_agent.original"] == "TestBrowser/1.0"
+    assert (
+        server_span["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
+    )
+    assert (
+        child_span["attributes"][ATTRIBUTE_NAMES.USER_AGENT_ORIGINAL]
+        == "TestBrowser/1.0"
+    )

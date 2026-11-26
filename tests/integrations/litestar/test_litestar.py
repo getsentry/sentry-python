@@ -12,6 +12,7 @@ from litestar.middleware.logging import LoggingMiddlewareConfig
 from litestar.middleware.rate_limit import RateLimitConfig
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.testing import TestClient
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -170,7 +171,10 @@ def test_segment_name_and_source(
 
     spans = [span for span in spans if expected_tx_name in span["name"]]
     assert len(spans) == 1
-    assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "component"
+    )
 
 
 def test_middleware_spans(
@@ -209,13 +213,14 @@ def test_middleware_spans(
     litestar_spans = (
         span
         for span in spans
-        if span["attributes"]["sentry.op"] == OP.MIDDLEWARE and span["name"] in expected
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MIDDLEWARE
+        and span["name"] in expected
     )
 
     for span in litestar_spans:
         assert span["name"] not in found
         found.add(span["name"])
-        assert span["name"] == span["attributes"]["middleware.name"]
+        assert span["name"] == span["attributes"][ATTRIBUTE_NAMES.MIDDLEWARE_NAME]
 
 
 def test_middleware_callback_spans(
@@ -250,8 +255,8 @@ def test_middleware_callback_spans(
             "name": "SampleMiddleware",
             "attributes": ApproxDict(
                 {
-                    "middleware.name": "SampleMiddleware",
-                    "sentry.op": OP.MIDDLEWARE,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: "SampleMiddleware",
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
                 },
             ),
         },
@@ -259,8 +264,8 @@ def test_middleware_callback_spans(
             "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "attributes": ApproxDict(
                 {
-                    "middleware.name": "SampleMiddleware",
-                    "sentry.op": OP.MIDDLEWARE,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: "SampleMiddleware",
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
                 }
             ),
         },
@@ -268,8 +273,8 @@ def test_middleware_callback_spans(
             "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "attributes": ApproxDict(
                 {
-                    "middleware.name": "SampleMiddleware",
-                    "sentry.op": OP.MIDDLEWARE,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: "SampleMiddleware",
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
                 }
             ),
         },
@@ -284,7 +289,9 @@ def test_middleware_callback_spans(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     actual_litestar_spans = list(
-        span for span in spans if OP.MIDDLEWARE in span["attributes"].get("sentry.op")
+        span
+        for span in spans
+        if OP.MIDDLEWARE in span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP)
     )
 
     assert len(actual_litestar_spans) == 3
@@ -365,8 +372,8 @@ def test_middleware_partial_receive_send(
             "name": "SamplePartialReceiveSendMiddleware",
             "attributes": ApproxDict(
                 {
-                    "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": OP.MIDDLEWARE,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: "SamplePartialReceiveSendMiddleware",
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
                 }
             ),
         },
@@ -374,8 +381,8 @@ def test_middleware_partial_receive_send(
             "name": "TestClientTransport.create_receive.<locals>.receive",
             "attributes": ApproxDict(
                 {
-                    "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": OP.MIDDLEWARE,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: "SamplePartialReceiveSendMiddleware",
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
                 }
             ),
         },
@@ -383,8 +390,8 @@ def test_middleware_partial_receive_send(
             "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "attributes": ApproxDict(
                 {
-                    "middleware.name": "SamplePartialReceiveSendMiddleware",
-                    "sentry.op": OP.MIDDLEWARE,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: "SamplePartialReceiveSendMiddleware",
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
                 }
             ),
         },
@@ -397,7 +404,9 @@ def test_middleware_partial_receive_send(
         )
 
     actual_litestar_spans = list(
-        span for span in spans if OP.MIDDLEWARE in span["attributes"].get("sentry.op")
+        span
+        for span in spans
+        if OP.MIDDLEWARE in span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP)
     )
     assert len(actual_litestar_spans) == 3
 
@@ -439,9 +448,9 @@ def test_span_origin(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"]["sentry.origin"] == "auto.http.httpx":
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.httpx":
             continue
-        assert span["attributes"]["sentry.origin"] == "auto.http.litestar"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.litestar"
 
 
 @pytest.mark.parametrize(

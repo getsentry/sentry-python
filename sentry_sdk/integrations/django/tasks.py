@@ -1,5 +1,7 @@
 from functools import wraps
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import qualname_from_function
@@ -38,8 +40,8 @@ def patch_tasks() -> None:
         with sentry_sdk.start_span(
             name=name,
             attributes={
-                "sentry.op": OP.QUEUE_PUBLISH,
-                "sentry.origin": DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PUBLISH,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
             },
         ):
             return old_task_enqueue(self, *args, **kwargs)

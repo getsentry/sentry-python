@@ -3,10 +3,11 @@ from typing import TYPE_CHECKING
 
 from django import VERSION as DJANGO_VERSION
 from django.core.cache import CacheHandler
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from urllib3.util import parse_url as urlparse
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -64,30 +65,30 @@ def _patch_cache_method(
         with sentry_sdk.start_span(
             name=description,
             attributes={
-                "sentry.op": op,
-                "sentry.origin": DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: op,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
             },
         ) as span:
             value = original_method(*args, **kwargs)
 
             with capture_internal_exceptions():
                 if address is not None:
-                    span.set_attribute(SPANDATA.NETWORK_PEER_ADDRESS, address)
+                    span.set_attribute(ATTRIBUTE_NAMES.NETWORK_PEER_ADDRESS, address)
 
                 if port is not None:
-                    span.set_attribute(SPANDATA.NETWORK_PEER_PORT, port)
+                    span.set_attribute(ATTRIBUTE_NAMES.NETWORK_PEER_PORT, port)
 
                 key = _get_safe_key(method_name, args, kwargs)
                 if key is not None:
-                    span.set_attribute(SPANDATA.CACHE_KEY, key)
+                    span.set_attribute(ATTRIBUTE_NAMES.CACHE_KEY, key)
 
                 item_size = None
                 if is_get_many_method:
                     if value != {}:
                         item_size = len(str(value))
-                        span.set_attribute(SPANDATA.CACHE_HIT, True)
+                        span.set_attribute(ATTRIBUTE_NAMES.CACHE_HIT, True)
                     else:
-                        span.set_attribute(SPANDATA.CACHE_HIT, False)
+                        span.set_attribute(ATTRIBUTE_NAMES.CACHE_HIT, False)
                 elif is_get_method:
                     default_value = None
                     if len(args) >= 2:
@@ -97,9 +98,9 @@ def _patch_cache_method(
 
                     if value != default_value:
                         item_size = len(str(value))
-                        span.set_attribute(SPANDATA.CACHE_HIT, True)
+                        span.set_attribute(ATTRIBUTE_NAMES.CACHE_HIT, True)
                     else:
-                        span.set_attribute(SPANDATA.CACHE_HIT, False)
+                        span.set_attribute(ATTRIBUTE_NAMES.CACHE_HIT, False)
                 else:  # TODO: We don't handle `get_or_set` which we should
                     arg_count = len(args)
                     if arg_count >= 2:
@@ -110,7 +111,7 @@ def _patch_cache_method(
                         item_size = len(str(args[0]))
 
                 if item_size is not None:
-                    span.set_attribute(SPANDATA.CACHE_ITEM_SIZE, item_size)
+                    span.set_attribute(ATTRIBUTE_NAMES.CACHE_ITEM_SIZE, item_size)
 
             return value
 

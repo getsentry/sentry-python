@@ -22,10 +22,12 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk import capture_exception, capture_message
 from sentry_sdk._compat import PY310
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import (
     DjangoIntegration,
     DjangoRequestExtractor,
@@ -356,9 +358,9 @@ def test_materialized_user_captured(
     spans = [item.payload for item in items]
     (span,) = (span for span in spans if span["name"] == "/template-test")
 
-    assert span["attributes"][SPANDATA.USER_ID] == "1"
-    assert span["attributes"][SPANDATA.USER_EMAIL] == "lennon@thebeatles.com"
-    assert span["attributes"][SPANDATA.USER_NAME] == "john"
+    assert span["attributes"][ATTRIBUTE_NAMES.USER_ID] == "1"
+    assert span["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "lennon@thebeatles.com"
+    assert span["attributes"][ATTRIBUTE_NAMES.USER_NAME] == "john"
 
 
 @pytest.mark.forked
@@ -705,9 +707,9 @@ def test_django_connect_trace(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db":
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db":
             attributes = span.get("attributes")
-            assert attributes.get(SPANDATA.DB_SYSTEM_NAME) == "postgresql"
+            assert attributes.get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "postgresql"
 
     assert '- sentry.op="db": name="connect"' in render_span_tree(spans)
 
@@ -790,18 +792,18 @@ def test_db_connection_span_data(
     spans = [item.payload for item in items]
 
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db":
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db":
             attributes = span.get("attributes")
-            assert attributes.get(SPANDATA.DB_SYSTEM_NAME) == "postgresql"
+            assert attributes.get(ATTRIBUTE_NAMES.DB_SYSTEM_NAME) == "postgresql"
             conn_params = connections["postgres"].get_connection_params()
-            assert attributes.get(SPANDATA.DB_NAMESPACE) is not None
-            assert attributes.get(SPANDATA.DB_NAMESPACE) == conn_params.get(
+            assert attributes.get(ATTRIBUTE_NAMES.DB_NAMESPACE) is not None
+            assert attributes.get(ATTRIBUTE_NAMES.DB_NAMESPACE) == conn_params.get(
                 "database"
             ) or conn_params.get("dbname")
-            assert attributes.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+            assert attributes.get(ATTRIBUTE_NAMES.SERVER_ADDRESS) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
             )
-            assert attributes.get(SPANDATA.SERVER_PORT) == os.environ.get(
+            assert attributes.get(ATTRIBUTE_NAMES.SERVER_PORT) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
             )
 
@@ -853,7 +855,10 @@ def test_segment_name(
     spans = [item.payload for item in items if item.type == "span"]
 
     assert spans[2]["is_segment"] is True
-    assert spans[2]["attributes"]["sentry.segment.name.source"] == expected_source
+    assert (
+        spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == expected_source
+    )
 
     (event,) = (item.payload for item in items if item.type == "event")
 
@@ -905,7 +910,7 @@ def test_http_route(
 
     sentry_sdk.flush()
     (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message"
+    assert segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == "/message"
 
 
 def test_request_body(
@@ -1576,10 +1581,10 @@ def test_signals_spans(
 """
     )
 
-    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[0]["name"] == "django.db.reset_queries"
 
-    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[1]["name"] == "django.db.close_old_connections"
 
 
@@ -1641,13 +1646,13 @@ def test_signals_spans_filtering(
 """
     )
 
-    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[0]["name"] == "django.db.reset_queries"
 
-    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[1]["name"] == "django.db.close_old_connections"
 
-    assert spans[2]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[2]["name"] == "tests.integrations.django.myapp.signals.signal_handler"
 
 
@@ -1789,11 +1794,11 @@ def test_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[-1]["attributes"]["sentry.origin"] == "auto.http.django"
+    assert spans[-1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
 
     for span in spans:
-        assert span["attributes"]["sentry.origin"] == "auto.http.django"
-        if span["attributes"]["sentry.op"] == OP.FUNCTION:
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.django"
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION:
             signal_span_found = True
 
     assert signal_span_found
@@ -1820,7 +1825,7 @@ def test_transaction_http_method_default(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[2]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "GET"
 
 
 def test_transaction_http_method_custom(
@@ -1847,14 +1852,14 @@ def test_transaction_http_method_custom(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[2]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "OPTIONS"
 
     client.head("/nomessage")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] == "HEAD"
 
 
 def test_get_frame_name_when_in_lazy_object():

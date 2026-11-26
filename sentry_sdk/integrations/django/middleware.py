@@ -7,9 +7,10 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 from django import VERSION as DJANGO_VERSION
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
@@ -82,9 +83,9 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         middleware_span = sentry_sdk.start_span(
             name=description,
             attributes={
-                "sentry.op": OP.MIDDLEWARE,
-                "sentry.origin": DjangoIntegration.origin,
-                SPANDATA.MIDDLEWARE_NAME: middleware_name,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.MIDDLEWARE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.MIDDLEWARE_NAME: middleware_name,
             },
         )
 

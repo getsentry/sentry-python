@@ -3,8 +3,9 @@ import os
 import sys
 import weakref
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -67,7 +68,7 @@ class PyramidIntegration(Integration):
             server_span = sentry_sdk.get_current_scope()._server_segment_span
             if server_span is not None and route_path is not None:
                 server_span.set_attribute(
-                    SPANDATA.HTTP_ROUTE, request.matched_route.pattern
+                    ATTRIBUTE_NAMES.HTTP_ROUTE, request.matched_route.pattern
                 )
 
             try:

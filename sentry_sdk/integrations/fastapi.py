@@ -2,8 +2,9 @@ import sys
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, _check_minimum_version
 from sentry_sdk.traces import (
     SegmentNameSource,
@@ -94,7 +95,7 @@ async def _wrap_async_handler(
 
     server_span = sentry_sdk.get_current_scope()._server_segment_span
     if server_span is not None and route_path is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+        server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
     sentry_sdk.get_current_scope().set_transaction_name(
         route_path if route_path is not None else _DEFAULT_TRANSACTION_NAME,
@@ -149,7 +150,7 @@ async def _wrap_async_handler(
                 )
                 if request_body:
                     current_span._segment.set_attribute(
-                        SPANDATA.HTTP_REQUEST_BODY_DATA,
+                        ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA,
                         request_body,
                     )
 

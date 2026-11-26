@@ -4,6 +4,7 @@ import functools
 from typing import Any, Dict
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from starlite import AbstractMiddleware, Controller, LoggingConfig, Starlite, get, post
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
 from starlite.middleware.session.memory_backend import MemoryBackendConfig
@@ -162,7 +163,10 @@ def test_transaction_name_and_source(
     spans = [item.payload for item in items]
     spans = [span for span in spans if expected_tx_name in span["name"]]
     assert len(spans) == 1
-    assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "component"
+    )
 
 
 def test_middleware_spans(sentry_init, capture_items):
@@ -197,7 +201,8 @@ def test_middleware_spans(sentry_init, capture_items):
     middleware_spans = [
         item.payload
         for item in items
-        if item.payload.get("attributes", {}).get("sentry.op", "") == OP.MIDDLEWARE
+        if item.payload.get("attributes", {}).get(ATTRIBUTE_NAMES.SENTRY_OP, "")
+        == OP.MIDDLEWARE
         and item.payload.get("name") in expected
     ]
     assert len(middleware_spans) == 3
@@ -206,7 +211,7 @@ def test_middleware_spans(sentry_init, capture_items):
     for span in middleware_spans:
         assert span["name"] not in found
         found.add(span["name"])
-        assert span["name"] == span["attributes"]["middleware.name"]
+        assert span["name"] == span["attributes"][ATTRIBUTE_NAMES.MIDDLEWARE_NAME]
 
 
 def test_middleware_callback_spans(sentry_init, capture_items):
@@ -251,13 +256,14 @@ def test_middleware_callback_spans(sentry_init, capture_items):
     actual_starlite_spans = [
         item.payload
         for item in items
-        if OP.MIDDLEWARE in item.payload.get("attributes", {}).get("sentry.op", "")
+        if OP.MIDDLEWARE
+        in item.payload.get("attributes", {}).get(ATTRIBUTE_NAMES.SENTRY_OP, "")
     ]
     assert len(actual_starlite_spans) == 3
 
     def is_matching_span(expected_span, actual_span):
         return (
-            expected_span["op"] == actual_span["attributes"]["sentry.op"]
+            expected_span["op"] == actual_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP]
             and expected_span["description"] == actual_span["name"]
         )
 
@@ -344,13 +350,14 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     actual_starlite_spans = [
         item.payload
         for item in items
-        if OP.MIDDLEWARE in item.payload.get("attributes", {}).get("sentry.op", "")
+        if OP.MIDDLEWARE
+        in item.payload.get("attributes", {}).get(ATTRIBUTE_NAMES.SENTRY_OP, "")
     ]
     assert len(actual_starlite_spans) == 3
 
     def is_matching_span(expected_span, actual_span):
         return expected_span["op"] == actual_span["attributes"][
-            "sentry.op"
+            ATTRIBUTE_NAMES.SENTRY_OP
         ] and actual_span["name"].startswith(expected_span["description"])
 
     for expected_span in expected_starlite_spans:
@@ -390,11 +397,15 @@ def test_span_origin(sentry_init, capture_items):
     starlite_items = [
         item
         for item in items
-        if item.payload.get("attributes", {}).get("sentry.op", "") == OP.MIDDLEWARE
+        if item.payload.get("attributes", {}).get(ATTRIBUTE_NAMES.SENTRY_OP, "")
+        == OP.MIDDLEWARE
     ]
     assert len(starlite_items) > 0
     for item in starlite_items:
-        assert item.payload["attributes"]["sentry.origin"] == "auto.http.starlite"
+        assert (
+            item.payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.http.starlite"
+        )
 
 
 @pytest.mark.parametrize(

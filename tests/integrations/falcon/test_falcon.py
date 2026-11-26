@@ -4,9 +4,9 @@ from http import HTTPStatus
 import falcon
 import falcon.testing
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
@@ -122,7 +122,10 @@ def test_segment_name_and_source(
     spans = [item.payload for item in items if item.type == "span"]
     spans = [span for span in spans if span["name"] == expected_transaction]
     assert len(spans) == 1
-    assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == expected_source
+    )
 
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
@@ -145,7 +148,9 @@ def test_http_route(
 
     sentry_sdk.flush()
     (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
-    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/{message_id:int}"
+    assert (
+        segment["attributes"][ATTRIBUTE_NAMES.HTTP_ROUTE] == "/message/{message_id:int}"
+    )
 
 
 def test_unhandled_errors(
@@ -709,7 +714,7 @@ def test_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.http.falcon"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.http.falcon"
 
 
 def test_falcon_request_media(sentry_init):

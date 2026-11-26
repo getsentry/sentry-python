@@ -7,9 +7,11 @@ from copy import deepcopy
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
@@ -146,7 +148,7 @@ def _enable_span_for_middleware(
             and route_path is not None
             and name_source == SegmentNameSource.ROUTE
         ):
-            server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+            server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
         # Update transaction name with middleware name
         if route_path is not None:
@@ -167,9 +169,9 @@ def _enable_span_for_middleware(
             return sentry_sdk.start_span(
                 name=name,
                 attributes={
-                    "sentry.op": op,
-                    "sentry.origin": StarletteIntegration.origin,
-                    "middleware.name": middleware_name,
+                    ATTRIBUTE_NAMES.SENTRY_OP: op,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: StarletteIntegration.origin,
+                    ATTRIBUTE_NAMES.MIDDLEWARE_NAME: middleware_name,
                 },
             )
 
@@ -481,7 +483,7 @@ async def _wrap_async_handler(
         and route_path is not None
         and name_source == SegmentNameSource.ROUTE
     ):
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+        server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
     sentry_sdk.get_current_scope().set_transaction_name(
         route_path if route_path is not None else _DEFAULT_TRANSACTION_NAME,
@@ -530,7 +532,7 @@ async def _wrap_async_handler(
                 )
                 if request_body:
                     current_span._segment.set_attribute(
-                        SPANDATA.HTTP_REQUEST_BODY_DATA,
+                        ATTRIBUTE_NAMES.HTTP_REQUEST_BODY_DATA,
                         request_body,
                     )
 
@@ -594,7 +596,7 @@ def patch_request_response() -> None:
                     and route_path is not None
                     and name_source == SegmentNameSource.ROUTE
                 ):
-                    server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+                    server_span.set_attribute(ATTRIBUTE_NAMES.HTTP_ROUTE, route_path)
 
                 sentry_sdk.get_current_scope().set_transaction_name(
                     route_path if route_path is not None else _DEFAULT_TRANSACTION_NAME,

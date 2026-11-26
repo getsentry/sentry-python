@@ -2,9 +2,10 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 from django.dispatch import Signal
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import DJANGO_VERSION
 
 if TYPE_CHECKING:
@@ -69,9 +70,9 @@ def patch_signals() -> None:
                 with sentry_sdk.start_span(
                     name=signal_name,
                     attributes={
-                        "sentry.op": OP.FUNCTION,
-                        "sentry.origin": DjangoIntegration.origin,
-                        SPANDATA.CODE_FUNCTION_NAME: signal_name,
+                        ATTRIBUTE_NAMES.SENTRY_OP: OP.FUNCTION,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
+                        ATTRIBUTE_NAMES.CODE_FUNCTION_NAME: signal_name,
                     },
                 ):
                     return receiver(*args, **kwargs)

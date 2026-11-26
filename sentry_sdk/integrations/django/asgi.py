@@ -12,6 +12,7 @@ import inspect
 from typing import TYPE_CHECKING
 
 from django.core.handlers.wsgi import WSGIRequest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -183,8 +184,8 @@ def wrap_async_view(callback: "Any") -> "Any":
         with sentry_sdk.start_span(
             name=request.resolver_match.view_name,
             attributes={
-                "sentry.op": OP.VIEW_RENDER,
-                "sentry.origin": DjangoIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.VIEW_RENDER,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: DjangoIntegration.origin,
             },
         ):
             return await callback(request, *args, **kwargs)
