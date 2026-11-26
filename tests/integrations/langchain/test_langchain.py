@@ -4,6 +4,7 @@ from unittest import mock
 from unittest.mock import Mock, patch
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 from sentry_sdk.consts import SPANDATA
 
@@ -343,22 +344,27 @@ def test_langchain_text_completion(
     llm_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
     assert llm_span["name"] == "text_completion gpt-3.5-turbo"
-    assert llm_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert llm_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
-    assert llm_span["attributes"]["gen_ai.request.model"] == "gpt-3.5-turbo"
+    assert llm_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "openai"
+    assert (
+        llm_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
+    )
+    assert (
+        llm_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    )
     assert (
         llm_span["attributes"]["gen_ai.response.text"]
         == "The capital of France is Paris."
     )
-    assert llm_span["attributes"]["gen_ai.usage.total_tokens"] == 25
-    assert llm_span["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert llm_span["attributes"]["gen_ai.usage.output_tokens"] == 15
+    assert llm_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 25
+    assert llm_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert llm_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
 
 
 def test_langchain_chat_with_run_name(
@@ -419,10 +425,13 @@ def test_langchain_chat_with_run_name(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    chat_spans = list(x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat")
+    chat_spans = list(
+        x for x in spans if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
+    )
     assert len(chat_spans) == 1
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
     )
 
 
@@ -471,15 +480,20 @@ def test_langchain_multi_choice_response(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    chat_spans = list(x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat")
+    chat_spans = list(
+        x for x in spans if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
+    )
     assert len(chat_spans) == 1
 
-    assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 25
-    assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 25
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 4
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS
+        ]
+        == 4
     )
 
 
@@ -508,11 +522,14 @@ def test_langchain_tool_call_with_run_name(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     tool_spans = list(
-        x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
+        x
+        for x in spans
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.execute_tool"
     )
     assert len(tool_spans) == 1
     assert (
-        tool_spans[0]["attributes"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
+        tool_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
     )
 
 
@@ -625,32 +642,54 @@ def test_langchain_create_agent(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     assert len(chat_spans) == 1
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
-    assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-
-    assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
-    assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
 
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 4
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME]
+        == "openai-chat"
     )
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS
+        ]
+        == 4
+    )
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+        ]
         == 6
     )
 
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 5
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS
+        ]
+        == 5
     )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
-        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
+            == "gpt-4"
+        )
 
     assert (
         chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
@@ -671,7 +710,7 @@ def test_langchain_create_agent(
     ]
 
     assert expected_system_instructions == json.loads(
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
 
 
@@ -751,34 +790,56 @@ def test_langchain_create_agent_no_sensitive_data(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     assert len(chat_spans) == 1
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
-    assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-
-    assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
-    assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
 
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 4
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME]
+        == "openai-chat"
     )
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS
+        ]
+        == 4
+    )
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+        ]
         == 6
     )
 
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 5
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS
+        ]
+        == 5
     )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
-        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
+            == "gpt-4"
+        )
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
         "attributes", {}
     )
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("attributes", {})
@@ -886,63 +947,112 @@ def test_tool_execution_span(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     assert len(chat_spans) == 2
 
     tool_exec_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.execute_tool"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.execute_tool"
     )
     assert len(tool_exec_spans) == 1
     tool_exec_span = tool_exec_spans[0]
 
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
-
-    assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-    assert chat_spans[1]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-    assert tool_exec_span["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-
-    assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
-    assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
-    assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 69
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
     )
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 142
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 192
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS
+        ]
+        == 69
+    )
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+        ]
         == 31
     )
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 10
-    )
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
-
-    assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
-    assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
-    assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
-    assert (
-        chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 69
-    )
-    assert (
-        chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS
+        ]
         == 10
     )
     assert (
-        chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 11
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME]
+        == "openai-chat"
     )
-    assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
+
+    assert chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 89
+    assert chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 28
+    assert chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 117
+    assert (
+        chat_spans[1]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS
+        ]
+        == 69
+    )
+    assert (
+        chat_spans[1]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+        ]
+        == 10
+    )
+    assert (
+        chat_spans[1]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS
+        ]
+        == 11
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME]
+        == "openai-chat"
+    )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
+            == "gpt-4-0613"
         )
         assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
+            == "gpt-4-0613"
         )
 
-    assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
+    assert (
+        "word"
+        in tool_exec_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS]
+    )
 
     assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -952,7 +1062,7 @@ def test_tool_execution_span(
     assert "get_word_length" in tool_calls_data
 
     for chat_span in chat_spans:
-        tools_data = chat_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
+        tools_data = chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS]
         assert "get_word_length" in tools_data
 
 
@@ -1057,70 +1167,118 @@ def test_tool_execution_span_no_sensitive_data(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     assert len(chat_spans) == 2
 
     tool_exec_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.execute_tool"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.execute_tool"
     )
     assert len(tool_exec_spans) == 1
     tool_exec_span = tool_exec_spans[0]
 
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
-
-    assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-    assert chat_spans[1]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-    assert tool_exec_span["attributes"]["gen_ai.agent.name"] == "word_length_agent"
-
-    assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
-    assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
-    assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 69
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
     )
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_AGENT_NAME]
+        == "word_length_agent"
+    )
+
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 142
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 192
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS
+        ]
+        == 69
+    )
+    assert (
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+        ]
         == 31
     )
     assert (
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 10
-    )
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
-
-    assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
-    assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
-    assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
-    assert (
-        chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 69
-    )
-    assert (
-        chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        chat_spans[0]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS
+        ]
         == 10
     )
     assert (
-        chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 11
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME]
+        == "openai-chat"
     )
-    assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
+
+    assert chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 89
+    assert chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 28
+    assert chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 117
+    assert (
+        chat_spans[1]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS
+        ]
+        == 69
+    )
+    assert (
+        chat_spans[1]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+        ]
+        == 10
+    )
+    assert (
+        chat_spans[1]["attributes"][
+            ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS
+        ]
+        == 11
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME]
+        == "openai-chat"
+    )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
+            == "gpt-4-0613"
         )
         assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
+            == "gpt-4-0613"
         )
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("attributes", {})
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("attributes", {})
-    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
         "attributes", {}
     )
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get("attributes", {})
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get(
+        "attributes", {}
+    )
 
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
@@ -1250,53 +1408,99 @@ def test_langchain_openai_tools_agent(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     invoke_agent_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.invoke_agent"
     )
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     tool_exec_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.execute_tool"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.execute_tool"
     )
 
     assert len(chat_spans) == 2
 
-    assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert (
-        len(list(x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"))
+        len(
+            list(
+                x
+                for x in spans
+                if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
+            )
+        )
         > 0
     )
 
     # Token usage is only available in newer versions of langchain (v0.2+)
     # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
-        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[0]["attributes"]:
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS]
+            == 142
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 50
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 192
+        )
 
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
-        assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[1]["attributes"]:
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 89
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 28
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 117
+        )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
         assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
 
     assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
-    assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_RESULT])
+    assert (
+        "word"
+        in tool_exec_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS]
+    )
+    assert 5 == int(
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT]
+    )
 
     assert json.loads(
         chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -1308,7 +1512,7 @@ def test_langchain_openai_tools_agent(
     ]
 
     assert expected_system_instructions == json.loads(
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
 
     assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
@@ -1325,15 +1529,15 @@ def test_langchain_openai_tools_agent(
         assert "get_word_length" in tool_call_str
 
     # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "stop"
-    ]
+    assert chat_spans[0]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["function_call"]
+    assert chat_spans[1]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["stop"]
 
     for chat_span in chat_spans:
-        tools_data = chat_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
+        tools_data = chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS]
         assert tools_data is not None
         assert "get_word_length" in tools_data
 
@@ -1409,66 +1613,112 @@ def test_langchain_openai_tools_agent_no_sensitive_data(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     invoke_agent_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.invoke_agent"
     )
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     tool_exec_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.execute_tool"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.execute_tool"
     )
 
     assert len(chat_spans) == 2
 
-    assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
 
-    assert invoke_agent_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
+    )
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert (
-        len(list(x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"))
+        len(
+            list(
+                x
+                for x in spans
+                if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
+            )
+        )
         > 0
     )
 
     # Token usage is only available in newer versions of langchain (v0.2+)
     # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
-        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[0]["attributes"]:
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS]
+            == 142
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 50
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 192
+        )
 
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
-        assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[1]["attributes"]:
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 89
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 28
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 117
+        )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
         assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
         "attributes", {}
     )
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("attributes", {})
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get(
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get(
         "attributes", {}
     )
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("attributes", {})
-    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
         "attributes", {}
     )
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get("attributes", {})
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get(
+        "attributes", {}
+    )
 
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
@@ -1478,12 +1728,12 @@ def test_langchain_openai_tools_agent_no_sensitive_data(
     )
 
     # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "stop"
-    ]
+    assert chat_spans[0]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["function_call"]
+    assert chat_spans[1]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["stop"]
 
 
 def test_langchain_openai_tools_agent_with_config(
@@ -1558,9 +1808,14 @@ def test_langchain_openai_tools_agent_with_config(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     invoke_agent_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.invoke_agent"
     )
-    assert invoke_agent_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
+    )
 
 
 def test_langchain_openai_tools_agent_stream_no_sensitive_data(
@@ -1634,68 +1889,114 @@ def test_langchain_openai_tools_agent_stream_no_sensitive_data(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     invoke_agent_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.invoke_agent"
     )
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     tool_exec_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.execute_tool"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.execute_tool"
     )
 
     assert len(chat_spans) == 2
 
-    assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
 
-    assert invoke_agent_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert (
-        len(list(x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"))
+        len(
+            list(
+                x
+                for x in spans
+                if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
+            )
+        )
         > 0
     )
 
     # Token usage is only available in newer versions of langchain (v0.2+)
     # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
-        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[0]["attributes"]:
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS]
+            == 142
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 50
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 192
+        )
 
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
-        assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[1]["attributes"]:
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 89
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 28
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 117
+        )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
         assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
         "attributes", {}
     )
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("attributes", {})
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get(
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get(
         "attributes", {}
     )
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("attributes", {})
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("attributes", {})
-    assert SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS not in tool_exec_span.get(
         "attributes", {}
     )
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get("attributes", {})
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in tool_exec_span.get(
+        "attributes", {}
+    )
 
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
         "attributes", {}
@@ -1705,12 +2006,12 @@ def test_langchain_openai_tools_agent_stream_no_sensitive_data(
     )
 
     # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "stop"
-    ]
+    assert chat_spans[0]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["function_call"]
+    assert chat_spans[1]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["stop"]
 
 
 @pytest.mark.parametrize(
@@ -1835,55 +2136,104 @@ def test_langchain_openai_tools_agent_stream(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     invoke_agent_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.invoke_agent"
     )
     chat_spans = list(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     )
     tool_exec_span = next(
-        x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.execute_tool"
+        x
+        for x in spans
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.execute_tool"
     )
 
     assert len(chat_spans) == 2
 
-    assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
-    assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        chat_spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
+    assert (
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.ai.langchain"
+    )
 
-    assert invoke_agent_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
+    )
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert (
-        len(list(x for x in spans if x["attributes"].get("sentry.op") == "gen_ai.chat"))
+        len(
+            list(
+                x
+                for x in spans
+                if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
+            )
+        )
         > 0
     )
 
     # Token usage is only available in newer versions of langchain (v0.2+)
     # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
-        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[0]["attributes"]:
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS]
+            == 142
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 50
+        )
+        assert (
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 192
+        )
 
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
-        assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in chat_spans[1]["attributes"]:
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 89
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS]
+            == 28
+        )
+        assert (
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS]
+            == 117
+        )
 
     if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
         assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
         assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+            chat_spans[1]["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
             == "gpt-3.5-turbo"
         )
 
     assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS]
-    assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_CALL_RESULT])
+    assert (
+        "word"
+        in tool_exec_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS]
+    )
+    assert 5 == int(
+        tool_exec_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT]
+    )
 
     assert json.loads(
         chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -1895,7 +2245,7 @@ def test_langchain_openai_tools_agent_stream(
     ]
 
     assert expected_system_instructions == json.loads(
-        chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        chat_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
 
     assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
@@ -1912,15 +2262,15 @@ def test_langchain_openai_tools_agent_stream(
         assert "get_word_length" in tool_call_str
 
     # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "stop"
-    ]
+    assert chat_spans[0]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["function_call"]
+    assert chat_spans[1]["attributes"][
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS
+    ] == ["stop"]
 
     for chat_span in chat_spans:
-        tools_data = chat_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
+        tools_data = chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS]
         assert tools_data is not None
         assert "get_word_length" in tools_data
 
@@ -1997,9 +2347,14 @@ def test_langchain_openai_tools_agent_stream_with_config(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     invoke_agent_span = next(
-        x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+        x
+        for x in spans
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.invoke_agent"
     )
-    assert invoke_agent_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+    assert (
+        invoke_agent_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_FUNCTION_ID]
+        == "my-snazzy-pipeline"
+    )
 
 
 def test_langchain_error(
@@ -2486,7 +2841,7 @@ def test_langchain_message_role_mapping(
     gen_ai_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op", "").startswith("gen_ai")
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP, "").startswith("gen_ai")
     ]
 
     # Check if any span has message data with normalized roles
@@ -2862,16 +3217,21 @@ def test_langchain_ai_system_detection(
     llm_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.text_completion"
     ]
 
     assert len(llm_spans) > 0
     llm_span = llm_spans[0]
 
     if expected_system is not None:
-        assert llm_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == expected_system
+        assert (
+            llm_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME]
+            == expected_system
+        )
     else:
-        assert SPANDATA.GEN_AI_PROVIDER_NAME not in llm_span.get("attributes", {})
+        assert ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME not in llm_span.get(
+            "attributes", {}
+        )
 
 
 class TestTransformLangchainMessageContent:
@@ -2999,7 +3359,7 @@ class TestTransformLangchainMessageContent:
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: [
                     {"role": "user", "content": "How many letters in the word eudca"}
                 ],
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS: [
                     {"type": "text", "content": "You are a helpful assistant."}
                 ],
             },
@@ -3011,7 +3371,7 @@ class TestTransformLangchainMessageContent:
             {SPANDATA.GEN_AI_RESPONSE_TEXT: "the model response"},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -3079,7 +3439,11 @@ def test_langchain_chat_data_collection(
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
-    (span,) = [s for s in spans if s["attributes"].get("sentry.op") == "gen_ai.chat"]
+    (span,) = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
+    ]
     span_data = span["attributes"]
 
     for key, expected in expected_present.items():
@@ -3092,9 +3456,9 @@ def test_langchain_chat_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai-chat"
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "openai-chat"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.parametrize(
@@ -3183,7 +3547,9 @@ def test_langchain_text_completion_data_collection(
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
     (span,) = [
-        s for s in spans if s["attributes"].get("sentry.op") == "gen_ai.text_completion"
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.text_completion"
     ]
     span_data = span["attributes"]
 
@@ -3197,10 +3563,10 @@ def test_langchain_text_completion_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 25
 
 
 @pytest.mark.parametrize(
@@ -3208,7 +3574,7 @@ def test_langchain_text_completion_data_collection(
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
+            [ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS],
             [
                 # REQUEST_AVAILABLE_TOOLS is the legacy value set when data collection is not enabled
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
@@ -3220,7 +3586,7 @@ def test_langchain_text_completion_data_collection(
             {"gen_ai": {"inputs": False, "outputs": True}},
             [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
             [
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled-only-response-tool-calls-collected",
@@ -3289,7 +3655,7 @@ def test_langchain_data_collection_tools(
     chat_spans = [
         s["attributes"]
         for s in spans
-        if s["attributes"].get("sentry.op") == "gen_ai.chat"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     ]
 
     assert len(chat_spans) == 2
@@ -3304,7 +3670,7 @@ def test_langchain_data_collection_tools(
 
     # Tool definitions are gated the same way on every span they are set on
     for key in (
-        SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+        ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS,
         SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
     ):
         collected = key in expected_present
@@ -3365,7 +3731,7 @@ def test_langchain_data_collection_request_tool_call_params(
     (span_data,) = [
         s["attributes"]
         for s in spans
-        if s["attributes"].get("sentry.op") == "gen_ai.chat"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.chat"
     ]
 
     if tool_calls_collected:
@@ -3373,7 +3739,7 @@ def test_langchain_data_collection_request_tool_call_params(
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
 
 
 @pytest.mark.parametrize(
@@ -3381,14 +3747,14 @@ def test_langchain_data_collection_request_tool_call_params(
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            {SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS: {"word": "eudca"}},
-            [SPANDATA.GEN_AI_TOOL_CALL_RESULT],
+            {ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS: {"word": "eudca"}},
+            [ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
-            {SPANDATA.GEN_AI_TOOL_CALL_RESULT: 5},
-            [SPANDATA.GEN_AI_TOOL_CALL_ARGUMENTS],
+            {ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT: 5},
+            [ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_ARGUMENTS],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
     ],
@@ -3455,7 +3821,7 @@ def test_langchain_tool_execution_data_collection(
     span_data = next(
         s["attributes"]
         for s in spans
-        if s["attributes"].get("sentry.op") == "gen_ai.execute_tool"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.execute_tool"
     )
 
     for key, expected in expected_present.items():
@@ -3468,8 +3834,8 @@ def test_langchain_tool_execution_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_TOOL_NAME] == "get_word_length"
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "execute_tool"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "get_word_length"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "execute_tool"
 
 
 @pytest.mark.parametrize("agent_method", ["invoke", "stream"])
@@ -3556,7 +3922,7 @@ def test_langchain_agent_executor_data_collection(
     span_data = next(
         s["attributes"]
         for s in spans
-        if s["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "gen_ai.invoke_agent"
     )
 
     for key, expected in expected_present.items():
@@ -3569,4 +3935,4 @@ def test_langchain_agent_executor_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "invoke_agent"
