@@ -10,7 +10,7 @@ dev = [
     "tox",
     "tox-uv",
     "coverage[toml]",
-    "pre-commit",
+    "prek>=0.5.10",
     "ruff",
     "typos",
 ]
