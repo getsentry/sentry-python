@@ -12,8 +12,10 @@ from re import Pattern
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
 )
@@ -138,13 +140,15 @@ def record_sql_queries(
 
     additional_attributes = {}
     if query is not None:
-        additional_attributes["db.query.text"] = query
+        additional_attributes[ATTRIBUTE_NAMES.DB_QUERY_TEXT] = query
 
     with sentry_sdk.start_span(
         name="<unknown SQL query>" if query is None else query,
         attributes={
-            "sentry.origin": span_origin,
-            "sentry.op": span_op_override_value if span_op_override_value else OP.DB,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: span_origin,
+            ATTRIBUTE_NAMES.SENTRY_OP: span_op_override_value
+            if span_op_override_value
+            else OP.DB,
             **additional_attributes,
         },
     ) as span:
@@ -188,14 +192,14 @@ def get_url_attributes(
 
     url_full = parsed_url.url
     if query:
-        attributes[SPANDATA.URL_QUERY] = query
+        attributes[ATTRIBUTE_NAMES.URL_QUERY] = query
         url_full += "?" + query
 
     if parsed_url.fragment:
-        attributes[SPANDATA.URL_FRAGMENT] = parsed_url.fragment
+        attributes[ATTRIBUTE_NAMES.URL_FRAGMENT] = parsed_url.fragment
         url_full += "#" + parsed_url.fragment
 
-    attributes[SPANDATA.URL_FULL] = url_full
+    attributes[ATTRIBUTE_NAMES.URL_FULL] = url_full
 
     return attributes
 
@@ -271,14 +275,14 @@ def add_source(
         except Exception:
             lineno = None
         if lineno is not None:
-            span.set_attribute("code.line.number", lineno)
+            span.set_attribute(ATTRIBUTE_NAMES.CODE_LINE_NUMBER, lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
+            span.set_attribute(ATTRIBUTE_NAMES.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -290,7 +294,7 @@ def add_source(
                 in_app_path = filepath
 
             if in_app_path is not None:
-                span.set_attribute("code.file.path", in_app_path)
+                span.set_attribute(ATTRIBUTE_NAMES.CODE_FILE_PATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -298,7 +302,7 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            span.set_attribute(ATTRIBUTE_NAMES.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def add_query_source(
@@ -759,7 +763,7 @@ class Baggage:
                 sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if (
-            segment.get_attributes().get("sentry.segment.name.source")
+            segment.get_attributes().get(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE)
             not in LOW_QUALITY_SEGMENT_SOURCES
         ) and segment.name:
             sentry_items["transaction"] = segment.name
@@ -906,8 +910,8 @@ def create_span_decorator(
         Decorator to create a span for the given function.
         """
         new_attributes = dict(attributes) if attributes else {}
-        if "sentry.op" not in new_attributes:
-            new_attributes["sentry.op"] = OP.FUNCTION
+        if ATTRIBUTE_NAMES.SENTRY_OP not in new_attributes:
+            new_attributes[ATTRIBUTE_NAMES.SENTRY_OP] = OP.FUNCTION
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
@@ -1105,12 +1109,12 @@ def _make_sampling_decision(
                 "trace_id": propagation_context.trace_id,
                 "span_id": None,
                 "parent_span_id": propagation_context.parent_span_id,
-                "op": attributes.get("sentry.op"),
+                "op": attributes.get(ATTRIBUTE_NAMES.SENTRY_OP),
                 "name": name,
                 "description": name,
                 "start_timestamp": None,
                 "timestamp": None,
-                "source": attributes.get("sentry.segment.name.source"),
+                "source": attributes.get(ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE),
                 "sampled": None,
                 "data": attributes,
             },

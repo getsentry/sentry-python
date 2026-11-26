@@ -3,10 +3,11 @@ import sys
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import get_client
-from sentry_sdk.consts import SPANDATA, VERSION
+from sentry_sdk.consts import VERSION
 
 
 def test_metrics_basics(sentry_init, capture_items):
@@ -26,8 +27,8 @@ def test_metrics_basics(sentry_init, capture_items):
     assert metrics[0]["type"] == "counter"
     assert metrics[0]["value"] == 1.0
     assert "unit" not in metrics[0]
-    assert "sentry.sdk.name" in metrics[0]["attributes"]
-    assert "sentry.sdk.version" in metrics[0]["attributes"]
+    assert ATTRIBUTE_NAMES.SENTRY_SDK_NAME in metrics[0]["attributes"]
+    assert ATTRIBUTE_NAMES.SENTRY_SDK_VERSION in metrics[0]["attributes"]
 
     assert metrics[1]["name"] == "test.gauge"
     assert metrics[1]["type"] == "gauge"
@@ -55,12 +56,14 @@ def test_metrics_with_attributes(sentry_init, capture_items):
 
     assert metrics[0]["attributes"]["endpoint"] == "/api/test"
     assert metrics[0]["attributes"]["status"] == "success"
-    assert metrics[0]["attributes"]["sentry.release"] == "1.0.0"
-    assert metrics[0]["attributes"]["sentry.environment"] == "test"
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_RELEASE] == "1.0.0"
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT] == "test"
 
-    assert metrics[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
-    assert metrics[0]["attributes"]["sentry.sdk.name"].startswith("sentry.python")
-    assert metrics[0]["attributes"]["sentry.sdk.version"] == VERSION
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.SERVER_ADDRESS] == "test-server"
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SDK_NAME].startswith(
+        "sentry.python"
+    )
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_SDK_VERSION] == VERSION
 
 
 def test_metrics_with_user(sentry_init, capture_items):
@@ -77,9 +80,9 @@ def test_metrics_with_user(sentry_init, capture_items):
     metrics = [item.payload for item in items]
     assert len(metrics) == 1
 
-    assert metrics[0]["attributes"]["user.id"] == "user-123"
-    assert metrics[0]["attributes"]["user.email"] == "test@example.com"
-    assert metrics[0]["attributes"]["user.name"] == "testuser"
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.USER_ID] == "user-123"
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "test@example.com"
+    assert metrics[0]["attributes"][ATTRIBUTE_NAMES.USER_NAME] == "testuser"
 
 
 def test_metrics_no_user_if_user_info_off(sentry_init, capture_items):
@@ -96,9 +99,9 @@ def test_metrics_no_user_if_user_info_off(sentry_init, capture_items):
     metrics = [item.payload for item in items]
     assert len(metrics) == 1
 
-    assert "user.id" not in metrics[0]["attributes"]
-    assert "user.email" not in metrics[0]["attributes"]
-    assert "user.name" not in metrics[0]["attributes"]
+    assert ATTRIBUTE_NAMES.USER_ID not in metrics[0]["attributes"]
+    assert ATTRIBUTE_NAMES.USER_EMAIL not in metrics[0]["attributes"]
+    assert ATTRIBUTE_NAMES.USER_NAME not in metrics[0]["attributes"]
 
 
 def test_metrics_with_span(sentry_init, capture_items):
@@ -282,31 +285,31 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "timestamp": mock.ANY,
                 "trace_id": mock.ANY,
                 "attributes": {
-                    "sentry.environment": {
+                    ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: {
                         "type": "string",
                         "value": "production",
                     },
-                    "sentry.release": {
+                    ATTRIBUTE_NAMES.SENTRY_RELEASE: {
                         "type": "string",
                         "value": "1.0.0",
                     },
-                    "process.runtime.name": {
+                    ATTRIBUTE_NAMES.PROCESS_RUNTIME_NAME: {
                         "type": "string",
                         "value": mock.ANY,
                     },
-                    "process.runtime.version": {
+                    ATTRIBUTE_NAMES.PROCESS_RUNTIME_VERSION: {
                         "type": "string",
                         "value": mock.ANY,
                     },
-                    "sentry.sdk.name": {
+                    ATTRIBUTE_NAMES.SENTRY_SDK_NAME: {
                         "type": "string",
                         "value": mock.ANY,
                     },
-                    "sentry.sdk.version": {
+                    ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: {
                         "type": "string",
                         "value": VERSION,
                     },
-                    "server.address": {
+                    ATTRIBUTE_NAMES.SERVER_ADDRESS: {
                         "type": "string",
                         "value": "test-server",
                     },

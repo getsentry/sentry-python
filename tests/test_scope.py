@@ -3,6 +3,7 @@ import os
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import (
@@ -99,8 +100,8 @@ def test_set_user_none_values_are_dropped_when_copying_to_attributes(
 
     segment = items[0].payload
 
-    assert "user.name" not in segment["attributes"]
-    assert segment["attributes"]["user.email"] == "ada@beans.com"
+    assert ATTRIBUTE_NAMES.USER_NAME not in segment["attributes"]
+    assert segment["attributes"][ATTRIBUTE_NAMES.USER_EMAIL] == "ada@beans.com"
 
 
 def test_merging(sentry_init, capture_events):

@@ -41,6 +41,8 @@ try:
 except (ImportError, RuntimeError):
     TestClient = None  # type: ignore[assignment, misc]
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope, parse_json
@@ -553,7 +555,7 @@ def render_span_tree():
 
         def render_span(span):
             yield "- sentry.op={}: name={}".format(
-                json.dumps(span["attributes"].get("sentry.op")),
+                json.dumps(span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP)),
                 json.dumps(span["name"]),
             )
 

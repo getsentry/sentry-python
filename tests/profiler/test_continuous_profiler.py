@@ -4,6 +4,7 @@ from collections import defaultdict
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import VERSION
@@ -145,8 +146,8 @@ def assert_single_transaction_with_profile_chunks(
         {
             "data": ApproxDict(
                 {
-                    "thread.id": str(thread.ident),
-                    "thread.name": thread.name,
+                    ATTRIBUTE_NAMES.THREAD_ID: str(thread.ident),
+                    ATTRIBUTE_NAMES.THREAD_NAME: thread.name,
                 }
             ),
         }
@@ -163,8 +164,8 @@ def assert_single_transaction_with_profile_chunks(
         assert span["data"] == ApproxDict(
             {
                 "profiler_id": profiler_id,
-                "thread.id": str(thread.ident),
-                "thread.name": thread.name,
+                ATTRIBUTE_NAMES.THREAD_ID: str(thread.ident),
+                ATTRIBUTE_NAMES.THREAD_NAME: thread.name,
             }
         )
 
@@ -214,16 +215,23 @@ def assert_single_segment_with_profile_chunks(
 
     segment = segments_list[0]
 
-    assert segment["attributes"]["thread.id"]["value"] == str(thread.ident)
-    assert segment["attributes"]["thread.name"]["value"] == thread.name
+    assert segment["attributes"][ATTRIBUTE_NAMES.THREAD_ID]["value"] == str(
+        thread.ident
+    )
+    assert segment["attributes"][ATTRIBUTE_NAMES.THREAD_NAME]["value"] == thread.name
 
-    profiler_id = segment["attributes"]["sentry.profiler_id"]["value"]
+    profiler_id = segment["attributes"][ATTRIBUTE_NAMES.SENTRY_PROFILER_ID]["value"]
 
     assert len(child_span_list) > 0
     for span in child_span_list:
-        assert span["attributes"]["sentry.profiler_id"]["value"] == profiler_id
-        assert span["attributes"]["thread.id"]["value"] == str(thread.ident)
-        assert span["attributes"]["thread.name"]["value"] == thread.name
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.SENTRY_PROFILER_ID]["value"]
+            == profiler_id
+        )
+        assert span["attributes"][ATTRIBUTE_NAMES.THREAD_ID]["value"] == str(
+            thread.ident
+        )
+        assert span["attributes"][ATTRIBUTE_NAMES.THREAD_NAME]["value"] == thread.name
 
     for profile_chunk_item in items["profile_chunk"]:
         profile_chunk = profile_chunk_item.payload.json
@@ -270,7 +278,7 @@ def assert_single_segment_without_profile_chunks(envelopes):
     assert len(items["profile_chunk"]) == 0
 
     segment = segments_list[0]
-    assert "sentry.profiler_id" not in segment["attributes"]
+    assert ATTRIBUTE_NAMES.SENTRY_PROFILER_ID not in segment["attributes"]
 
 
 @pytest.mark.forked

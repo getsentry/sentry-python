@@ -1,3 +1,5 @@
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 
 
@@ -13,7 +15,7 @@ def test_span_origin_manual(sentry_init, capture_items):
     (span,) = [item.payload for item in items]
 
     assert len(items) == 1
-    assert span["attributes"]["sentry.origin"] == "manual"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
 
 def test_span_origin_custom(sentry_init, capture_items):
@@ -21,12 +23,12 @@ def test_span_origin_custom(sentry_init, capture_items):
     items = capture_items("span")
 
     with sentry_sdk.start_span(
-        name="hi", attributes={"sentry.origin": "foo.foo2.foo3"}
+        name="hi", attributes={ATTRIBUTE_NAMES.SENTRY_ORIGIN: "foo.foo2.foo3"}
     ):
         pass
 
     with sentry_sdk.start_span(
-        name="ho", attributes={"sentry.origin": "baz.baz2.baz3"}
+        name="ho", attributes={ATTRIBUTE_NAMES.SENTRY_ORIGIN: "baz.baz2.baz3"}
     ):
         pass
 
@@ -35,5 +37,5 @@ def test_span_origin_custom(sentry_init, capture_items):
     (span1, span2) = [item.payload for item in items]
 
     assert len(items) == 2
-    assert span1["attributes"]["sentry.origin"] == "foo.foo2.foo3"
-    assert span2["attributes"]["sentry.origin"] == "baz.baz2.baz3"
+    assert span1["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "foo.foo2.foo3"
+    assert span2["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "baz.baz2.baz3"
