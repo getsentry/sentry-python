@@ -77,6 +77,7 @@ def make_capturing_server(request, wsgi_capturing_server):
 @pytest.fixture
 def capturing_server():
     global server
+    assert server is not None
     server.clear_captured()
     return server
 
@@ -350,7 +351,7 @@ def test_socket_options_merge_with_keep_alive(make_client):
         assert options["socket_options"] == [
             (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
             (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
-            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),  # type: ignore[attr-defined, unused-ignore]
             (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
         ]
     except AttributeError:

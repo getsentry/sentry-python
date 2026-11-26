@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk.client
 from sentry_sdk import capture_event
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.session import Session
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import Event
 
 
 def generate_event_item():
@@ -28,7 +33,7 @@ def generate_event_item():
 def test_add_and_get_basic_event():
     envelope = Envelope()
 
-    expected = {"message": "Hello, World!"}
+    expected: "Event" = {"message": "Hello, World!"}
     envelope.add_event(expected)
 
     assert envelope.get_event() == {"message": "Hello, World!"}

@@ -94,7 +94,7 @@ def test_filename_module_file_is_none():
     class DummyModule:
         __file__ = None
 
-    os.sys.modules["foo"] = DummyModule()
+    sys.modules["foo"] = DummyModule()  # type: ignore[assignment]
 
     assert filename_for_module("foo.bar", "path/to/foo/bar.py") == "path/to/foo/bar.py"
 
@@ -534,6 +534,7 @@ def test_set_in_app_in_frames(
         project_root=project_root,
     )
 
+    assert new_frames is not None
     assert new_frames[0] == resulting_frame
 
 
@@ -542,7 +543,7 @@ def test_iter_stacktraces():
         iter_event_stacktraces(
             {
                 "threads": {"values": [{"stacktrace": 1}]},
-                "stacktrace": 2,
+                "stacktrace": 2,  # type: ignore[typeddict-item]
                 "exception": {"values": [{"stacktrace": 3}]},
             }
         )
@@ -591,7 +592,7 @@ def test_normalize_data_with_pydantic_class():
     """Test that _normalize_data handles Pydantic model classes"""
 
     class TestClass:
-        name: str = None
+        name: str = None  # type: ignore[assignment]
 
         def __init__(self, name: str):
             self.name = name

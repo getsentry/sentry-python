@@ -311,6 +311,7 @@ def test_sanitize_url(url, expected_result):
 )
 def test_sanitize_url_and_split(url, expected_result):
     sanitized_url = sanitize_url(url, split=True)
+    assert isinstance(sanitized_url, Components)
 
     assert sanitized_url.scheme == expected_result.scheme
     assert sanitized_url.netloc == expected_result.netloc
@@ -455,9 +456,9 @@ def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragmen
     [0.0, 1.0, True],
 )
 def test_accepts_valid_sample_rate(rate):
-    with mock.patch.object(logger, "warning", mock.Mock()):
+    with mock.patch.object(logger, "warning", mock.Mock()) as warning:
         result = is_valid_sample_rate(rate, source="Testing")
-        assert logger.warning.called is False
+        assert warning.called is False
         assert result is True
 
 
@@ -472,9 +473,9 @@ def test_accepts_valid_sample_rate(rate):
     ],
 )
 def test_warns_on_invalid_sample_rate(rate, StringContaining):
-    with mock.patch.object(logger, "warning", mock.Mock()):
+    with mock.patch.object(logger, "warning", mock.Mock()) as warning:
         result = is_valid_sample_rate(rate, source="Testing")
-        logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
+        warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert result is False
 
 
@@ -745,7 +746,7 @@ def test_check_minimum_version(monkeypatch, version, min_version, expected_pass)
 
     monkeypatch.setattr(sentry_sdk.integrations, "_MIN_VERSIONS", {"test": min_version})
     try:
-        _check_minimum_version(TestIntegration, parse_version(version))
+        _check_minimum_version(TestIntegration, parse_version(version))  # type: ignore[type-abstract]
     except DidNotEnable:
         if expected_pass:
             assert False, (
@@ -790,7 +791,7 @@ def test_is_sentry_url_true(
 def test_is_sentry_url_no_client():
     test_url = "https://asdf@abcd1234.ingest.sentry.io/123456789"
 
-    ret_val = is_sentry_url(None, test_url)
+    ret_val = is_sentry_url(None, test_url)  # type: ignore[arg-type]
 
     assert not ret_val
 
@@ -804,11 +805,11 @@ def test_is_sentry_url_no_client():
 )
 def test_get_error_message(error, expected_result):
     exc_value = Exception()
-    exc_value.message = error
+    exc_value.message = error  # type: ignore[attr-defined]
     assert get_error_message(exc_value) == expected_result(exc_value)
 
     exc_value = Exception()
-    exc_value.detail = error
+    exc_value.detail = error  # type: ignore[attr-defined]
     assert get_error_message(exc_value) == expected_result(exc_value)
 
 
@@ -1018,7 +1019,7 @@ def test_get_current_thread_meta_bad_explicit_thread():
 
     main_thread = threading.main_thread()
 
-    assert (main_thread.ident, main_thread.name) == get_current_thread_meta(thread)
+    assert (main_thread.ident, main_thread.name) == get_current_thread_meta(thread)  # type: ignore[arg-type]
 
 
 @pytest.mark.skipif(gevent is None, reason="gevent not enabled")
@@ -1162,7 +1163,7 @@ def test_qualname_from_function_inner_function():
 def test_qualname_from_function_none_name():
     def test_function(): ...
 
-    test_function.__module__ = None
+    test_function.__module__ = None  # type: ignore[assignment]
 
     assert (
         sentry_sdk.utils.qualname_from_function(test_function)
@@ -1176,7 +1177,7 @@ def test_to_string_unicode_decode_error():
             raise UnicodeDecodeError("utf-8", b"", 0, 1, "reason")
 
     obj = BadStr()
-    result = to_string(obj)
+    result = to_string(obj)  # type: ignore[arg-type]
     assert result == repr(obj)[1:-1]
 
 
@@ -1187,11 +1188,11 @@ def test_exc_info_from_error_dont_get_an_exc():
     with pytest.raises(
         ValueError, match="Expected Exception object to report, got <class"
     ):
-        exc_info_from_error(NotAnException())
+        exc_info_from_error(NotAnException())  # type: ignore[arg-type]
 
 
 def test_get_lines_from_file_handle_linecache_errors():
-    expected_result = ([], None, [])
+    expected_result: "tuple[list[str], None, list[str]]" = ([], None, [])
 
     class Loader:
         @staticmethod

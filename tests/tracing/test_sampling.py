@@ -54,6 +54,7 @@ def test_get_span_from_scope_regardless_of_sampling_decision(
         with sentry_sdk.start_span(name="child-span"):
             with sentry_sdk.start_span(name="child-child-span"):
                 scope = sentry_sdk.get_current_scope()
+                assert scope.span is not None
                 if sampling_decision is True:
                     assert scope.span.name == "child-child-span"
                 else:
@@ -290,9 +291,9 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
     )
 
-    with mock.patch.object(logger, "warning", mock.Mock()):
+    with mock.patch.object(logger, "warning", mock.Mock()) as warning:
         span = sentry_sdk.start_span(name="dogpark")
-        logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
+        warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert span.sampled is False
 
 

@@ -73,6 +73,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
     propagation_context = get_isolation_scope()._propagation_context
+    assert propagation_context is not None
     expected_traceparent = "%s-%s" % (
         propagation_context.trace_id,
         propagation_context.span_id,
@@ -83,6 +84,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
+    assert propagation_context is not None
     expected_baggage = (
         "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
             propagation_context.trace_id
@@ -101,7 +103,9 @@ def test_baggage_with_tracing_enabled(sentry_init):
         expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-transaction=segment,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             segment.trace_id, "true" if segment.sampled else "false"
         )
-        assert re.match(expected_baggage_re, get_baggage())
+        baggage = get_baggage()
+        assert baggage is not None
+        assert re.match(expected_baggage_re, baggage)
 
 
 def test_baggage_with_dsn(sentry_init):
@@ -116,7 +120,9 @@ def test_baggage_with_dsn(sentry_init):
         expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=2\.0\.0,sentry-public_key=97333d956c9e40989a0139756c121c34,sentry-transaction=segment,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             segment.trace_id, "true" if segment.sampled else "false"
         )
-        assert re.match(expected_baggage_re, get_baggage())
+        baggage = get_baggage()
+        assert baggage is not None
+        assert re.match(expected_baggage_re, baggage)
 
 
 def test_continue_trace(sentry_init):
@@ -135,6 +141,7 @@ def test_continue_trace(sentry_init):
         assert segment.name == "some name"
 
         propagation_context = get_isolation_scope()._propagation_context
+        assert propagation_context is not None
         assert propagation_context.trace_id == segment.trace_id == trace_id
         assert propagation_context.parent_span_id == parent_span_id
         assert propagation_context.parent_sampled == parent_sampled

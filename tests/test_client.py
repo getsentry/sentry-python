@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import time
-from collections.abc import Mapping
 from textwrap import dedent
 from unittest import mock
 
@@ -25,7 +24,7 @@ from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
-from sentry_sdk.transport import AsyncHttpTransport, Transport
+from sentry_sdk.transport import AsyncHttpTransport, HttpTransportCore, Transport
 from sentry_sdk.utils import capture_internal_exception
 
 try:
@@ -39,7 +38,7 @@ skip_under_gevent = pytest.mark.skipif(
     running_under_gevent, reason="Async tests not compatible with gevent"
 )
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Mapping
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -325,7 +324,7 @@ def test_proxy(monkeypatch, testcase, http2):
     if testcase.get("env_no_proxy") is not None:
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
 
-    kwargs = {}
+    kwargs: "dict[str, Any]" = {}
 
     if http2:
         kwargs["_experiments"] = {"transport_http2": True}
@@ -338,15 +337,14 @@ def test_proxy(monkeypatch, testcase, http2):
         kwargs["proxy_headers"] = testcase["arg_proxy_headers"]
 
     client = Client(testcase["dsn"], **kwargs)
+    assert isinstance(client.transport, HttpTransportCore)
+    pool: "Any" = client.transport._pool
 
-    proxy = getattr(
-        client.transport._pool,
-        "proxy",
-        getattr(client.transport._pool, "_proxy_url", None),
-    )
+    proxy = getattr(pool, "proxy", getattr(pool, "_proxy_url", None))
     if testcase["expected_proxy_scheme"] is None:
         assert proxy is None
     else:
+        assert proxy is not None
         scheme = (
             proxy.scheme.decode("ascii")
             if isinstance(proxy.scheme, bytes)
@@ -358,10 +356,10 @@ def test_proxy(monkeypatch, testcase, http2):
             proxy_headers = (
                 dict(
                     (k.decode("ascii"), v.decode("ascii"))
-                    for k, v in client.transport._pool._proxy_headers
+                    for k, v in pool._proxy_headers
                 )
                 if http2
-                else client.transport._pool.proxy_headers
+                else pool.proxy_headers
             )
             assert proxy_headers == testcase["arg_proxy_headers"]
 
@@ -371,7 +369,7 @@ def test_proxy(monkeypatch, testcase, http2):
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
 def test_socks_proxy(testcase, http2):
-    kwargs = {}
+    kwargs: "dict[str, Any]" = {}
 
     if http2:
         kwargs["_experiments"] = {"transport_http2": True}
@@ -382,11 +380,11 @@ def test_socks_proxy(testcase, http2):
         kwargs["https_proxy"] = testcase["arg_https_proxy"]
 
     client = Client(testcase["dsn"], **kwargs)
-    assert ("socks" in str(type(client.transport._pool)).lower()) == testcase[
-        "should_be_socks_proxy"
-    ], (
+    assert isinstance(client.transport, HttpTransportCore)
+    pool_type = str(type(client.transport._pool))
+    assert ("socks" in pool_type.lower()) == testcase["should_be_socks_proxy"], (
         f"Expected {kwargs} to result in SOCKS == {testcase['should_be_socks_proxy']}"
-        f"but got {str(type(client.transport._pool))}"
+        f"but got {pool_type}"
     )
 
 
@@ -675,7 +673,7 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
 def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-    capture_message("föö".encode("latin1"))
+    capture_message("föö".encode("latin1"))  # type: ignore[arg-type]
     (event,) = events
     assert json.loads(json.dumps(event)) == event
 
@@ -706,7 +704,7 @@ def test_cyclic_frame_vars(sentry_init, capture_events):
     events = capture_events()
 
     try:
-        a = {}
+        a: "dict[str, Any]" = {}
         a["a"] = a
         1 / 0
     except Exception:
@@ -722,7 +720,7 @@ def test_cyclic_data(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    data = {}
+    data: "dict[str, Any]" = {}
     data["is_cyclic"] = data
 
     other_data = ""
@@ -840,7 +838,7 @@ def test_broken_mapping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    class C(Mapping):
+    class C(Mapping[str, Any]):
         def broken(self, *args, **kwargs):
             raise Exception("broken")
 
@@ -870,7 +868,7 @@ def test_mapping_sends_exception(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    class C(Mapping):
+    class C(Mapping[str, Any]):
         def __iter__(self):
             try:
                 1 / 0
@@ -952,7 +950,7 @@ def test_non_string_variables(sentry_init, capture_events):
     events = capture_events()
 
     try:
-        locals()[42] = True
+        locals()[42] = True  # type: ignore[index]
         1 / 0
     except ZeroDivisionError:
         capture_exception()
@@ -987,7 +985,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
             return self.environ["my_representation"]
 
     try:
-        environ = {}
+        environ: "dict[str, Any]" = {}
         environ["a"] = TooSmartClass(environ)
         1 / 0
     except ZeroDivisionError:
@@ -1238,7 +1236,7 @@ class IssuesSamplerTestConfig:
         ),
         # If sampler returns invalid value, we should still send the event
         IssuesSamplerTestConfig(
-            sampler_function=lambda *_: (  # type: ignore[arg-type, return-value]
+            sampler_function=lambda *_: (  # type: ignore[arg-type]
                 "This is an invalid return value for the sampler"
             ),
             expected_events=1,
@@ -1381,7 +1379,7 @@ async def test_async_proxy(monkeypatch, testcase):
     if testcase.get("env_no_proxy") is not None:
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
 
-    kwargs = {
+    kwargs: "dict[str, Any]" = {
         "_experiments": {"transport_async": True},
         "integrations": [AsyncioIntegration()],
     }
@@ -1395,15 +1393,13 @@ async def test_async_proxy(monkeypatch, testcase):
 
     client = Client(testcase["dsn"], **kwargs)
     assert isinstance(client.transport, AsyncHttpTransport)
+    pool: "Any" = client.transport._pool
 
-    proxy = getattr(
-        client.transport._pool,
-        "proxy",
-        getattr(client.transport._pool, "_proxy_url", None),
-    )
+    proxy = getattr(pool, "proxy", getattr(pool, "_proxy_url", None))
     if testcase["expected_proxy_scheme"] is None:
         assert proxy is None
     else:
+        assert proxy is not None
         scheme = (
             proxy.scheme.decode("ascii")
             if isinstance(proxy.scheme, bytes)
@@ -1413,8 +1409,7 @@ async def test_async_proxy(monkeypatch, testcase):
 
         if testcase.get("arg_proxy_headers") is not None:
             proxy_headers = dict(
-                (k.decode("ascii"), v.decode("ascii"))
-                for k, v in client.transport._pool._proxy_headers
+                (k.decode("ascii"), v.decode("ascii")) for k, v in pool._proxy_headers
             )
             assert proxy_headers == testcase["arg_proxy_headers"]
 
@@ -1605,7 +1600,7 @@ async def test_async_socks_proxy(testcase):
     # These are just the same tests as the sync ones, but they need to be run in an event loop
     # and respect the shutdown behavior of the async transport
 
-    kwargs = {
+    kwargs: "dict[str, Any]" = {
         "_experiments": {"transport_async": True},
         "integrations": [AsyncioIntegration()],
     }

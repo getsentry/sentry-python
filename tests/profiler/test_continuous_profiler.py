@@ -1,6 +1,7 @@
 import threading
 import time
 from collections import defaultdict
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
@@ -15,6 +16,9 @@ from sentry_sdk.profiler.continuous_profiler import (
     stop_profiler,
 )
 from tests.conftest import ApproxDict
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import SDKInfo
 
 try:
     import gevent
@@ -59,7 +63,7 @@ def wait_for_profiler_to_stop(envelopes, timeout=1.0):
     ), "profiler should have flushed a profile chunk"
 
 
-mock_sdk_info = {
+mock_sdk_info: "SDKInfo" = {
     "name": "sentry.python",
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],

@@ -8,6 +8,7 @@ def capture_spotlight_envelopes(monkeypatch):
     def inner():
         envelopes = []
         test_spotlight = sentry_sdk.get_client().spotlight
+        assert test_spotlight is not None
         old_capture_envelope = test_spotlight.capture_envelope
 
         def append_envelope(envelope):

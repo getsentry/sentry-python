@@ -6,7 +6,7 @@ from sentry_sdk.utils import event_from_exception
 
 try:
     # Python 3.11
-    from builtins import ExceptionGroup  # type: ignore
+    from builtins import ExceptionGroup
 except ImportError:
     # Python 3.10 and below
     ExceptionGroup = None  # type: ignore[assignment, misc]

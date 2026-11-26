@@ -170,8 +170,8 @@ def test_scope_attributes_preserialized(sentry_init, capture_items):
     dictionary = {"color": "tortoiseshell"}
 
     with sentry_sdk.new_scope() as scope:
-        scope.set_attribute("instance", instance)
-        scope.set_attribute("dictionary", dictionary)
+        scope.set_attribute("instance", instance)  # type: ignore[arg-type]
+        scope.set_attribute("dictionary", dictionary)  # type: ignore[arg-type]
 
         # Scope attrs are stored preserialized
         assert isinstance(scope._attributes["instance"], str)

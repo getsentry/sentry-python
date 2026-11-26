@@ -110,6 +110,7 @@ def test_should_propagate_trace_to_sentry(
     )
 
     client = sentry_sdk.get_client()
+    assert client.transport is not None
     client.transport.parsed_dsn = Dsn(dsn)
 
     assert should_propagate_trace(client, url) == expected_propagation_decision

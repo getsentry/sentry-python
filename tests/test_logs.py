@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -665,7 +666,7 @@ def test_log_array_attributes(sentry_init, capture_envelopes):
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("string_list", ["value1", "value2"])
         scope.set_attribute("int_tuple", (3, 2, 1, 4))
-        scope.set_attribute("inhomogeneous_tuple", (3, 2.0, 1, 4))  # type: ignore[arg-type]
+        scope.set_attribute("inhomogeneous_tuple", (3, 2.0, 1, 4))
 
         sentry_sdk.logger.warning(
             "Hello, world!",
@@ -791,6 +792,7 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
 
     client = sentry_sdk.get_client()
     batcher = client.log_batcher
+    assert batcher is not None
 
     reentrant_add_called = False
     original_add_to_envelope = batcher._add_to_envelope
@@ -798,11 +800,11 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     def add_to_envelope_with_reentrant_add(envelope):
         nonlocal reentrant_add_called
         # Simulate a GC warning routing back into add() during flush
-        batcher.add({"fake": "log"})
+        batcher.add({"fake": "log"})  # type: ignore[typeddict-item, typeddict-unknown-key]
         reentrant_add_called = True
         original_add_to_envelope(envelope)
 
-    batcher._add_to_envelope = add_to_envelope_with_reentrant_add
+    batcher._add_to_envelope = add_to_envelope_with_reentrant_add  # type: ignore[method-assign]
 
     sentry_sdk.logger.warning("test log")
     client.flush()
@@ -835,7 +837,7 @@ def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock = batcher._lock
     original_lock.acquire()
 
-    batcher._buffer.append(object())
+    batcher._buffer.append(object())  # type: ignore[arg-type]
     batcher._active.flag = True
     batcher._flush_event.set()
     batcher._running = False
@@ -886,7 +888,7 @@ def test_flush_loop_swallows_flush_exception():
 
     calls = []
 
-    class ExplodingBatcher(Batcher):
+    class ExplodingBatcher(Batcher[Any]):
         def _flush(self):
             calls.append(1)
             self._running = False  # exit the loop after this one iteration

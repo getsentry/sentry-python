@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
@@ -12,6 +13,9 @@ from sentry_sdk.traces import (
     Span,
     SpanStatus,
 )
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import SpanLink
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
@@ -417,9 +421,9 @@ def test_span_attributes_serialize_early(sentry_init, capture_items):
         span.set_attributes(
             {
                 # arrays of different types will be serialized
-                "attribute1": [123, "text"],
+                "attribute1": [123, "text"],  # type: ignore[dict-item]
                 # so will custom class instances
-                "attribute2": Class(),
+                "attribute2": Class(),  # type: ignore[dict-item]
             }
         )
         attributes = span.get_attributes()
@@ -445,7 +449,7 @@ def test_span_links(sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    previous_trace = {
+    previous_trace: "SpanLink" = {
         "trace_id": "627a2885119dcc8184fae7eef09438cb",
         "span_id": "6c71fc6b09b8b716",
         "sampled": True,
@@ -502,7 +506,7 @@ def test_span_links_on_noop_span(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    link = {"trace_id": "a" * 32, "span_id": "b" * 16}
+    link: "SpanLink" = {"trace_id": "a" * 32, "span_id": "b" * 16}
     with sentry_sdk.start_span(name="parent", links=[link]) as span:
         assert isinstance(span, NoOpSpan)
         span.add_link(link)
@@ -829,6 +833,7 @@ def test_backpressure_outcome(
     record_lost_event_calls = capture_record_lost_event_calls()
 
     client = sentry_sdk.get_client()
+    assert client.monitor is not None
     client.monitor._downsample_factor = 1
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"
@@ -948,7 +953,10 @@ def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_ra
             assert traceparent == f"{trace_id}-{span_id}"
 
         baggage = sentry_sdk.get_baggage()
-        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert baggage is not None
+        baggage_items = {
+            k: v for k, _, v in (item.partition("=") for item in baggage.split(","))
+        }
 
         assert "sentry-trace_id" in baggage_items
         assert baggage_items["sentry-trace_id"] == trace_id
@@ -1046,7 +1054,10 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
             )
 
         baggage = sentry_sdk.get_baggage()
-        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert baggage is not None
+        baggage_items = {
+            k: v for k, _, v in (item.partition("=") for item in baggage.split(","))
+        }
 
         # As we've received incoming baggage, we shouldn't modify it ourselves
         # and should propagate it as-is
@@ -1096,7 +1107,10 @@ def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
 
         # We shouldn't be updating incoming baggage
         baggage = sentry_sdk.get_baggage()
-        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert baggage is not None
+        baggage_items = {
+            k: v for k, _, v in (item.partition("=") for item in baggage.split(","))
+        }
         assert baggage_items == incoming_baggage
 
 
@@ -1163,7 +1177,10 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
             assert traceparent == f"{trace_id}-{span_id}"
 
         baggage = sentry_sdk.get_baggage()
-        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert baggage is not None
+        baggage_items = {
+            k: v for k, _, v in (item.partition("=") for item in baggage.split(","))
+        }
 
         assert baggage_items == incoming_baggage
 
@@ -1202,7 +1219,10 @@ def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
         assert traceparent == f"{trace_id}-{span.span_id}-0"
 
         baggage = sentry_sdk.get_baggage()
-        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert baggage is not None
+        baggage_items = {
+            k: v for k, _, v in (item.partition("=") for item in baggage.split(","))
+        }
         assert baggage_items == incoming_baggage
 
 
@@ -1246,7 +1266,10 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
             assert traceparent == f"{trace_id}-{segment.span_id}-1"
 
             baggage = sentry_sdk.get_baggage()
-            baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+            assert baggage is not None
+            baggage_items = {
+                k: v for k, _, v in (item.partition("=") for item in baggage.split(","))
+            }
             assert baggage_items == incoming_baggage
 
 

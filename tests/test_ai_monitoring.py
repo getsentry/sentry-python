@@ -131,7 +131,7 @@ class TestGetModalityFromMimeType:
 
     def test_none_mime_type_returns_image(self):
         """Test that None-like values default to 'image'"""
-        assert get_modality_from_mime_type(None) == "image"
+        assert get_modality_from_mime_type(None) == "image"  # type: ignore[arg-type]
 
     def test_unknown_mime_type_returns_image(self):
         """Test that unknown MIME types default to 'image'"""
@@ -227,9 +227,9 @@ class TestTransformOpenAIContentPart:
 
     def test_non_dict_returns_none(self):
         """Test that non-dict input returns None"""
-        assert transform_openai_content_part("string") is None
-        assert transform_openai_content_part(123) is None
-        assert transform_openai_content_part(None) is None
+        assert transform_openai_content_part("string") is None  # type: ignore[arg-type]
+        assert transform_openai_content_part(123) is None  # type: ignore[arg-type]
+        assert transform_openai_content_part(None) is None  # type: ignore[arg-type]
 
 
 class TestTransformAnthropicContentPart:
@@ -363,9 +363,9 @@ class TestTransformAnthropicContentPart:
 
     def test_non_dict_returns_none(self):
         """Test that non-dict input returns None"""
-        assert transform_anthropic_content_part("string") is None
-        assert transform_anthropic_content_part(123) is None
-        assert transform_anthropic_content_part(None) is None
+        assert transform_anthropic_content_part("string") is None  # type: ignore[arg-type]
+        assert transform_anthropic_content_part(123) is None  # type: ignore[arg-type]
+        assert transform_anthropic_content_part(None) is None  # type: ignore[arg-type]
 
 
 class TestTransformGoogleContentPart:
@@ -450,9 +450,9 @@ class TestTransformGoogleContentPart:
 
     def test_non_dict_returns_none(self):
         """Test that non-dict input returns None"""
-        assert transform_google_content_part("string") is None
-        assert transform_google_content_part(123) is None
-        assert transform_google_content_part(None) is None
+        assert transform_google_content_part("string") is None  # type: ignore[arg-type]
+        assert transform_google_content_part(123) is None  # type: ignore[arg-type]
+        assert transform_google_content_part(None) is None  # type: ignore[arg-type]
 
 
 class TestTransformGenericContentPart:
@@ -551,9 +551,9 @@ class TestTransformGenericContentPart:
 
     def test_non_dict_returns_none(self):
         """Test that non-dict input returns None"""
-        assert transform_generic_content_part("string") is None
-        assert transform_generic_content_part(123) is None
-        assert transform_generic_content_part(None) is None
+        assert transform_generic_content_part("string") is None  # type: ignore[arg-type]
+        assert transform_generic_content_part(123) is None  # type: ignore[arg-type]
+        assert transform_generic_content_part(None) is None  # type: ignore[arg-type]
 
     def test_missing_data_key_returns_none(self):
         """Test that missing data key (base64/url/file_id) returns None"""
@@ -846,10 +846,10 @@ class TestTransformContentPart:
 
     def test_non_dict_returns_none(self):
         """Test that non-dict input returns None"""
-        assert transform_content_part("string") is None
-        assert transform_content_part(123) is None
-        assert transform_content_part(None) is None
-        assert transform_content_part([1, 2, 3]) is None
+        assert transform_content_part("string") is None  # type: ignore[arg-type]
+        assert transform_content_part(123) is None  # type: ignore[arg-type]
+        assert transform_content_part(None) is None  # type: ignore[arg-type]
+        assert transform_content_part([1, 2, 3]) is None  # type: ignore[arg-type]
 
     def test_empty_dict_returns_none(self):
         """Test that empty dict returns None"""
