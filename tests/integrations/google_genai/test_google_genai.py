@@ -5,6 +5,7 @@ import pytest
 from google import genai
 from google.genai import types as genai_types
 from google.genai.types import Content, Part
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -155,11 +156,14 @@ def test_nonstreaming_generate_content(
     chat_span = next(item.payload for item in items if item.type == "span")
 
     # Check chat span
-    assert chat_span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert chat_span["name"] == "chat gemini-1.5-flash"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "gemini-1.5-flash"
+    )
 
     assert json.loads(chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -185,12 +189,18 @@ def test_nonstreaming_generate_content(
     assert response_texts == ["Hello! How can I help you today?"]
 
     # Check token usage
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
     # Output tokens now include reasoning tokens: candidates_token_count (20) + thoughts_token_count (3) = 23
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 3
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 5
+    )
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 3
+    )
 
 
 def test_nonstreaming_generate_content_no_sensitive_data(
@@ -234,21 +244,30 @@ def test_nonstreaming_generate_content_no_sensitive_data(
     chat_span = next(item.payload for item in items if item.type == "span")
 
     # Check chat span
-    assert chat_span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert chat_span["name"] == "chat gemini-1.5-flash"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "gemini-1.5-flash"
+    )
 
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["attributes"]
 
     # Check token usage
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
     # Output tokens now include reasoning tokens: candidates_token_count (20) + thoughts_token_count (3) = 23
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 3
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 5
+    )
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 3
+    )
 
 
 @pytest.mark.parametrize("generate_content_config", (False, True))
@@ -322,11 +341,13 @@ def test_generate_content_with_system_instruction(
     invoke_span = next(item.payload for item in items)
 
     if expected_texts is None:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["attributes"]
+        assert (
+            ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["attributes"]
+        )
         return
 
     system_instructions = json.loads(
-        invoke_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
 
     assert system_instructions == [
@@ -461,11 +482,11 @@ def test_tool_execution(
     sentry_sdk.flush()
     tool_span = next(item.payload for item in items)
 
-    assert tool_span["attributes"]["sentry.op"] == OP.GEN_AI_EXECUTE_TOOL
+    assert tool_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EXECUTE_TOOL
     assert tool_span["name"] == "execute_tool get_weather"
-    assert tool_span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "get_weather"
+    assert tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "get_weather"
     assert (
-        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
+        tool_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_DESCRIPTION]
         == "Get the weather for a location"
     )
 
@@ -624,7 +645,7 @@ def test_streaming_generate_content(
     ]
 
     # Check that streaming flag is set on both spans
-    assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
     # Verify accumulated response text (all chunks combined)
     expected_full_text = "Hello! How can I help you today?"
@@ -637,16 +658,28 @@ def test_streaming_generate_content(
 
     # Verify finish reasons (only the final chunk has a finish reason)
     # When there's a single finish reason, it's stored as a plain string (not JSON)
-    assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["attributes"]
-    assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 5
-    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS] == 3
+    assert ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["attributes"]
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS]
+        == "STOP"
+    )
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 25
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+        == 5
+    )
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]
+        == 3
+    )
 
     # Verify model name
-    assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert (
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "gemini-1.5-flash"
+    )
 
 
 def test_span_origin(
@@ -673,7 +706,9 @@ def test_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.google_genai"
+        )
 
 
 def test_response_without_usage_metadata(
@@ -715,9 +750,9 @@ def test_response_without_usage_metadata(
     chat_span = next(item.payload for item in items)
 
     # Usage data should not be present
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in chat_span["attributes"]
-    assert SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS not in chat_span["attributes"]
-    assert SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS not in chat_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS not in chat_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS not in chat_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS not in chat_span["attributes"]
 
 
 def test_multiple_candidates(
@@ -790,7 +825,7 @@ def test_multiple_candidates(
 
     # Finish reasons are serialized as JSON
     finish_reasons = json.loads(
-        chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS]
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS]
     )
     assert finish_reasons == ["STOP", "MAX_TOKENS"]
 
@@ -829,13 +864,19 @@ def test_all_configuration_parameters(
     invoke_span = next(item.payload for item in items)
 
     # Check all parameters are recorded
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.8
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.95
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 40
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 2048
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_SEED] == 12345
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.8
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.95
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_K] == 40
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 2048
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY]
+        == 0.1
+    )
+    assert (
+        invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY]
+        == 0.2
+    )
+    assert invoke_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_SEED] == 12345
 
 
 def test_empty_response(
@@ -910,9 +951,9 @@ def test_response_with_different_id_fields(
     sentry_sdk.flush()
     chat_span = next(item.payload for item in items)
 
-    assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID] == "resp-456"
+    assert chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID] == "resp-456"
     assert (
-        chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+        chat_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL]
         == "gemini-1.5-flash-001"
     )
 
@@ -1131,15 +1172,22 @@ def test_embed_content(
     (embed_span,) = spans
 
     # Check embeddings span
-    assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert embed_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
-        embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "text-embedding-004"
     )
 
-    input_texts = json.loads(embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+    input_texts = json.loads(
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
+    )
     assert input_texts == [
         "What is your name?",
         "What is your favorite color?",
@@ -1147,8 +1195,8 @@ def test_embed_content(
 
     # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 25
 
 
 def test_embed_content_no_sensitive_data(
@@ -1191,20 +1239,25 @@ def test_embed_content_no_sensitive_data(
     (embed_span,) = spans
 
     # Check embeddings span
-    assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert embed_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
-        embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "text-embedding-004"
     )
 
-    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
 
     # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 25
 
 
 def test_embed_content_string_input(
@@ -1255,13 +1308,15 @@ def test_embed_content_string_input(
     (embed_span,) = spans
 
     # Check that single string is handled correctly
-    input_texts = json.loads(embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+    input_texts = json.loads(
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
+    )
 
     assert input_texts == ["Single text input"]
     # Should use token_count from statistics (5), not billable_character_count (10)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 5
 
 
 def test_embed_content_error_handling(
@@ -1335,7 +1390,7 @@ def test_embed_content_without_statistics(
 
     # No usage tokens since there are no statistics in older versions
     # This is expected and the integration should handle it gracefully
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
 
 
 def test_embed_content_span_origin(
@@ -1362,7 +1417,9 @@ def test_embed_content_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.google_genai"
+        )
 
 
 @pytest.mark.asyncio
@@ -1407,15 +1464,22 @@ async def test_async_embed_content(
     (embed_span,) = spans
 
     # Check embeddings span
-    assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert embed_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
-        embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "text-embedding-004"
     )
 
-    input_texts = json.loads(embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+    input_texts = json.loads(
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
+    )
     assert input_texts == [
         "What is your name?",
         "What is your favorite color?",
@@ -1423,8 +1487,8 @@ async def test_async_embed_content(
 
     # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 25
 
 
 @pytest.mark.asyncio
@@ -1469,20 +1533,25 @@ async def test_async_embed_content_no_sensitive_data(
     (embed_span,) = spans
 
     # Check embeddings span
-    assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert embed_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
     assert embed_span["name"] == "embeddings text-embedding-004"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
     assert (
-        embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
+    )
+    assert (
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "text-embedding-004"
     )
 
-    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
 
     # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 25
 
 
 @pytest.mark.asyncio
@@ -1536,12 +1605,14 @@ async def test_async_embed_content_string_input(
     (embed_span,) = spans
 
     # Check that single string is handled correctly
-    input_texts = json.loads(embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+    input_texts = json.loads(
+        embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
+    )
     assert input_texts == ["Single text input"]
     # Should use token_count from statistics (5), not billable_character_count (10)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+    if ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 5
 
 
 @pytest.mark.asyncio
@@ -1619,7 +1690,7 @@ async def test_async_embed_content_without_statistics(
 
     # No usage tokens since there are no statistics in older versions
     # This is expected and the integration should handle it gracefully
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -1650,7 +1721,9 @@ async def test_async_embed_content_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.google_genai"
+        )
 
 
 # Integration tests for generate_content with different input message formats
@@ -2533,14 +2606,14 @@ def test_extract_contents_messages_object_with_text_attribute():
 
 DATA_COLLECTION_CHAT_EXPECTED_VALUES = {
     SPANDATA.GEN_AI_REQUEST_MESSAGES: [{"role": "user", "content": "Tell me a joke"}],
-    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+    ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS: [
         {"type": "text", "content": "You are a helpful assistant."}
     ],
     SPANDATA.GEN_AI_RESPONSE_TEXT: ["Hello! How can I help you today?"],
 }
 
 DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_EMBEDDINGS_INPUT: [
+    ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT: [
         "What is your name?",
         "What is your favorite color?",
     ],
@@ -2554,7 +2627,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             {"gen_ai": {"inputs": True, "outputs": False}},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             ],
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -2568,7 +2641,7 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
             ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -2609,7 +2682,11 @@ def test_generate_content_data_collection(
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured if item.type == "span"]
-    (span,) = [s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT]
+    (span,) = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+    ]
     span_data = span["attributes"]
 
     for key in expected_present:
@@ -2619,14 +2696,14 @@ def test_generate_content_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "gcp.gemini"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
 
 
 @pytest.mark.parametrize(
@@ -2714,7 +2791,11 @@ def test_generate_content_data_collection_tools(
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured if item.type == "span"]
-    (span,) = [s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT]
+    (span,) = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+    ]
     span_data = span["attributes"]
 
     for key in expected_present:
@@ -2740,7 +2821,7 @@ def test_generate_content_data_collection_tools(
             {"gen_ai": {"inputs": True, "outputs": False}},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             ],
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -2754,7 +2835,7 @@ def test_generate_content_data_collection_tools(
             ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -2830,7 +2911,11 @@ def test_streaming_generate_content_data_collection(
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured if item.type == "span"]
-    (span,) = [s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT]
+    (span,) = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+    ]
     span_data = span["attributes"]
 
     for key in expected_present:
@@ -2840,11 +2925,11 @@ def test_streaming_generate_content_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
-    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 25
 
 
 @pytest.mark.parametrize(
@@ -2938,7 +3023,11 @@ def test_streaming_generate_content_data_collection_tools(
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured if item.type == "span"]
-    (span,) = [s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT]
+    (span,) = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+    ]
     span_data = span["attributes"]
 
     for key in expected_present:
@@ -2962,7 +3051,7 @@ def test_streaming_generate_content_data_collection_tools(
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             [
-                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT,
             ],
             [],
             id="gen-ai-inputs-enabled-outputs-disabled",
@@ -2971,7 +3060,7 @@ def test_streaming_generate_content_data_collection_tools(
             {"gen_ai": {"inputs": False, "outputs": True}},
             [],
             [
-                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -3008,7 +3097,9 @@ def test_embed_content_data_collection(
     sentry_sdk.flush()
     spans = [item.payload for item in captured if item.type == "span"]
     (span,) = [
-        s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_EMBEDDINGS
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_EMBEDDINGS
     ]
     span_data = span["attributes"]
 
@@ -3019,8 +3110,8 @@ def test_embed_content_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
 
 
 @pytest.mark.asyncio
@@ -3031,7 +3122,7 @@ def test_embed_content_data_collection(
             {"gen_ai": {"inputs": True, "outputs": False}},
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             ],
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -3045,7 +3136,7 @@ def test_embed_content_data_collection(
             ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -3084,7 +3175,11 @@ async def test_async_generate_content_data_collection(
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured if item.type == "span"]
-    (span,) = [s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT]
+    (span,) = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+    ]
     span_data = span["attributes"]
 
     for key in expected_present:
@@ -3094,8 +3189,8 @@ async def test_async_generate_content_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.asyncio
@@ -3105,7 +3200,7 @@ async def test_async_generate_content_data_collection(
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             [
-                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT,
             ],
             [],
             id="gen-ai-inputs-enabled-outputs-disabled",
@@ -3114,7 +3209,7 @@ async def test_async_generate_content_data_collection(
             {"gen_ai": {"inputs": False, "outputs": True}},
             [],
             [
-                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
@@ -3151,7 +3246,9 @@ async def test_async_embed_content_data_collection(
     sentry_sdk.flush()
     spans = [item.payload for item in captured if item.type == "span"]
     (span,) = [
-        s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_EMBEDDINGS
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_EMBEDDINGS
     ]
     span_data = span["attributes"]
 
@@ -3162,5 +3259,5 @@ async def test_async_embed_content_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "text-embedding-004"

@@ -20,8 +20,10 @@ try:
 except ImportError:
     Image = None  # type: ignore[assignment, misc]
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.typesafe import TypeSafeIntegration
 
 
@@ -110,20 +112,20 @@ def test_system_one(sentry_init, capture_items, typesafe_response):
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_DECIDE
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_DECIDE
     )
     assert span["name"] == "decide jev-latest"
 
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "decide"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "typesafe"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "decide"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES]) == [
         {
             "type": "evaluation",
             "state": {
@@ -163,7 +165,7 @@ def test_system_one(sentry_init, capture_items, typesafe_response):
         }
     ]
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "type": "evaluation",
             "answers": {
@@ -263,20 +265,20 @@ async def test_system_one_async(sentry_init, capture_items, typesafe_response):
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_DECIDE
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_DECIDE
     )
     assert span["name"] == "decide jev-latest"
 
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "typesafe"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "decide"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "jev-latest"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "typesafe"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "decide"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "jev-latest"
 
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "jev-latest"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "jev-latest"
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 3
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES]) == [
         {
             "type": "evaluation",
             "state": {
@@ -316,7 +318,7 @@ async def test_system_one_async(sentry_init, capture_items, typesafe_response):
         }
     ]
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "type": "evaluation",
             "answers": {
@@ -401,7 +403,7 @@ def test_system_one_with_inline_image(
     spans = [item.payload for item in items]
     (span,) = spans
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES]) == [
         {
             "type": "evaluation",
             "state": [
@@ -474,7 +476,7 @@ async def test_system_one_async_with_inline_image(
     spans = [item.payload for item in items]
     (span,) = spans
 
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES]) == [
         {
             "type": "evaluation",
             "state": [

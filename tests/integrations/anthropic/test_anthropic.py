@@ -2,6 +2,7 @@ import json
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 
@@ -114,7 +115,7 @@ DATA_COLLECTION_EXAMPLE_TOOLS = [
 ]
 
 DATA_COLLECTION_EXPECTED_INPUT_DATA = {
-    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+    ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS: [
         {"type": "text", "content": "You are a helpful assistant."}
     ],
     SPANDATA.GEN_AI_REQUEST_MESSAGES: [{"role": "user", "content": "Hello, Claude"}],
@@ -344,11 +345,11 @@ def test_nonstreaming_create_message(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -371,19 +372,21 @@ def test_nonstreaming_create_message(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi, I'm Claude."}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
 
 
 def test_nonstreaming_create_message_no_sensitive_data(
@@ -431,24 +434,26 @@ def test_nonstreaming_create_message_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
 
 
 @pytest.mark.asyncio
@@ -499,11 +504,11 @@ async def test_nonstreaming_create_message_async(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -526,16 +531,16 @@ async def test_nonstreaming_create_message_async(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi, I'm Claude."}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -588,21 +593,21 @@ async def test_nonstreaming_create_message_async_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -668,14 +673,16 @@ def test_streaming_create_message(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -698,19 +705,21 @@ def test_streaming_create_message(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "max_tokens"
+    ]
 
 
 def test_streaming_create_message_no_sensitive_data(
@@ -774,27 +783,31 @@ def test_streaming_create_message_no_sensitive_data(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "max_tokens"
+    ]
 
 
 def test_streaming_create_message_close(
@@ -847,29 +860,31 @@ def test_streaming_create_message_close(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -926,29 +941,31 @@ def test_streaming_create_message_api_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -1016,14 +1033,16 @@ def test_stream_messages(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -1046,19 +1065,21 @@ def test_stream_messages(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "max_tokens"
+    ]
 
 
 def test_stream_messages_no_sensitive_data(
@@ -1122,27 +1143,31 @@ def test_stream_messages_no_sensitive_data(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "max_tokens"
+    ]
 
 
 def test_stream_messages_close(
@@ -1199,29 +1224,31 @@ def test_stream_messages_close(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -1278,29 +1305,31 @@ def test_stream_messages_api_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -1376,11 +1405,11 @@ async def test_streaming_create_message_async(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -1403,19 +1432,21 @@ async def test_streaming_create_message_async(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "max_tokens"
+    ]
 
 
 @pytest.mark.asyncio
@@ -1487,24 +1518,26 @@ async def test_streaming_create_message_async_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "max_tokens"
+    ]
 
 
 @pytest.mark.asyncio
@@ -1558,29 +1591,31 @@ async def test_streaming_create_message_async_close(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -1639,29 +1674,31 @@ async def test_streaming_create_message_async_api_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -1737,11 +1774,11 @@ async def test_stream_message_async(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -1764,16 +1801,16 @@ async def test_stream_message_async(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -1847,21 +1884,21 @@ async def test_stream_message_async_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -1921,29 +1958,31 @@ async def test_stream_messages_async_api_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -2009,29 +2048,31 @@ async def test_stream_messages_async_close(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     )
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "Hello, Claude"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
     assert (
-        span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_ID]
         == "msg_01XFDUDYJgAACzvnptvVoYEL"
     )
 
@@ -2153,27 +2194,27 @@ def test_streaming_create_message_with_input_json_delta(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "role": "assistant",
             "parts": [{"type": "text", "content": '{"location": "San Francisco, CA"}'}],
         }
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.skipif(
@@ -2293,19 +2334,19 @@ def test_streaming_create_message_with_input_json_delta_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.skipif(
@@ -2425,27 +2466,27 @@ def test_stream_messages_with_input_json_delta(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "role": "assistant",
             "parts": [{"type": "text", "content": '{"location": "San Francisco, CA"}'}],
         }
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.skipif(
@@ -2565,19 +2606,19 @@ def test_stream_messages_with_input_json_delta_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -2704,27 +2745,27 @@ async def test_streaming_create_message_with_input_json_delta_async(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "role": "assistant",
             "parts": [{"type": "text", "content": '{"location": "San Francisco, CA"}'}],
         }
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -2851,19 +2892,19 @@ async def test_streaming_create_message_with_input_json_delta_async_no_sensitive
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -2991,27 +3032,27 @@ async def test_stream_message_with_input_json_delta_async(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert (
         span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "role": "assistant",
             "parts": [{"type": "text", "content": '{"location": "San Francisco, CA"}'}],
         }
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -3139,19 +3180,19 @@ async def test_stream_message_with_input_json_delta_async_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_exception_message_create(
@@ -3209,8 +3250,8 @@ def test_span_status_error(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     assert spans[0]["status"] == "error"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
 
 @pytest.mark.asyncio
@@ -3242,8 +3283,8 @@ async def test_span_status_error_async(
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
     assert spans[0]["status"] == "error"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
 
 @pytest.mark.asyncio
@@ -3299,9 +3340,9 @@ def test_span_origin(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.anthropic"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
 
 @pytest.mark.asyncio
@@ -3330,9 +3371,9 @@ async def test_span_origin_async(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert spans[0]["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.anthropic"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
 
 @pytest.mark.skipif(
@@ -3403,15 +3444,15 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
     )
 
-    assert json.loads(span._attributes.get(SPANDATA.GEN_AI_OUTPUT_MESSAGES)) == [
+    assert json.loads(span._attributes.get(ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES)) == [
         {
             "role": "assistant",
             "parts": [{"type": "text", "content": "{'test': 'data','more': 'json'}"}],
         }
     ]
-    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
-    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
-    assert span._attributes.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
+    assert span._attributes.get(ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS) == 10
+    assert span._attributes.get(ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
+    assert span._attributes.get(ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS) == 30
 
 
 # Test messages with mixed roles including "ai" that should be mapped to "assistant"
@@ -3474,9 +3515,9 @@ def test_anthropic_message_role_mapping(
     span = next(item.payload for item in items)
 
     # Verify that the span was created correctly
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
 
     # Parse the stored messages
@@ -3532,15 +3573,15 @@ def test_nonstreaming_create_message_with_system_prompt(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
     system_instructions = json.loads(
-        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
     assert system_instructions == [
         {"type": "text", "content": "You are a helpful assistant."}
@@ -3562,15 +3603,17 @@ def test_nonstreaming_create_message_with_system_prompt(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi, I'm Claude."}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
 
 
 def test_nonstreaming_create_message_with_system_prompt_no_sensitive_data(
@@ -3620,21 +3663,23 @@ def test_nonstreaming_create_message_with_system_prompt_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
 
 
 @pytest.mark.asyncio
@@ -3685,15 +3730,15 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
     system_instructions = json.loads(
-        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
     assert system_instructions == [
         {"type": "text", "content": "You are a helpful assistant."}
@@ -3715,15 +3760,17 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi, I'm Claude."}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
 
 
 @pytest.mark.asyncio
@@ -3774,21 +3821,23 @@ async def test_nonstreaming_create_message_with_system_prompt_async_no_sensitive
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "end_turn"
+    ]
 
 
 def test_streaming_create_message_with_system_prompt(
@@ -3856,15 +3905,15 @@ def test_streaming_create_message_with_system_prompt(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
     system_instructions = json.loads(
-        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
     assert system_instructions == [
         {"type": "text", "content": "You are a helpful assistant."}
@@ -3886,14 +3935,14 @@ def test_streaming_create_message_with_system_prompt(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_streaming_create_message_with_system_prompt_no_sensitive_data(
@@ -3961,20 +4010,20 @@ def test_streaming_create_message_with_system_prompt_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_stream_messages_with_system_prompt(
@@ -4039,15 +4088,15 @@ def test_stream_messages_with_system_prompt(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
     system_instructions = json.loads(
-        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
     assert system_instructions == [
         {"type": "text", "content": "You are a helpful assistant."}
@@ -4068,14 +4117,14 @@ def test_stream_messages_with_system_prompt(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_stream_messages_with_system_prompt_no_sensitive_data(
@@ -4140,20 +4189,20 @@ def test_stream_messages_with_system_prompt_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -4223,15 +4272,15 @@ async def test_stream_message_with_system_prompt_async(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
     system_instructions = json.loads(
-        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
     assert system_instructions == [
         {"type": "text", "content": "You are a helpful assistant."}
@@ -4253,14 +4302,14 @@ async def test_stream_message_with_system_prompt_async(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -4330,20 +4379,20 @@ async def test_stream_message_with_system_prompt_async_no_sensitive_data(
 
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -4415,15 +4464,15 @@ async def test_streaming_create_message_with_system_prompt_async(
     assert len(spans) == 1
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
     system_instructions = json.loads(
-        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
     assert system_instructions == [
         {"type": "text", "content": "You are a helpful assistant."}
@@ -4446,14 +4495,14 @@ async def test_streaming_create_message_with_system_prompt_async(
         if ThinkingBlock is not None
         else [{"type": "text", "content": "Hi! I'm Claude!"}]
     )
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {"role": "assistant", "parts": expected_parts}
     ]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -4525,20 +4574,20 @@ async def test_streaming_create_message_with_system_prompt_async_no_sensitive_da
     assert len(spans) == 1
     (span,) = spans
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat model"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "model"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-    assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_system_prompt_with_complex_structure(
@@ -4586,12 +4635,12 @@ def test_system_prompt_with_complex_structure(
 
     (span,) = spans
 
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "anthropic"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "anthropic"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS in span["attributes"]
     system_instructions = json.loads(
-        span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
 
     # System content should be a list of text blocks
@@ -5075,11 +5124,16 @@ def test_cache_tokens_nonstreaming(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 250
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 20
+    )
 
 
 @pytest.mark.skipif(
@@ -5124,8 +5178,8 @@ def test_reasoning_tokens_nonstreaming(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     # Reasoning tokens are part of output_tokens, so totals are unchanged.
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 150
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
 
 
@@ -5172,8 +5226,8 @@ async def test_reasoning_tokens_nonstreaming_async(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     # Reasoning tokens are part of output_tokens, so totals are unchanged.
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 150
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
 
 
@@ -5227,10 +5281,15 @@ def test_input_tokens_include_cache_write_nonstreaming(
     (span,) = (item.payload for item in items)
 
     # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 0
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 2846
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
+    )  # 2865 + 14
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 0
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 2846
+    )
 
 
 def test_input_tokens_include_cache_read_nonstreaming(
@@ -5283,10 +5342,17 @@ def test_input_tokens_include_cache_read_nonstreaming(
     (span,) = [item.payload for item in items]
 
     # input_tokens should be total: 19 (non-cached) + 2846 (cache_read) = 2865
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 0
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
+    )  # 2865 + 14
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 0
+    )
 
 
 def test_input_tokens_include_cache_read_streaming(
@@ -5354,10 +5420,17 @@ def test_input_tokens_include_cache_read_streaming(
     (span,) = (item.payload for item in items)
 
     # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 0
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
+    )  # 2865 + 14
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 0
+    )
 
 
 def test_stream_messages_input_tokens_include_cache_read_streaming(
@@ -5423,10 +5496,17 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
     (span,) = (item.payload for item in items)
 
     # input_tokens should be total: 19 + 2846 = 2865
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 0
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 2879
+    )  # 2865 + 14
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 2846
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 0
+    )
 
 
 def test_input_tokens_unchanged_without_caching(
@@ -5471,8 +5551,10 @@ def test_input_tokens_unchanged_without_caching(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 32
+    )  # 20 + 12
 
 
 def test_cache_tokens_streaming(
@@ -5535,11 +5617,16 @@ def test_cache_tokens_streaming(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 210
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 20
+    )
 
 
 def test_stream_messages_cache_tokens(
@@ -5601,11 +5688,16 @@ def test_stream_messages_cache_tokens(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 210
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 80
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+        == 20
+    )
 
 
 @pytest.mark.skipif(
@@ -5670,8 +5762,8 @@ def test_reasoning_tokens_streaming(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     # Reasoning tokens are part of output_tokens, so totals are unchanged.
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 150
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15
 
 
@@ -5736,6 +5828,6 @@ def test_stream_messages_reasoning_tokens(
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
     # Reasoning tokens are part of output_tokens, so totals are unchanged.
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 150
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 15

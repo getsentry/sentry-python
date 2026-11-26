@@ -5,6 +5,7 @@ import httpx
 import pytest
 from cohere import ChatMessage, Client
 from httpx import Client as HTTPXClient
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -55,7 +56,7 @@ def test_nonstreaming_chat(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert (
@@ -68,9 +69,9 @@ def test_nonstreaming_chat(
     )
     assert "the model response" in span["attributes"][SPANDATA.AI_RESPONSES]
 
-    assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
-    assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
-    assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 def test_nonstreaming_chat_no_sensitive_data(
@@ -117,15 +118,15 @@ def test_nonstreaming_chat_no_sensitive_data(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
     assert SPANDATA.AI_RESPONSES not in span["attributes"]
 
-    assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
-    assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
-    assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 def test_streaming_chat(
@@ -187,7 +188,7 @@ def test_streaming_chat(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert (
@@ -200,9 +201,9 @@ def test_streaming_chat(
     )
     assert "the model response" in span["attributes"][SPANDATA.AI_RESPONSES]
 
-    assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
-    assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
-    assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 def test_streaming_chat_no_sensitive_data(
@@ -264,15 +265,15 @@ def test_streaming_chat_no_sensitive_data(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["attributes"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
     assert SPANDATA.AI_RESPONSES not in span["attributes"]
 
-    assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
-    assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
-    assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 def test_embed(
@@ -317,11 +318,11 @@ def test_embed(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
     assert "hello" in span["attributes"][SPANDATA.AI_INPUT_MESSAGES]
 
-    assert span["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert span["attributes"]["gen_ai.usage.total_tokens"] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 10
 
 
 def test_embed_no_sensitive_data(
@@ -366,11 +367,11 @@ def test_embed_no_sensitive_data(
     assert len(items) == 1
     span = items[0].payload
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
     assert SPANDATA.AI_INPUT_MESSAGES not in span["attributes"]
 
-    assert span["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert span["attributes"]["gen_ai.usage.total_tokens"] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 10
 
 
 def test_bad_chat(sentry_init, capture_items):
@@ -449,7 +450,7 @@ def test_span_origin_chat(sentry_init, capture_items):
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
-    assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.cohere"
 
 
 def test_span_origin_embed(sentry_init, capture_items):
@@ -482,7 +483,7 @@ def test_span_origin_embed(sentry_init, capture_items):
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
-    assert span["attributes"]["sentry.origin"] == "auto.ai.cohere"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.cohere"
 
 
 # data_collection config, expect_inputs, expect_outputs
@@ -569,8 +570,8 @@ def test_nonstreaming_chat_data_collection(
     attributes = items[0].payload["attributes"]
 
     assert attributes[SPANDATA.AI_MODEL_ID] == "some-model"
-    assert attributes["gen_ai.usage.input_tokens"] == 20
-    assert attributes["gen_ai.usage.output_tokens"] == 10
+    assert attributes[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert attributes[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert attributes["ai.generation_id"] == "gen-1"
 
     if expect_inputs:
@@ -657,8 +658,8 @@ def test_streaming_chat_data_collection(
     attributes = items[0].payload["attributes"]
 
     assert attributes[SPANDATA.AI_MODEL_ID] == "some-model"
-    assert attributes["gen_ai.usage.input_tokens"] == 20
-    assert attributes["gen_ai.usage.output_tokens"] == 10
+    assert attributes[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert attributes[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
 
     if expect_inputs:
         assert '{"role": "user", "content": "hello"}' in str(
@@ -718,7 +719,7 @@ def test_embed_data_collection(
     attributes = items[0].payload["attributes"]
 
     assert attributes[SPANDATA.AI_MODEL_ID] == "text-embedding-3-large"
-    assert attributes["gen_ai.usage.input_tokens"] == 10
+    assert attributes[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
 
     if expect_inputs:
         assert "hello" in str(attributes[SPANDATA.AI_INPUT_MESSAGES])

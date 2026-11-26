@@ -13,9 +13,10 @@ from mistralai.client.models import (
     UsageInfo,
     UserMessage,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.mistral import MistralIntegration
 
 
@@ -95,26 +96,31 @@ def test_nonstreaming_chat(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert span["name"] == "chat mistral-medium-latest"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "mistral"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "mistral-medium-latest"
+    )
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.asyncio
@@ -163,26 +169,31 @@ async def test_nonstreaming_chat_async(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert span["name"] == "chat mistral-medium-latest"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "mistral"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "mistral"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "mistral-medium-latest"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
+        == "mistral-medium-latest"
+    )
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is False
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.parametrize(
@@ -419,16 +430,18 @@ def test_input_attributes_nonstreaming_chat(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert span["name"] == "chat mistral-medium-latest"
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS])
         == expected_system_instructions
     )
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES])
         == expected_input_messages
     )
 
@@ -668,16 +681,18 @@ async def test_input_attributes_nonstreaming_chat_async(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert span["name"] == "chat mistral-medium-latest"
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS])
         == expected_system_instructions
     )
     assert (
-        json.loads(span["attributes"][SPANDATA.GEN_AI_INPUT_MESSAGES])
+        json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES])
         == expected_input_messages
     )
 
@@ -721,11 +736,13 @@ def test_output_attributes_nonstreaming_chat(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert span["name"] == "chat mistral-medium-latest"
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "role": "assistant",
             "parts": [
@@ -782,11 +799,13 @@ async def test_output_attributes_nonstreaming_chat_async(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     (span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        span
+        for span in spans
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
     )
 
     assert span["name"] == "chat mistral-medium-latest"
-    assert json.loads(span["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+    assert json.loads(span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES]) == [
         {
             "role": "assistant",
             "parts": [
