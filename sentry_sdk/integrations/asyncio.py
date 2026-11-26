@@ -2,6 +2,8 @@ import functools
 import sys
 from contextlib import nullcontext
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -152,8 +154,8 @@ def patch_asyncio() -> None:
                         span_ctx = sentry_sdk.start_span(
                             name=get_name(coro),
                             attributes={
-                                "sentry.op": OP.FUNCTION,
-                                "sentry.origin": AsyncioIntegration.origin,
+                                ATTRIBUTE_NAMES.SENTRY_OP: OP.FUNCTION,
+                                ATTRIBUTE_NAMES.SENTRY_ORIGIN: AsyncioIntegration.origin,
                             },
                         )
 
