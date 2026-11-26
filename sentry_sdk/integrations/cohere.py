@@ -2,6 +2,8 @@ import sys
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 from sentry_sdk import consts
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
@@ -120,13 +122,13 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             if hasattr(res.meta, "billed_units"):
                 if res.meta.billed_units.input_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
                         res.meta.billed_units.input_tokens,
                     )
 
                 if res.meta.billed_units.output_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
                         res.meta.billed_units.output_tokens,
                     )
 
@@ -135,19 +137,20 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                     and res.meta.billed_units.output_tokens is not None
                 ):
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
                         res.meta.billed_units.input_tokens
                         + res.meta.billed_units.output_tokens,
                     )
             elif hasattr(res.meta, "tokens"):
                 if res.meta.tokens.input_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, res.meta.tokens.input_tokens
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
+                        res.meta.tokens.input_tokens,
                     )
 
                 if res.meta.tokens.output_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
                         res.meta.tokens.output_tokens,
                     )
 
@@ -156,7 +159,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                     and res.meta.tokens.output_tokens is not None
                 ):
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
                         res.meta.tokens.input_tokens + res.meta.tokens.output_tokens,
                     )
 
@@ -179,8 +182,8 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
         span = sentry_sdk.start_span(
             name="cohere.client.Chat",
             attributes={
-                "sentry.op": consts.OP.GEN_AI_CHAT,
-                "sentry.origin": CohereIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: consts.OP.GEN_AI_CHAT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: CohereIntegration.origin,
             },
         )
 
@@ -273,8 +276,8 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name="Cohere Embedding Creation",
             attributes={
-                "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
-                "sentry.origin": CohereIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: consts.OP.GEN_AI_EMBEDDINGS,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: CohereIntegration.origin,
             },
         ) as span:
             if (
@@ -310,12 +313,12 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
             ):
                 if res.meta.billed_units.input_tokens is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
                         res.meta.billed_units.input_tokens,
                     )
 
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS,
                         res.meta.billed_units.input_tokens,
                     )
             return res

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from huggingface_hub import InferenceClient
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
@@ -438,30 +439,32 @@ def test_text_generation(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.text_completion"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.text_completion"
     assert span["name"] == "text_completion test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "text_completion",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "length",
-        "gen_ai.response.streaming": False,
-        "gen_ai.usage.total_tokens": 10,
-        "sentry.op": "gen_ai.text_completion",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "text_completion",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "length",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: False,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 10,
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.text_completion",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     expected_data["gen_ai.request.messages"] = "Hello"
@@ -470,7 +473,7 @@ def test_text_generation(
     assert span["attributes"] == ApproxDict(expected_data)
 
     # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL not in span["attributes"]
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -503,30 +506,32 @@ def test_text_generation_no_sensitive_data(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.text_completion"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.text_completion"
     assert span["name"] == "text_completion test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "text_completion",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "length",
-        "gen_ai.response.streaming": False,
-        "gen_ai.usage.total_tokens": 10,
-        "sentry.op": "gen_ai.text_completion",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "text_completion",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "length",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: False,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 10,
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.text_completion",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     assert "gen_ai.request.messages" not in expected_data
@@ -535,7 +540,7 @@ def test_text_generation_no_sensitive_data(
     assert span["attributes"] == ApproxDict(expected_data)
 
     # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL not in span["attributes"]
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -570,31 +575,33 @@ def test_text_generation_streaming(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.text_completion"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.text_completion"
     assert span["name"] == "text_completion test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "text_completion",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "length",
-        "gen_ai.response.streaming": True,
-        "gen_ai.usage.total_tokens": 10,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.text_completion",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "text_completion",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "length",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 10,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.text_completion",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     expected_data["gen_ai.request.messages"] = "Hello"
@@ -603,7 +610,7 @@ def test_text_generation_streaming(
     assert span["attributes"] == ApproxDict(expected_data)
 
     # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL not in span["attributes"]
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -637,31 +644,33 @@ def test_text_generation_streaming_no_sensitive_data(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.text_completion"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.text_completion"
     assert span["name"] == "text_completion test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "text_completion",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "length",
-        "gen_ai.response.streaming": True,
-        "gen_ai.usage.total_tokens": 10,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.text_completion",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "text_completion",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "length",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 10,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.text_completion",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     assert "gen_ai.request.messages" not in expected_data
@@ -670,7 +679,7 @@ def test_text_generation_streaming_no_sensitive_data(
     assert span["attributes"] == ApproxDict(expected_data)
 
     # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL not in span["attributes"]
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -709,34 +718,36 @@ def test_chat_completion(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "stop",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.response.streaming": False,
-        "gen_ai.usage.input_tokens": 10,
-        "gen_ai.usage.output_tokens": 8,
-        "gen_ai.usage.total_tokens": 18,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "stop",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: False,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS: 10,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS: 8,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 18,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     expected_data["gen_ai.request.messages"] = safe_serialize(
@@ -788,34 +799,36 @@ def test_chat_completion_no_sensitive_data(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "stop",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.response.streaming": False,
-        "gen_ai.usage.input_tokens": 10,
-        "gen_ai.usage.output_tokens": 8,
-        "gen_ai.usage.total_tokens": 18,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "stop",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: False,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS: 10,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS: 8,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 18,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     assert "gen_ai.request.messages" not in expected_data
@@ -862,37 +875,39 @@ def test_chat_completion_streaming(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "stop",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.response.streaming": True,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "stop",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
     # usage is not available in older versions of the library
     if HF_VERSION and HF_VERSION >= (0, 26, 0):
-        expected_data["gen_ai.usage.input_tokens"] = 183
-        expected_data["gen_ai.usage.output_tokens"] = 14
-        expected_data["gen_ai.usage.total_tokens"] = 197
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] = 183
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] = 14
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] = 197
 
     expected_data["gen_ai.request.messages"] = safe_serialize(
         [
@@ -945,37 +960,39 @@ def test_chat_completion_streaming_no_sensitive_data(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "stop",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.response.streaming": True,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "stop",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
     # usage is not available in older versions of the library
     if HF_VERSION and HF_VERSION >= (0, 26, 0):
-        expected_data["gen_ai.usage.input_tokens"] = 183
-        expected_data["gen_ai.usage.output_tokens"] = 14
-        expected_data["gen_ai.usage.total_tokens"] = 197
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] = 183
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] = 14
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] = 197
 
     assert "gen_ai.request.messages" not in expected_data
     assert "gen_ai.response.text" not in expected_data
@@ -1013,30 +1030,32 @@ def test_chat_completion_api_error(
     spans = [item.payload for item in items if item.type == "span"]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
     assert span["status"] == "error"
 
     assert error["contexts"]["trace"]["trace_id"] == span["trace_id"]
     expected_data = {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "test-model",
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
     assert span["attributes"] == ApproxDict(expected_data)
 
@@ -1067,15 +1086,15 @@ def test_span_status_error(
     spans = [item.payload for item in items if item.type == "span"]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
     assert span["status"] == "error"
@@ -1127,34 +1146,36 @@ def test_chat_completion_with_tools(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
         "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "tool_calls",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.usage.input_tokens": 10,
-        "gen_ai.usage.output_tokens": 8,
-        "gen_ai.usage.total_tokens": 18,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "tool_calls",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS: 10,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS: 8,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 18,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     expected_data["gen_ai.request.messages"] = (
@@ -1212,33 +1233,35 @@ def test_chat_completion_with_tools_no_sensitive_data(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "tool_calls",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.usage.input_tokens": 10,
-        "gen_ai.usage.output_tokens": 8,
-        "gen_ai.usage.total_tokens": 18,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "tool_calls",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS: 10,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS: 8,
+        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS: 18,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     assert "gen_ai.request.messages" not in expected_data
@@ -1298,38 +1321,40 @@ def test_chat_completion_streaming_with_tools(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
         "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "tool_calls",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.response.streaming": True,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "tool_calls",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     if HF_VERSION and HF_VERSION >= (0, 26, 0):
-        expected_data["gen_ai.usage.input_tokens"] = 183
-        expected_data["gen_ai.usage.output_tokens"] = 14
-        expected_data["gen_ai.usage.total_tokens"] = 197
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] = 183
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] = 14
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] = 197
 
     expected_data["gen_ai.request.messages"] = (
         '[{"role": "user", "content": "What is the weather in Paris?"}]'
@@ -1390,37 +1415,39 @@ def test_chat_completion_streaming_with_tools_no_sensitive_data(
     spans = [item.payload for item in items]
     span = None
     for sp in spans:
-        if "sentry.op" in sp["attributes"] and sp["attributes"]["sentry.op"].startswith(
-            "gen_ai"
-        ):
+        if ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"] and sp["attributes"][
+            ATTRIBUTE_NAMES.SENTRY_OP
+        ].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
-        elif "sentry.op" in sp["attributes"]:
+        elif ATTRIBUTE_NAMES.SENTRY_OP in sp["attributes"]:
             # there should be no other spans, just the gen_ai span
             # and optionally some http.client spans from talking to the hf api
-            assert sp["attributes"]["sentry.op"] == "http.client"
+            assert sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "http.client"
 
     assert span is not None
 
-    assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "gen_ai.chat"
     assert span["name"] == "chat test-model"
-    assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.huggingface_hub"
+    )
 
     expected_data = {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "tool_calls",
-        "gen_ai.response.model": "test-model-123",
-        "gen_ai.response.streaming": True,
-        "sentry.environment": "production",
-        "sentry.op": "gen_ai.chat",
-        "sentry.origin": "auto.ai.huggingface_hub",
+        ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+        ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: "test-model",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS: "tool_calls",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL: "test-model-123",
+        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_OP: "gen_ai.chat",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.ai.huggingface_hub",
     }
 
     if HF_VERSION and HF_VERSION >= (0, 26, 0):
-        expected_data["gen_ai.usage.input_tokens"] = 183
-        expected_data["gen_ai.usage.output_tokens"] = 14
-        expected_data["gen_ai.usage.total_tokens"] = 197
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] = 183
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] = 14
+        expected_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] = 197
 
     assert "gen_ai.request.messages" not in expected_data
     assert "gen_ai.response.text" not in expected_data
@@ -1497,7 +1524,11 @@ def test_text_generation_data_collection(
     client.text_generation("Hello", stream=False, details=True)
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
-    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    (span,) = [
+        sp
+        for sp in spans
+        if sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP].startswith("gen_ai")
+    ]
     span_data = span["attributes"]
 
     expected_values = {
@@ -1512,10 +1543,10 @@ def test_text_generation_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "text_completion"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 10
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -1570,7 +1601,11 @@ def test_text_generation_streaming_data_collection(
         pass
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
-    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    (span,) = [
+        sp
+        for sp in spans
+        if sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP].startswith("gen_ai")
+    ]
     span_data = span["attributes"]
 
     expected_values = {
@@ -1585,11 +1620,11 @@ def test_text_generation_streaming_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "text_completion"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 10
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -1649,7 +1684,11 @@ def test_chat_completion_data_collection_tools(
     )
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
-    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    (span,) = [
+        sp
+        for sp in spans
+        if sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP].startswith("gen_ai")
+    ]
     span_data = span["attributes"]
 
     expected_values = {
@@ -1668,13 +1707,13 @@ def test_chat_completion_data_collection_tools(
     # This response carries only tool calls, so there is never any response text
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "test-model-123"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_calls"
-    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 8
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 18
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "test-model-123"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_calls"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 8
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 18
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -1738,7 +1777,11 @@ def test_chat_completion_streaming_data_collection_tools(
         pass
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
-    (span,) = [sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")]
+    (span,) = [
+        sp
+        for sp in spans
+        if sp["attributes"][ATTRIBUTE_NAMES.SENTRY_OP].startswith("gen_ai")
+    ]
     span_data = span["attributes"]
 
     expected_values = {
@@ -1755,13 +1798,13 @@ def test_chat_completion_streaming_data_collection_tools(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "test-model-123"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_calls"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "test-model-123"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_calls"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
     if HF_VERSION and HF_VERSION >= (0, 26, 0):
-        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 183
-        assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 14
-        assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 197
+        assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 183
+        assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 14
+        assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 197

@@ -6,6 +6,7 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 
@@ -195,18 +196,18 @@ def test_nonstreaming_chat_completion(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+        and x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN) == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -217,9 +218,9 @@ def test_nonstreaming_chat_completion(
     ]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 def test_nonstreaming_chat_completion_no_sensitive_data(
@@ -283,25 +284,25 @@ def test_nonstreaming_chat_completion_no_sensitive_data(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+        and x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN) == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -366,18 +367,18 @@ async def test_async_nonstreaming_chat_completion(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+        and x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN) == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
     assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
         {
@@ -388,9 +389,9 @@ async def test_async_nonstreaming_chat_completion(
     ]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -455,25 +456,25 @@ async def test_async_nonstreaming_chat_completion_no_sensitive_data(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+        and x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN) == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["attributes"][SPANDATA.GEN_AI_PROVIDER_NAME] == "openai"
-    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME] == "openai"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 def test_streaming_chat_completion(
@@ -534,14 +535,14 @@ def test_streaming_chat_completion(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -606,14 +607,14 @@ async def test_async_streaming_chat_completion(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_embeddings_create(
@@ -670,23 +671,23 @@ def test_embeddings_create(
         spans = list(
             x
             for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+            if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
         )
 
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
         assert span["name"] == "embeddings text-embedding-ada-002"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 5
         assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
             == "text-embedding-ada-002"
         )
         # Check that embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
         assert json.loads(embeddings_input) == ["Hello, world!"]
 
 
@@ -746,22 +747,22 @@ async def test_async_embeddings_create(
         spans = list(
             x
             for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+            if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
         assert span["name"] == "embeddings text-embedding-ada-002"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS] == 5
         assert (
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL]
             == "text-embedding-ada-002"
         )
         # Check that embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
 
         assert json.loads(embeddings_input) == ["Hello, world!"]
 
@@ -816,16 +817,16 @@ def test_embeddings_create_with_list_input(
         spans = list(
             x
             for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+            if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
         # Check that list of embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
 
         assert json.loads(embeddings_input) == [
             "First text",
@@ -885,16 +886,16 @@ async def test_async_embeddings_create_with_list_input(
         spans = list(
             x
             for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+            if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "embeddings"
         # Check that list of embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT]
 
         assert json.loads(embeddings_input) == [
             "First text",
@@ -951,14 +952,14 @@ def test_embeddings_no_sensitive_data(
         spans = list(
             x
             for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+            if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+        assert ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -1011,14 +1012,14 @@ async def test_async_embeddings_no_sensitive_data(
         spans = list(
             x
             for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+            if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_EMBEDDINGS
+        assert ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
 def test_exception_handling(
@@ -1140,7 +1141,7 @@ def test_span_origin(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.litellm"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
 
 
 def test_multiple_providers(
@@ -1241,7 +1242,7 @@ def test_multiple_providers(
     spans = [item.payload for item in items]
     for span in spans:
         # The provider should be detected by litellm.get_llm_provider
-        assert SPANDATA.GEN_AI_PROVIDER_NAME in span["attributes"]
+        assert ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME in span["attributes"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -1345,7 +1346,7 @@ async def test_async_multiple_providers(
     spans = [item.payload for item in items]
     for span in spans:
         # The provider should be detected by litellm.get_llm_provider
-        assert SPANDATA.GEN_AI_PROVIDER_NAME in span["attributes"]
+        assert ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME in span["attributes"]
 
 
 def test_additional_parameters(
@@ -1405,17 +1406,17 @@ def test_additional_parameters(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -1476,17 +1477,17 @@ async def test_async_additional_parameters(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
-    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
 
 
 def test_no_integration(
@@ -1540,8 +1541,8 @@ def test_no_integration(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 0
 
@@ -1598,8 +1599,8 @@ async def test_async_no_integration(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 0
 
@@ -1645,7 +1646,7 @@ def test_response_without_usage(
     (span,) = (item.payload for item in items)
 
     # Span should still be created even without usage info
-    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
     assert span["name"] == "chat gpt-3.5-turbo"
 
 
@@ -1737,8 +1738,8 @@ def test_binary_content_encoding_image_url(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
@@ -1833,8 +1834,8 @@ async def test_async_binary_content_encoding_image_url(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
@@ -1929,8 +1930,8 @@ def test_binary_content_encoding_mixed_content(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
@@ -2014,8 +2015,8 @@ async def test_async_binary_content_encoding_mixed_content(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
@@ -2095,8 +2096,8 @@ def test_binary_content_encoding_uri_type(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
@@ -2185,8 +2186,8 @@ async def test_async_binary_content_encoding_uri_type(
     chat_spans = list(
         x
         for x in spans
-        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
+        if x["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.GEN_AI_CHAT
+        and x["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
@@ -2383,8 +2384,8 @@ def test_chat_completion_data_collection(
     (span,) = [
         x
         for x in spans
-        if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+        if x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.GEN_AI_CHAT
+        and x["attributes"].get(ATTRIBUTE_NAMES.SENTRY_ORIGIN) == "auto.ai.litellm"
     ]
     span_data = span["attributes"]
 
@@ -2402,7 +2403,7 @@ def test_chat_completion_data_collection(
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
 
-    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span_data[ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS] == 30

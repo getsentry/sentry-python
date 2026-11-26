@@ -1,6 +1,8 @@
 import copy
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.utils import (
@@ -95,20 +97,20 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     span = sentry_sdk.start_span(
         name=f"{operation} {model}",
         attributes={
-            "sentry.op": (
+            ATTRIBUTE_NAMES.SENTRY_OP: (
                 consts.OP.GEN_AI_CHAT
                 if operation == "chat"
                 else consts.OP.GEN_AI_EMBEDDINGS
             ),
-            "sentry.origin": LiteLLMIntegration.origin,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: LiteLLMIntegration.origin,
         },
     )
 
     _store_span(kwargs, span)
 
     # Set basic data
-    set_data_normalized(span, SPANDATA.GEN_AI_PROVIDER_NAME, provider)
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
+    set_data_normalized(span, ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME, provider)
+    set_data_normalized(span, ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME, operation)
 
     if client.options["data_collection"]["gen_ai"]["inputs"]:
         if operation == "embeddings":
@@ -124,7 +126,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                 if input_list is not None:
                     set_data_normalized(
                         span,
-                        SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                        ATTRIBUTE_NAMES.GEN_AI_EMBEDDINGS_INPUT,
                         input_list,
                         unpack=False,
                     )
@@ -142,13 +144,13 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
 
     # Record other parameters
     params = {
-        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-        "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
-        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-        "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-        "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+        "model": ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL,
+        "stream": ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING,
+        "max_tokens": ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS,
+        "presence_penalty": ATTRIBUTE_NAMES.GEN_AI_REQUEST_PRESENCE_PENALTY,
+        "frequency_penalty": ATTRIBUTE_NAMES.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+        "temperature": ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE,
+        "top_p": ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P,
     }
     for key, attribute in params.items():
         value = kwargs.get(key)
@@ -181,7 +183,7 @@ def _success_callback(
         # Record model information
         if hasattr(completion_response, "model"):
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_MODEL, completion_response.model
+                span, ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, completion_response.model
             )
 
         if client.options["data_collection"]["gen_ai"]["outputs"]:
@@ -215,11 +217,15 @@ def _success_callback(
 
             input_tokens = getattr(usage, "prompt_tokens", None)
             if input_tokens is not None:
-                span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, input_tokens
+                )
 
             output_tokens = getattr(usage, "completion_tokens", None)
             if output_tokens is not None:
-                span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens
+                )
 
             total_tokens = getattr(usage, "total_tokens", None)
             if (
@@ -230,7 +236,9 @@ def _success_callback(
                 total_tokens = input_tokens + output_tokens
 
             if total_tokens is not None:
-                span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+                span.set_attribute(
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens
+                )
 
     finally:
         is_streaming = kwargs.get("stream")

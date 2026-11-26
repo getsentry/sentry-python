@@ -3,8 +3,10 @@ from collections.abc import Mapping
 from functools import wraps
 from typing import TYPE_CHECKING, cast
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 
 if TYPE_CHECKING:
@@ -241,14 +243,14 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"decide {model}".strip(),
             attributes={
-                "sentry.op": OP.GEN_AI_DECIDE,
-                "sentry.origin": TypeSafeIntegration.origin,
-                SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
-                SPANDATA.GEN_AI_OPERATION_NAME: "decide",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_DECIDE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: TypeSafeIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: "typesafe",
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "decide",
             },
         ) as span:
             if model is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model)
 
             if client.options["data_collection"]["gen_ai"]["inputs"]:
                 input_message: "InputMessageModel" = {
@@ -264,7 +266,7 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     input_message["questions"] = _transform_questions(questions)
 
                 span.set_attribute(
-                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES,
                     json.dumps([input_message], default=_json_default),
                 )
 
@@ -273,23 +275,25 @@ def _wrap_system_one(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if not isinstance(response, SystemOneResponse):
                 return response
 
-            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response.model)
 
             if response.usage.input_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
+                    response.usage.input_tokens,
                 )
 
             if response.usage.output_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    response.usage.output_tokens,
                 )
 
             if not client.options["data_collection"]["gen_ai"]["outputs"]:
                 return response
 
             span.set_attribute(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES,
                 json.dumps(
                     [
                         {
@@ -327,14 +331,14 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"decide {model}".strip(),
             attributes={
-                "sentry.op": OP.GEN_AI_DECIDE,
-                "sentry.origin": TypeSafeIntegration.origin,
-                SPANDATA.GEN_AI_PROVIDER_NAME: "typesafe",
-                SPANDATA.GEN_AI_OPERATION_NAME: "decide",
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_DECIDE,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: TypeSafeIntegration.origin,
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: "typesafe",
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "decide",
             },
         ) as span:
             if model is not None:
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL, model)
 
             if client.options["data_collection"]["gen_ai"]["inputs"]:
                 input_message: "InputMessageModel" = {
@@ -350,7 +354,7 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     input_message["questions"] = _transform_questions(questions)
 
                 span.set_attribute(
-                    SPANDATA.GEN_AI_INPUT_MESSAGES,
+                    ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES,
                     json.dumps([input_message], default=_json_default),
                 )
 
@@ -359,23 +363,25 @@ def _wrap_system_one_async(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if not isinstance(response, SystemOneResponse):
                 return response
 
-            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_RESPONSE_MODEL, response.model)
 
             if response.usage.input_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, response.usage.input_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
+                    response.usage.input_tokens,
                 )
 
             if response.usage.output_tokens is not None:
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, response.usage.output_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    response.usage.output_tokens,
                 )
 
             if not client.options["data_collection"]["gen_ai"]["outputs"]:
                 return response
 
             span.set_attribute(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES,
                 json.dumps(
                     [
                         {

@@ -7,8 +7,10 @@ from typing import (
     List,
 )
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import SpanStatus
 from sentry_sdk.utils import parse_version
@@ -80,12 +82,12 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
         chat_span = sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
-                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
+                ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: model_name,
+                ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
             },
         )
 
@@ -144,12 +146,12 @@ def _wrap_async_generate_content_stream(
         chat_span = sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
-                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
+                ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: model_name,
+                ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: True,
             },
         )
 
@@ -204,11 +206,11 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
-                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
+                ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: model_name,
             },
         ) as chat_span:
             set_span_data_for_request(
@@ -247,11 +249,11 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
         with sentry_sdk.start_span(
             name=f"chat {model_name}",
             attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
-                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_CHAT,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
+                ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: model_name,
             },
         ) as chat_span:
             set_span_data_for_request(
@@ -284,11 +286,11 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"embeddings {model_name}",
             attributes={
-                "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-                SPANDATA.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
-                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_EMBEDDINGS,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "embeddings",
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
+                ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: model_name,
             },
         ) as span:
             set_span_data_for_embed_request(span, integration, contents, kwargs)
@@ -322,11 +324,11 @@ def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         with sentry_sdk.start_span(
             name=f"embeddings {model_name}",
             attributes={
-                "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-                SPANDATA.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
-                SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.GEN_AI_EMBEDDINGS,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
+                ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "embeddings",
+                ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: GEN_AI_SYSTEM,
+                ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL: model_name,
             },
         ) as span:
             set_span_data_for_embed_request(span, integration, contents, kwargs)
