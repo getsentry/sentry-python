@@ -1,0 +1,35 @@
+name: PR classifiers
+
+on:
+  pull_request_target:
+    # Keep `edited`: it is the only event fired when the base branch changes.
+    types: [opened, synchronize, reopened, ready_for_review, edited, converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  # Two groups per pull request. Runs started by a title or description edit ("text") must
+  # never share a group with the runs that score a revision ("score"): GitHub keeps only one
+  # pending run per group, so a pending text edit would replace the pending run for a new
+  # commit, and the action would then skip the edit because the previous commit's label is
+  # still on the PR. Do not simplify this expression.
+  group: pr-classifiers-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'text' || 'score' }}
+  # Every started run must reach its label clear; an overtaken run ends as `pr_changed`.
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    name: PR classifiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write   # this job only; needed to publish the risk label and the summary comment
+    steps:
+      # This job must never check out or run code from the pull request.
+      - uses: getsentry/github-workflows/pr-classifiers@edc87d6f133ac6204e22dee5123167a5eff3ed79
+        with:
+          app-client-id: ${{ vars.CLASSIFIERS_APP_CLIENT_ID }}
+          app-private-key: ${{ secrets.CLASSIFIERS_APP_KEY }}
+          ai-gateway-api-key: ${{ secrets.AI_GATEWAY_API_KEY }}
+          publish-comment: true
