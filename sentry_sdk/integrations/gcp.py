@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from os import environ
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
@@ -92,7 +94,9 @@ def _wrap_func(func: "F") -> "F":
 
             additional_attributes = {}
             if hasattr(gcp_event, "method"):
-                additional_attributes["http.request.method"] = gcp_event.method
+                additional_attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] = (
+                    gcp_event.method
+                )
 
             if hasattr(gcp_event, "query_string"):
                 query_string = gcp_event.query_string.decode("utf-8", errors="replace")
@@ -102,7 +106,7 @@ def _wrap_func(func: "F") -> "F":
                         behaviour=client.options["data_collection"]["url_query_params"],
                     )
                     if filtered_qs:
-                        additional_attributes["url.query"] = filtered_qs
+                        additional_attributes[ATTRIBUTE_NAMES.URL_QUERY] = filtered_qs
 
             sampling_context = {
                 "gcp_env": {
@@ -118,15 +122,19 @@ def _wrap_func(func: "F") -> "F":
             function_name = environ.get("FUNCTION_NAME", "<unknown GCP function>")
 
             if environ.get("GCP_PROJECT"):
-                additional_attributes["gcp.project.id"] = environ.get("GCP_PROJECT")
+                additional_attributes[ATTRIBUTE_NAMES.GCP_PROJECT_ID] = environ.get(
+                    "GCP_PROJECT"
+                )
 
             if environ.get("FUNCTION_IDENTITY"):
-                additional_attributes["faas.identity"] = environ.get(
+                additional_attributes[ATTRIBUTE_NAMES.FAAS_IDENTITY] = environ.get(
                     "FUNCTION_IDENTITY"
                 )
 
             if environ.get("ENTRY_POINT"):
-                additional_attributes["faas.entry_point"] = environ.get("ENTRY_POINT")
+                additional_attributes[ATTRIBUTE_NAMES.FAAS_ENTRY_POINT] = environ.get(
+                    "ENTRY_POINT"
+                )
 
             sentry_sdk.continue_trace(headers)
             Scope.set_custom_sampling_context(sampling_context)
@@ -135,11 +143,11 @@ def _wrap_func(func: "F") -> "F":
                 name=function_name,
                 parent_span=None,
                 attributes={
-                    "sentry.op": OP.FUNCTION_GCP,
-                    "sentry.origin": GcpIntegration.origin,
-                    "sentry.segment.name.source": SegmentNameSource.COMPONENT,
-                    "cloud.provider": CLOUD_PROVIDER.GCP,
-                    "faas.name": function_name,
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.FUNCTION_GCP,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: GcpIntegration.origin,
+                    ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.COMPONENT,
+                    ATTRIBUTE_NAMES.CLOUD_PROVIDER: CLOUD_PROVIDER.GCP,
+                    ATTRIBUTE_NAMES.FAAS_NAME: function_name,
                     **header_attributes,
                     **additional_attributes,
                 },

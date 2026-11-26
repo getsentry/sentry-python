@@ -8,6 +8,7 @@ import docker
 import pytest
 import yaml
 from aws_cdk import App
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.aws_lambda.consts import (
@@ -336,8 +337,8 @@ def test_request_data_with_default_data_collection(lambda_client, test_environme
     assert len(segment_spans) == 1
     attrs = segment_spans[0]["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
-    assert _get_span_attr(attrs, SPANDATA.URL_QUERY) == "bonkers=true"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD) == "GET"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.URL_QUERY) == "bonkers=true"
 
 
 USER_INFO_PAYLOAD = b"""
@@ -378,7 +379,7 @@ def test_user_info_with_data_collection_user_info_on(lambda_client, test_environ
     assert len(segment_spans) == 1
     attrs = segment_spans[0]["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.USER_ID) == "42"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.USER_ID) == "42"
 
 
 def test_request_data_with_data_collection_allowlist(lambda_client, test_environment):
@@ -421,7 +422,7 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
     assert len(segment_spans) == 1
     attrs = segment_spans[0]["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD) == "GET"
     # Allowlisted, non-sensitive headers pass through.
     assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.user-agent") == [
         "custom"
@@ -486,7 +487,7 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
     assert len(segment_spans) == 1
     attrs = segment_spans[0]["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD) == "GET"
     # Not denied by any term -> pass through.
     assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.host") == [
         "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com"
@@ -550,7 +551,7 @@ def test_request_data_with_data_collection_off(lambda_client, test_environment):
     assert len(segment_spans) == 1
     attrs = segment_spans[0]["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "GET"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD) == "GET"
     # With request headers collection turned off, no header attributes are collected.
     header_attrs = [
         k for k in attrs if k.startswith(f"{SPANDATA.HTTP_REQUEST_HEADER}.")
@@ -602,7 +603,7 @@ def test_url_query_params_with_data_collection_allowlist(
     # Not allowlisted -> substituted.
     # Allowlisted but sensitive -> still filtered.
     assert (
-        _get_span_attr(attrs, SPANDATA.URL_QUERY)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.URL_QUERY)
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
 
@@ -645,7 +646,7 @@ def test_url_query_params_with_data_collection_off(lambda_client, test_environme
     attrs = segment_spans[0]["attributes"]
 
     # With url_query_params collection turned off, no query string is collected.
-    assert SPANDATA.URL_QUERY not in attrs
+    assert ATTRIBUTE_NAMES.URL_QUERY not in attrs
 
 
 @pytest.mark.parametrize(
@@ -689,7 +690,8 @@ def test_span_origin(lambda_client, test_environment):
     segment_spans = [s for s in span_items if s.get("is_segment")]
     assert len(segment_spans) == 1
     assert (
-        _get_span_attr(segment_spans[0]["attributes"], SPANDATA.SENTRY_ORIGIN) == ORIGIN
+        _get_span_attr(segment_spans[0]["attributes"], ATTRIBUTE_NAMES.SENTRY_ORIGIN)
+        == ORIGIN
     )
 
 
@@ -765,35 +767,37 @@ def test_no_error(lambda_client, test_environment):
 
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "server"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_ORIGIN) == ORIGIN
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_KIND) == "server"
     assert (
-        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE)
         == SegmentNameSource.COMPONENT
     )
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_ACCOUNT_ID) == "012345678912"
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_REGION) == "us-east-1"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID) == "012345678912"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_REGION) == "us-east-1"
     assert (
-        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
     )
-    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "BasicOkSpanStreaming"
-    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == LATEST_FUNCTION_VERSION
-    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_NAME) == "BasicOkSpanStreaming"
     assert (
-        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_VERSION) == LATEST_FUNCTION_VERSION
+    )
+    assert ATTRIBUTE_NAMES.FAAS_INVOCATION_ID in attrs
+    assert (
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LAMBDA_INVOKED_ARN)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
     )
-    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/BasicOkSpanStreaming"
     ]
-    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_TRIGGER) == "other"
 
 
 def test_error(lambda_client, test_environment):
@@ -822,32 +826,32 @@ def test_error(lambda_client, test_environment):
 
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_ORIGIN) == ORIGIN
     assert (
-        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE)
         == SegmentNameSource.COMPONENT
     )
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
-    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_NAME) == "RaiseErrorSpanStreaming"
     assert (
-        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID)
         == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming:5"
     )
-    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == "5"
-    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_VERSION) == "5"
+    assert ATTRIBUTE_NAMES.FAAS_INVOCATION_ID in attrs
     assert (
-        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LAMBDA_INVOKED_ARN)
         == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming:5"
     )
-    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/RaiseErrorSpanStreaming"
     ]
-    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
-    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == "other"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_TRIGGER) == "other"
 
 
 @pytest.mark.parametrize(
@@ -913,7 +917,7 @@ def test_trigger(lambda_client, test_environment, aws_event, trigger):
         s for s in test_environment["server"].span_items if s["is_segment"]
     ]
     attrs = segment_span["attributes"]
-    assert _get_span_attr(attrs, SPANDATA.FAAS_TRIGGER) == trigger
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_TRIGGER) == trigger
 
 
 @pytest.mark.parametrize(
@@ -938,19 +942,22 @@ def test_messaging_process_span(
     (process_span,) = [
         s
         for s in span_items
-        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+        if _get_span_attr(s["attributes"], ATTRIBUTE_NAMES.SENTRY_OP)
+        == OP.QUEUE_PROCESS
     ]
     assert process_span["parent_span_id"] == segment_span["span_id"]
     assert process_span["trace_id"] == segment_span["trace_id"]
     assert process_span["name"] == f"process {destination}"
 
     attrs = process_span["attributes"]
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_KIND) == "consumer"
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_SYSTEM) == system
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_TYPE) == "process"
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_OPERATION_NAME) == "process"
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_DESTINATION_NAME) == destination
-    assert _get_span_attr(attrs, SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == len(
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_KIND) == "consumer"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.MESSAGING_SYSTEM) == system
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE) == "process"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME) == "process"
+    assert (
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME) == destination
+    )
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT) == len(
         aws_event["Records"]
     )
 
@@ -984,7 +991,8 @@ def test_process_span_error(lambda_client, test_environment):
     (process_span,) = [
         s
         for s in span_items
-        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+        if _get_span_attr(s["attributes"], ATTRIBUTE_NAMES.SENTRY_OP)
+        == OP.QUEUE_PROCESS
     ]
     assert process_span["parent_span_id"] == segment_span["span_id"]
     assert process_span["status"] == "error"
@@ -1020,21 +1028,21 @@ def test_trace_continuation(lambda_client, test_environment):
     assert segment_span["trace_id"] == trace_id
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
     attrs = segment_span["attributes"]
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_OP) == OP.FUNCTION_AWS
-    assert _get_span_attr(attrs, SPANDATA.SENTRY_ORIGIN) == ORIGIN
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_OP) == OP.FUNCTION_AWS
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_ORIGIN) == ORIGIN
     assert (
-        _get_span_attr(attrs, SPANDATA.SENTRY_SEGMENT_NAME_SOURCE)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE)
         == SegmentNameSource.COMPONENT
     )
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
-    assert _get_span_attr(attrs, SPANDATA.FAAS_NAME) == "RaiseErrorSpanStreaming"
-    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == "5"
-    assert SPANDATA.FAAS_INVOCATION_ID in attrs
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_NAME) == "RaiseErrorSpanStreaming"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_VERSION) == "5"
+    assert ATTRIBUTE_NAMES.FAAS_INVOCATION_ID in attrs
 
 
 MESSAGE_ORIGIN_LINK = {
-    SPANDATA.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
+    ATTRIBUTE_NAMES.SENTRY_LINK_TYPE: {"value": "message_origin", "type": "string"}
 }
 
 
@@ -1165,7 +1173,8 @@ def test_producer_links(lambda_client, test_environment, aws_event, links):
     (process_span,) = [
         s
         for s in span_items
-        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+        if _get_span_attr(s["attributes"], ATTRIBUTE_NAMES.SENTRY_OP)
+        == OP.QUEUE_PROCESS
     ]
     # messages are linked from the process span, never the parent of the invocation.
     assert "parent_span_id" not in segment_span
@@ -1209,7 +1218,8 @@ def test_trace_continuation_from_client_context(
     (process_span,) = [
         s
         for s in span_items
-        if _get_span_attr(s["attributes"], SPANDATA.SENTRY_OP) == OP.QUEUE_PROCESS
+        if _get_span_attr(s["attributes"], ATTRIBUTE_NAMES.SENTRY_OP)
+        == OP.QUEUE_PROCESS
     ]
     assert segment_span["trace_id"] == "471a43a4192642f0b136d5159a501701"
     assert segment_span["parent_span_id"] == "6e8f22c393e68f19"
@@ -1245,9 +1255,9 @@ def test_request_attributes(lambda_client, test_environment):
     segment_span = segment_spans[0]
     attrs = segment_span["attributes"]
 
-    assert _get_span_attr(attrs, SPANDATA.HTTP_REQUEST_METHOD) == "POST"
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD) == "POST"
     assert (
-        _get_span_attr(attrs, SPANDATA.URL_QUERY)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.URL_QUERY)
         == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
     )
     assert _get_span_attr(attrs, f"{SPANDATA.HTTP_REQUEST_HEADER}.content-type") == [
@@ -1257,25 +1267,25 @@ def test_request_attributes(lambda_client, test_environment):
         "text/html"
     ]
     assert (
-        _get_span_attr(attrs, SPANDATA.FAAS_NAME)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_NAME)
         == "BasicOkSpanStreamingDataCollection"
     )
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PROVIDER) == CLOUD_PROVIDER
-    assert _get_span_attr(attrs, SPANDATA.CLOUD_PLATFORM) == CLOUD_PLATFORM
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PROVIDER) == CLOUD_PROVIDER
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_PLATFORM) == CLOUD_PLATFORM
     assert (
-        _get_span_attr(attrs, SPANDATA.AWS_LAMBDA_INVOKED_ARN)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LAMBDA_INVOKED_ARN)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreamingDataCollection:prod"
     )
     assert (
-        _get_span_attr(attrs, SPANDATA.CLOUD_RESOURCE_ID)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID)
         == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreamingDataCollection:5"
     )
-    assert _get_span_attr(attrs, SPANDATA.FAAS_VERSION) == "5"
-    assert SPANDATA.FAAS_INVOCATION_ID in attrs
-    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_GROUP_NAMES) == [
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.FAAS_VERSION) == "5"
+    assert ATTRIBUTE_NAMES.FAAS_INVOCATION_ID in attrs
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LOG_GROUP_NAMES) == [
         "aws/lambda/BasicOkSpanStreamingDataCollection"
     ]
-    assert _get_span_attr(attrs, SPANDATA.AWS_LOG_STREAM_NAMES) == [
+    assert _get_span_attr(attrs, ATTRIBUTE_NAMES.AWS_LOG_STREAM_NAMES) == [
         LATEST_FUNCTION_VERSION
     ]
 
@@ -1306,7 +1316,7 @@ def test_url_query_params_with_data_collection(lambda_client, test_environment):
     # "page" passes through; "tracking" is denied by a custom term and "token"
     # by the built-in sensitive denylist.
     assert (
-        _get_span_attr(attrs, SPANDATA.URL_QUERY)
+        _get_span_attr(attrs, ATTRIBUTE_NAMES.URL_QUERY)
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
 
@@ -1322,7 +1332,7 @@ def test_user_info_with_data_collection_user_info_off(lambda_client, test_enviro
     assert len(segment_spans) == 1
     attrs = segment_spans[0]["attributes"]
 
-    assert SPANDATA.USER_ID not in attrs
+    assert ATTRIBUTE_NAMES.USER_ID not in attrs
 
 
 @pytest.mark.parametrize(

@@ -1,7 +1,8 @@
 import re
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _extract_attributes,
@@ -33,7 +34,9 @@ class _SecretsManagerExtension(_ServiceExtension):
         # only `CreateSecret` takes a `Name`; every other operations acts on
         # a secret by name or full/partial arn.
         if "Name" in ctx.params:
-            attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] = ctx.params["Name"]
+            attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_NAME] = ctx.params[
+                "Name"
+            ]
 
         if "SecretId" in ctx.params:
             secret_id = ctx.params["SecretId"]
@@ -45,12 +48,16 @@ class _SecretsManagerExtension(_ServiceExtension):
                 )
                 attributes.update(arn_attributes)
                 if arn_attributes:
-                    attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN] = secret_id
-                    attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] = (
+                    attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_ARN] = (
+                        secret_id
+                    )
+                    attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_NAME] = (
                         _get_name_from_arn(secret_id)
                     )
                 else:
-                    attributes[SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME] = secret_id
+                    attributes[ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_NAME] = (
+                        secret_id
+                    )
 
         return attributes
 
@@ -63,8 +70,8 @@ class _SecretsManagerExtension(_ServiceExtension):
             _extract_attributes(
                 response,
                 (
-                    ("ARN", SPANDATA.AWS_SECRETSMANAGER_SECRET_ARN),
-                    ("Name", SPANDATA.AWS_SECRETSMANAGER_SECRET_NAME),
+                    ("ARN", ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_ARN),
+                    ("Name", ATTRIBUTE_NAMES.AWS_SECRETSMANAGER_SECRET_NAME),
                 ),
             )
         )

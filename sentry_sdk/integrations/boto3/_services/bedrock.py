@@ -3,8 +3,10 @@ import sys
 import time
 from typing import TYPE_CHECKING, cast
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.traces import SpanStatus, StreamedSpan
@@ -97,17 +99,18 @@ def _patch_event_stream() -> None:
 
                     input_tokens = usage["inputTokens"]
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"]
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        usage["outputTokens"],
                     )
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"]
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"]
                     )
 
                     cache_read_tokens = usage.get("cacheReadInputTokens")
                     if cache_read_tokens is not None:
                         input_tokens += cache_read_tokens
                         span.set_attribute(
-                            SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
                             cache_read_tokens,
                         )
 
@@ -115,12 +118,12 @@ def _patch_event_stream() -> None:
                     if cache_write_tokens is not None:
                         input_tokens += cache_write_tokens
                         span.set_attribute(
-                            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                            ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
                             cache_write_tokens,
                         )
 
                     span.set_attribute(
-                        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+                        ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS,
                         input_tokens,
                     )
 
@@ -129,7 +132,7 @@ def _patch_event_stream() -> None:
 
                 if start_time is not None and "contentBlockDelta" in event:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
+                        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK,
                         time.perf_counter() - start_time,
                     )
                     start_time = None
@@ -137,7 +140,7 @@ def _patch_event_stream() -> None:
                 if "messageStop" in event:
                     finish_reasons: "list[str]" = [event["messageStop"]["stopReason"]]
                     span.set_attribute(
-                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+                        ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
                     )
 
                 if not sentry_sdk.get_client().options["data_collection"]["gen_ai"][
@@ -154,7 +157,7 @@ def _patch_event_stream() -> None:
 
                 if "messageStop" in event and role is not None:
                     span.set_attribute(
-                        SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                        ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES,
                         json.dumps(
                             [
                                 {
@@ -619,29 +622,30 @@ class _BedrockExtension(_ServiceExtension):
             return {}
 
         attributes: "Attributes" = {
-            SPANDATA.GEN_AI_PROVIDER_NAME: "aws.bedrock",
-            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-            SPANDATA.GEN_AI_RESPONSE_STREAMING: ctx.operation_name == "ConverseStream",
+            ATTRIBUTE_NAMES.GEN_AI_PROVIDER_NAME: "aws.bedrock",
+            ATTRIBUTE_NAMES.GEN_AI_OPERATION_NAME: "chat",
+            ATTRIBUTE_NAMES.GEN_AI_RESPONSE_STREAMING: ctx.operation_name
+            == "ConverseStream",
         }
 
         model_id = ctx.params.get("modelId")
         if model_id is not None:
-            attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = model_id
+            attributes[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MODEL] = model_id
 
         inference_config = ctx.params.get("inferenceConfig")
 
         if isinstance(inference_config, dict):
             max_tokens = inference_config.get("maxTokens")
             if max_tokens is not None:
-                attributes[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] = max_tokens
+                attributes[ATTRIBUTE_NAMES.GEN_AI_REQUEST_MAX_TOKENS] = max_tokens
 
             temperature = inference_config.get("temperature")
             if temperature is not None:
-                attributes[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] = temperature
+                attributes[ATTRIBUTE_NAMES.GEN_AI_REQUEST_TEMPERATURE] = temperature
 
             top_p = inference_config.get("topP")
             if top_p is not None:
-                attributes[SPANDATA.GEN_AI_REQUEST_TOP_P] = top_p
+                attributes[ATTRIBUTE_NAMES.GEN_AI_REQUEST_TOP_P] = top_p
 
         client_options = sentry_sdk.get_client().options
         if not client_options["data_collection"]["gen_ai"]["inputs"]:
@@ -649,13 +653,13 @@ class _BedrockExtension(_ServiceExtension):
 
         system_instructions = ctx.params.get("system")
         if isinstance(system_instructions, (list, tuple)):
-            attributes[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS] = json.dumps(
+            attributes[ATTRIBUTE_NAMES.GEN_AI_SYSTEM_INSTRUCTIONS] = json.dumps(
                 _transform_system_instructions(system_instructions)
             )
 
         input_messages = ctx.params.get("messages")
         if isinstance(input_messages, (list, tuple)):
-            attributes[SPANDATA.GEN_AI_INPUT_MESSAGES] = json.dumps(
+            attributes[ATTRIBUTE_NAMES.GEN_AI_INPUT_MESSAGES] = json.dumps(
                 _transform_messages(input_messages)
             )
 
@@ -667,7 +671,7 @@ class _BedrockExtension(_ServiceExtension):
         if not isinstance(tools, list):
             return attributes
 
-        attributes[SPANDATA.GEN_AI_TOOL_DEFINITIONS] = json.dumps(
+        attributes[ATTRIBUTE_NAMES.GEN_AI_TOOL_DEFINITIONS] = json.dumps(
             _transform_tool_definitions(tools)
         )
 
@@ -684,9 +688,11 @@ class _BedrockExtension(_ServiceExtension):
             usage = response["usage"]
 
             span.set_attribute(
-                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"]
+                ATTRIBUTE_NAMES.GEN_AI_USAGE_OUTPUT_TOKENS, usage["outputTokens"]
             )
-            span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"])
+            span.set_attribute(
+                ATTRIBUTE_NAMES.GEN_AI_USAGE_TOTAL_TOKENS, usage["totalTokens"]
+            )
 
             input_tokens = usage["inputTokens"]
 
@@ -694,21 +700,24 @@ class _BedrockExtension(_ServiceExtension):
             if cache_read_tokens is not None:
                 input_tokens += cache_read_tokens
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                    cache_read_tokens,
                 )
 
             cache_write_tokens = usage.get("cacheWriteInputTokens")
             if cache_write_tokens is not None:
                 input_tokens += cache_write_tokens
                 span.set_attribute(
-                    SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                    ATTRIBUTE_NAMES.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
                     cache_write_tokens,
                 )
 
-            span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+            span.set_attribute(ATTRIBUTE_NAMES.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
             finish_reasons: "list[str]" = [response["stopReason"]]
-            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons)
+            span.set_attribute(
+                ATTRIBUTE_NAMES.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+            )
 
             if (
                 "message" in response["output"]
@@ -717,7 +726,7 @@ class _BedrockExtension(_ServiceExtension):
                 ]
             ):
                 span.set_attribute(
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    ATTRIBUTE_NAMES.GEN_AI_OUTPUT_MESSAGES,
                     json.dumps(_transform_messages([response["output"]["message"]])),
                 )
 

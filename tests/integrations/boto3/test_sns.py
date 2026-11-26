@@ -1,8 +1,9 @@
 import pytest
 from botocore.exceptions import ClientError, ParamValidationError
 from botocore.stub import Stubber
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
@@ -59,12 +60,12 @@ def test_request_attributes(
 
     (span,) = spans[OP.RPC]
     attributes = span["attributes"]
-    assert attributes[SPANDATA.MESSAGING_DESTINATION_NAME] == "alerts"
-    assert attributes.get(SPANDATA.AWS_SNS_TOPIC_ARN) == topic_arn
-    assert attributes.get(SPANDATA.CLOUD_RESOURCE_ID) == topic_arn
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] == "alerts"
+    assert attributes.get(ATTRIBUTE_NAMES.AWS_SNS_TOPIC_ARN) == topic_arn
+    assert attributes.get(ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID) == topic_arn
     if topic_arn is not None:
-        assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
-    assert SPANDATA.MESSAGING_SYSTEM not in attributes
+        assert attributes[ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID] == "123456789012"
+    assert ATTRIBUTE_NAMES.MESSAGING_SYSTEM not in attributes
 
 
 @pytest.mark.parametrize(
@@ -216,13 +217,15 @@ def test_publish(
     assert span["name"] == f"send {destination}"
     assert span["status"] == ("ok" if error_type is None else "error")
     attributes = span["attributes"]
-    assert attributes[SPANDATA.SENTRY_KIND] == "producer"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_TYPE] == "send"
-    assert attributes[SPANDATA.MESSAGING_OPERATION_NAME] == "publish"
-    assert attributes.get(SPANDATA.AWS_SNS_TOPIC_ARN) == topic_arn
-    assert attributes.get(SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
-    assert attributes.get(SPANDATA.MESSAGING_MESSAGE_ID) == message_id
-    assert attributes.get(SPANDATA.ERROR_TYPE) == error_type
+    assert attributes[ATTRIBUTE_NAMES.SENTRY_KIND] == "producer"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_TYPE] == "send"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_OPERATION_NAME] == "publish"
+    assert attributes.get(ATTRIBUTE_NAMES.AWS_SNS_TOPIC_ARN) == topic_arn
+    assert (
+        attributes.get(ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT) == message_count
+    )
+    assert attributes.get(ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID) == message_id
+    assert attributes.get(ATTRIBUTE_NAMES.ERROR_TYPE) == error_type
 
 
 def test_publish_without_destination(client_factory, capture_items):
@@ -241,7 +244,7 @@ def test_publish_without_destination(client_factory, capture_items):
 
     (span,) = spans[OP.QUEUE_PUBLISH]
     assert span["name"] == "send sns.eu-north-1.amazonaws.com:443"
-    assert SPANDATA.MESSAGING_DESTINATION_NAME not in span["attributes"]
+    assert ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME not in span["attributes"]
 
 
 @pytest.mark.tests_internal_exceptions
@@ -277,9 +280,12 @@ def test_publish_with_invalid_params(client_factory, capture_items, method, para
     (span,) = spans[OP.QUEUE_PUBLISH]
     assert span["status"] == "error"
     attributes = span["attributes"]
-    assert attributes[SPANDATA.MESSAGING_SYSTEM] == "aws.sns"
-    assert SPANDATA.MESSAGING_BATCH_MESSAGE_COUNT not in attributes
-    assert attributes[SPANDATA.ERROR_TYPE] == "botocore.exceptions.ParamValidationError"
+    assert attributes[ATTRIBUTE_NAMES.MESSAGING_SYSTEM] == "aws.sns"
+    assert ATTRIBUTE_NAMES.MESSAGING_BATCH_MESSAGE_COUNT not in attributes
+    assert (
+        attributes[ATTRIBUTE_NAMES.ERROR_TYPE]
+        == "botocore.exceptions.ParamValidationError"
+    )
 
 
 @pytest.mark.parametrize(
@@ -352,7 +358,7 @@ def test_resource_id_data_collection(
 
     ((span,),) = spans.values()
     attributes = span["attributes"]
-    assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == (
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID] == (
         arn if expect_user_info else filtered_arn
     )
-    assert attributes[SPANDATA.CLOUD_ACCOUNT_ID] == "123456789012"
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID] == "123456789012"

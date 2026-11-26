@@ -1,6 +1,8 @@
 import sys
 from functools import wraps
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -98,10 +100,12 @@ def _get_view_function_response(
 
                 additional_attrs: "Dict[str, Any]" = {}
                 if "method" in request_dict:
-                    additional_attrs["http.request.method"] = request_dict["method"]
+                    additional_attrs[ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD] = (
+                        request_dict["method"]
+                    )
 
                 attributes = {
-                    "sentry.origin": ChaliceIntegration.origin,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: ChaliceIntegration.origin,
                     **header_attrs,
                     **additional_attrs,
                 }

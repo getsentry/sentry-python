@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import NoOpSpan
 from sentry_sdk.tracing_utils import should_propagate_trace
 
@@ -46,9 +47,9 @@ def _get_aws_arn_attributes(
         if arn_parts[2] not in services:
             continue
 
-        attributes: "Attributes" = {SPANDATA.CLOUD_RESOURCE_ID: value}
+        attributes: "Attributes" = {ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID: value}
         if arn_parts[4]:
-            attributes[SPANDATA.CLOUD_ACCOUNT_ID] = arn_parts[4]
+            attributes[ATTRIBUTE_NAMES.CLOUD_ACCOUNT_ID] = arn_parts[4]
         return attributes
 
     return {}

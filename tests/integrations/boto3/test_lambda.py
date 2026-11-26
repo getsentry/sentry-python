@@ -7,9 +7,10 @@ from copy import deepcopy
 import pytest
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from tests.integrations.boto3.helpers import (
     capture_spans_by_op,
@@ -62,10 +63,10 @@ def test_invoke_attributes(
     )
 
     attributes = span["attributes"]
-    assert attributes[SPANDATA.FAAS_INVOKED_NAME] == "billing"
-    assert attributes[SPANDATA.FAAS_INVOKED_REGION] == region
-    assert attributes.get(SPANDATA.CLOUD_RESOURCE_ID) == resource_id
-    assert SPANDATA.AWS_LAMBDA_TARGET_FUNCTION_NAME not in attributes
+    assert attributes[ATTRIBUTE_NAMES.FAAS_INVOKED_NAME] == "billing"
+    assert attributes[ATTRIBUTE_NAMES.FAAS_INVOKED_REGION] == region
+    assert attributes.get(ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID) == resource_id
+    assert ATTRIBUTE_NAMES.AWS_LAMBDA_TARGET_FUNCTION_NAME not in attributes
 
 
 def test_function_attributes(client_factory, capture_items):
@@ -75,9 +76,9 @@ def test_function_attributes(client_factory, capture_items):
     )
 
     attributes = span["attributes"]
-    assert attributes[SPANDATA.AWS_LAMBDA_TARGET_FUNCTION_NAME] == "billing"
-    assert attributes[SPANDATA.CLOUD_RESOURCE_ID] == arn
-    assert SPANDATA.FAAS_INVOKED_NAME not in attributes
+    assert attributes[ATTRIBUTE_NAMES.AWS_LAMBDA_TARGET_FUNCTION_NAME] == "billing"
+    assert attributes[ATTRIBUTE_NAMES.CLOUD_RESOURCE_ID] == arn
+    assert ATTRIBUTE_NAMES.FAAS_INVOKED_NAME not in attributes
 
 
 @pytest.mark.parametrize(
@@ -106,7 +107,7 @@ def test_event_source_mapping_attributes(
     span, _ = _stubbed_span(client_factory, capture_items, method, params, response)
 
     assert (
-        span["attributes"][SPANDATA.AWS_LAMBDA_RESOURCE_MAPPING_ID]
+        span["attributes"][ATTRIBUTE_NAMES.AWS_LAMBDA_RESOURCE_MAPPING_ID]
         == "587b4f6c-1d0e-4d48-8a3f-2c6f9a1e0b7d"
     )
 
@@ -125,7 +126,7 @@ def test_invoke_function_error(client_factory, capture_items):
     )
 
     assert span["status"] == "error"
-    assert span["attributes"][SPANDATA.ERROR_TYPE] == "lambda_function_error"
+    assert span["attributes"][ATTRIBUTE_NAMES.ERROR_TYPE] == "lambda_function_error"
 
 
 def test_invoke_propagates_trace(client_factory, capture_items):

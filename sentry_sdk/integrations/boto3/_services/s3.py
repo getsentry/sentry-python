@@ -2,7 +2,9 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3._instrumentation import _instrument_streaming_body
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
@@ -51,9 +53,9 @@ _RESPONSE_FILE_SIZE_FIELDS = {
 
 # s3 request attributes that are extracted when present, regardless of operation.
 _REQUEST_ATTRIBUTES: "Sequence[_AttributeSpec]" = (
-    ("Bucket", SPANDATA.AWS_S3_BUCKET),
-    ("Key", SPANDATA.AWS_S3_KEY),
-    ("UploadId", SPANDATA.AWS_S3_UPLOAD_ID),
+    ("Bucket", ATTRIBUTE_NAMES.AWS_S3_BUCKET),
+    ("Key", ATTRIBUTE_NAMES.AWS_S3_KEY),
+    ("UploadId", ATTRIBUTE_NAMES.AWS_S3_UPLOAD_ID),
 )
 
 
@@ -79,12 +81,12 @@ class _S3Extension(_ServiceExtension):
                 # https://docs.aws.amazon.com/boto3/latest/reference/services/s3/client/upload_part_copy.html
                 copy_source = ctx.params["CopySource"]
                 if isinstance(copy_source, str):
-                    attributes[SPANDATA.AWS_S3_COPY_SOURCE] = copy_source
+                    attributes[ATTRIBUTE_NAMES.AWS_S3_COPY_SOURCE] = copy_source
                 else:
                     value = f"{copy_source['Bucket']}/{copy_source['Key']}"
                     if "VersionId" in copy_source:
                         value += f"?versionId={copy_source['VersionId']}"
-                    attributes[SPANDATA.AWS_S3_COPY_SOURCE] = value
+                    attributes[ATTRIBUTE_NAMES.AWS_S3_COPY_SOURCE] = value
 
         # OTel defines `PartNumber` for `UploadPart` and `UploadPartCopy` only.
         # https://opentelemetry.io/docs/specs/semconv/object-stores/s3/#attributes
@@ -92,11 +94,11 @@ class _S3Extension(_ServiceExtension):
             ctx.operation_name in ("UploadPart", "UploadPartCopy")
             and "PartNumber" in ctx.params
         ):
-            attributes[SPANDATA.AWS_S3_PART_NUMBER] = ctx.params["PartNumber"]
+            attributes[ATTRIBUTE_NAMES.AWS_S3_PART_NUMBER] = ctx.params["PartNumber"]
 
         if "Delete" in ctx.params:
             with capture_internal_exceptions():
-                attributes[SPANDATA.AWS_S3_DELETE] = json.dumps(
+                attributes[ATTRIBUTE_NAMES.AWS_S3_DELETE] = json.dumps(
                     ctx.params["Delete"],
                     default=lambda value: (
                         value.isoformat() if isinstance(value, datetime) else str(value)
@@ -109,7 +111,7 @@ class _S3Extension(_ServiceExtension):
             ctx.operation_name == "CompleteMultipartUpload"
             and "MpuObjectSize" in ctx.params
         ):
-            attributes[SPANDATA.FILE_SIZE] = ctx.params["MpuObjectSize"]
+            attributes[ATTRIBUTE_NAMES.FILE_SIZE] = ctx.params["MpuObjectSize"]
 
         return attributes
 
@@ -123,12 +125,14 @@ class _S3Extension(_ServiceExtension):
             and "ContentLength" in response
         ):
             # `ContentLength` is the size of the HTTP body returned, which may be a range.
-            attributes[SPANDATA.HTTP_BODY_SIZE] = response["ContentLength"]
+            attributes[ATTRIBUTE_NAMES.HTTP_RESPONSE_BODY_SIZE] = response[
+                "ContentLength"
+            ]
 
         # report the complete file size, not just the HTTP body size.
         file_size_field = _RESPONSE_FILE_SIZE_FIELDS.get(ctx.operation_name)
         if file_size_field is not None and file_size_field in response:
-            attributes[SPANDATA.FILE_SIZE] = response[file_size_field]
+            attributes[ATTRIBUTE_NAMES.FILE_SIZE] = response[file_size_field]
 
         if (
             ctx.operation_name == "HeadObject"
@@ -137,7 +141,7 @@ class _S3Extension(_ServiceExtension):
             and "ContentLength" in response
         ):
             # an un-ranged `HEAD` has no body, so `ContentLength` is the file size.
-            attributes[SPANDATA.FILE_SIZE] = response["ContentLength"]
+            attributes[ATTRIBUTE_NAMES.FILE_SIZE] = response["ContentLength"]
 
         span.set_attributes(attributes)
 

@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
@@ -59,8 +61,9 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Attributes":
         # Infer the effective port when the configured HTTP(S) endpoint omits it.
         # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/
         return {
-            SPANDATA.SERVER_ADDRESS: parsed_url.hostname,
-            SPANDATA.SERVER_PORT: parsed_url.port or DEFAULT_PORTS[parsed_url.scheme],
+            ATTRIBUTE_NAMES.SERVER_ADDRESS: parsed_url.hostname,
+            ATTRIBUTE_NAMES.SERVER_PORT: parsed_url.port
+            or DEFAULT_PORTS[parsed_url.scheme],
         }
 
     except (TypeError, UnicodeError, ValueError):
@@ -75,10 +78,10 @@ def _get_client_attributes(
 
     # `rpc.service` is deprecated in OTel, but js still uses it.
     if ctx.service_id is not None:
-        attributes[SPANDATA.RPC_SERVICE] = ctx.service_id
+        attributes[ATTRIBUTE_NAMES.RPC_SERVICE] = ctx.service_id
 
     if ctx.region_name:
-        attributes[SPANDATA.CLOUD_REGION] = ctx.region_name
+        attributes[ATTRIBUTE_NAMES.CLOUD_REGION] = ctx.region_name
 
     attributes.update(_get_server_attributes(ctx.endpoint_url))
     return attributes
@@ -92,11 +95,11 @@ def _get_response_attributes(response: "Mapping[str, Any]") -> "Attributes":
     # https://github.com/boto/botocore/blob/358f8eec8c76201bb1a7a35644abcbc9036de7ed/botocore/parsers.py#L273-L284
     status_code = metadata.get("HTTPStatusCode")
     if status_code is not None:
-        attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
+        attributes[ATTRIBUTE_NAMES.HTTP_RESPONSE_STATUS_CODE] = status_code
 
     retry_attempts = metadata.get("RetryAttempts", 0)
     if retry_attempts > 0:
-        attributes[SPANDATA.HTTP_REQUEST_RESEND_COUNT] = retry_attempts
+        attributes[ATTRIBUTE_NAMES.HTTP_REQUEST_RESEND_COUNT] = retry_attempts
 
     headers = metadata.get("HTTPHeaders", {})
 
@@ -107,13 +110,13 @@ def _get_response_attributes(response: "Mapping[str, Any]") -> "Attributes":
         or headers.get("x-amz-request-id")
     )
     if request_id:
-        attributes[SPANDATA.AWS_REQUEST_ID] = request_id
+        attributes[ATTRIBUTE_NAMES.AWS_REQUEST_ID] = request_id
 
     # S3's `HostId` is the extended request ID returned in `x-amz-id-2`.
     # https://docs.aws.amazon.com/AmazonS3/latest/developerguide/get-request-ids.html
     extended_request_id = metadata.get("HostId") or headers.get("x-amz-id-2")
     if extended_request_id:
-        attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] = extended_request_id
+        attributes[ATTRIBUTE_NAMES.AWS_EXTENDED_REQUEST_ID] = extended_request_id
 
     return attributes
 
@@ -142,7 +145,7 @@ def _get_error_attributes(exception: "BaseException") -> "Attributes":
     if isinstance(exception, ClientError):
         attributes.update(_get_response_attributes(exception.response))
 
-    attributes[SPANDATA.ERROR_TYPE] = _get_error_type(exception)
+    attributes[ATTRIBUTE_NAMES.ERROR_TYPE] = _get_error_type(exception)
     return attributes
 
 
@@ -159,12 +162,12 @@ def _start_client_span(
     service_name = ctx.service_id or "unknown"
     span_name = f"{service_name}.{ctx.operation_name}"
     attributes: "Attributes" = {
-        SPANDATA.CLOUD_PROVIDER: CLOUD_PROVIDER,
-        SPANDATA.RPC_METHOD: ctx.operation_name,
-        SPANDATA.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
+        ATTRIBUTE_NAMES.CLOUD_PROVIDER: CLOUD_PROVIDER,
+        ATTRIBUTE_NAMES.RPC_METHOD: ctx.operation_name,
+        ATTRIBUTE_NAMES.RPC_SYSTEM_NAME: AWS_RPC_SYSTEM_NAME,
         # all client call spans are by default "client" spans.
         # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
-        SPANDATA.SENTRY_KIND: "client",
+        ATTRIBUTE_NAMES.SENTRY_KIND: "client",
     }
     attributes.update(_get_client_attributes(ctx))
 
@@ -188,8 +191,8 @@ def _start_client_span(
     # https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
     attributes.update(
         {
-            SPANDATA.SENTRY_OP: span_op,
-            SPANDATA.SENTRY_ORIGIN: ORIGIN,
+            ATTRIBUTE_NAMES.SENTRY_OP: span_op,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
         }
     )
     return sentry_sdk.start_span(
@@ -224,8 +227,8 @@ def _instrument_streaming_body(span: "Span", parsed: "Dict[str, Any]") -> bool:
         # unrelated new spans attach to the stream span since it's the current span.
         active=False,
         attributes={
-            SPANDATA.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
-            SPANDATA.SENTRY_ORIGIN: ORIGIN,
+            ATTRIBUTE_NAMES.SENTRY_OP: OP.HTTP_CLIENT_STREAM,
+            ATTRIBUTE_NAMES.SENTRY_ORIGIN: ORIGIN,
         },
     )
 
@@ -319,7 +322,7 @@ def _set_request_attributes(span: "Span", request: "AWSRequest") -> None:
     span.set_attributes(_get_server_attributes(request.url))
 
     span.set_attributes(get_url_attributes(client, parsed_url))
-    span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, cast(str, request.method))
+    span.set_attribute(ATTRIBUTE_NAMES.HTTP_REQUEST_METHOD, cast(str, request.method))
 
 
 def _add_request_breadcrumb(request: "AWSRequest") -> None:

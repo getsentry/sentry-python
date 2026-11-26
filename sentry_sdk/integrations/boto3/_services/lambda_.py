@@ -2,7 +2,8 @@ import base64
 import json
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import (
     _get_aws_arn_attributes,
@@ -26,7 +27,9 @@ class _LambdaExtension(_ServiceExtension):
 
         # event source mapping apis.
         if "UUID" in ctx.params:
-            attributes[SPANDATA.AWS_LAMBDA_RESOURCE_MAPPING_ID] = ctx.params["UUID"]
+            attributes[ATTRIBUTE_NAMES.AWS_LAMBDA_RESOURCE_MAPPING_ID] = ctx.params[
+                "UUID"
+            ]
         if "FunctionName" not in ctx.params:
             return attributes
 
@@ -42,18 +45,20 @@ class _LambdaExtension(_ServiceExtension):
             "InvokeWithResponseStream",
         )
         if is_invoke:
-            attributes[SPANDATA.FAAS_INVOKED_NAME] = name
-            attributes[SPANDATA.FAAS_INVOKED_PROVIDER] = CLOUD_PROVIDER
+            attributes[ATTRIBUTE_NAMES.FAAS_INVOKED_NAME] = name
+            attributes[ATTRIBUTE_NAMES.FAAS_INVOKED_PROVIDER] = CLOUD_PROVIDER
             if ctx.region_name is not None:
-                attributes[SPANDATA.FAAS_INVOKED_REGION] = ctx.region_name
+                attributes[ATTRIBUTE_NAMES.FAAS_INVOKED_REGION] = ctx.region_name
         else:
-            attributes[SPANDATA.AWS_LAMBDA_TARGET_FUNCTION_NAME] = name
+            attributes[ATTRIBUTE_NAMES.AWS_LAMBDA_TARGET_FUNCTION_NAME] = name
 
         with capture_internal_exceptions():
             arn_attributes = _get_aws_arn_attributes((function_name,), ("lambda",))
             attributes.update(arn_attributes)
             if is_invoke and arn_attributes:
-                attributes[SPANDATA.FAAS_INVOKED_REGION] = function_name.split(":")[3]
+                attributes[ATTRIBUTE_NAMES.FAAS_INVOKED_REGION] = function_name.split(
+                    ":"
+                )[3]
 
         return attributes
 
@@ -99,15 +104,17 @@ class _LambdaExtension(_ServiceExtension):
         attributes: "Attributes" = {}
 
         if "UUID" in response:
-            attributes[SPANDATA.AWS_LAMBDA_RESOURCE_MAPPING_ID] = response["UUID"]
+            attributes[ATTRIBUTE_NAMES.AWS_LAMBDA_RESOURCE_MAPPING_ID] = response[
+                "UUID"
+            ]
 
         # `Invoke` returns `200 OK` when the function fails; reading it would leave
         # the caller with an empty body.
         if "FunctionError" in response:
-            attributes[SPANDATA.ERROR_TYPE] = "lambda_function_error"
+            attributes[ATTRIBUTE_NAMES.ERROR_TYPE] = "lambda_function_error"
 
         span.set_attributes(attributes)
-        if SPANDATA.ERROR_TYPE in attributes:
+        if ATTRIBUTE_NAMES.ERROR_TYPE in attributes:
             span.status = SpanStatus.ERROR
 
         # `Invoke`'s `Payload` is a `StreamingBody`, but span

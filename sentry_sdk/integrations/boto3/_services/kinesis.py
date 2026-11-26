@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 from sentry_sdk.integrations.boto3._services.base import _ServiceExtension
 from sentry_sdk.integrations.boto3._utils import _get_aws_arn_attributes
 from sentry_sdk.traces import SpanStatus
@@ -22,7 +23,7 @@ class _KinesisExtension(_ServiceExtension):
         # `…:stream/<name>/consumer/<consumer>:<timestamp>` for a consumer.
         for param in ("StreamName", "StreamARN", "ConsumerARN", "ResourceARN"):
             if param in ctx.params:
-                attributes[SPANDATA.AWS_KINESIS_STREAM_NAME] = (
+                attributes[ATTRIBUTE_NAMES.AWS_KINESIS_STREAM_NAME] = (
                     ctx.params[param].split(":stream/", 1)[-1].split("/", 1)[0]
                 )
                 break
@@ -57,7 +58,7 @@ class _KinesisExtension(_ServiceExtension):
             if "ErrorCode" in record
         }
         span.set_attribute(
-            SPANDATA.ERROR_TYPE,
+            ATTRIBUTE_NAMES.ERROR_TYPE,
             error_codes.pop() if len(error_codes) == 1 else "aws_batch_partial_failure",
         )
         span.status = SpanStatus.ERROR
