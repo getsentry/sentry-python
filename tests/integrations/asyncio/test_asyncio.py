@@ -7,6 +7,7 @@ if sys.version_info >= (3, 8):
     from unittest.mock import AsyncMock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -75,7 +76,7 @@ async def test_create_task(
     items = capture_items("span")
 
     with sentry_sdk.start_span(
-        name="not so important", attributes={"sentry.op": "root"}
+        name="not so important", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "root"}
     ):
         foo_task = asyncio.create_task(foo())
         bar_task = asyncio.create_task(bar())
@@ -95,16 +96,16 @@ async def test_create_task(
 
     assert segment["is_segment"] is True
     assert segment["name"] == "not so important"
-    assert segment["attributes"]["sentry.op"] == "root"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "root"
 
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[0]["name"] == "foo"
     assert spans[0]["parent_span_id"] == segment["span_id"]
 
-    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[1]["name"] == "bar"
     assert spans[1]["parent_span_id"] == segment["span_id"]
 
@@ -123,7 +124,7 @@ async def test_gather(
     items = capture_items("span")
 
     with sentry_sdk.start_span(
-        name="not so important", attributes={"sentry.op": "root"}
+        name="not so important", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "root"}
     ):
         await asyncio.gather(foo(), bar(), return_exceptions=True)
 
@@ -132,16 +133,16 @@ async def test_gather(
     segment = items.pop().payload
     assert segment["is_segment"] is True
     assert segment["name"] == "not so important"
-    assert segment["attributes"]["sentry.op"] == "root"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "root"
 
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[0]["name"] == "foo"
     assert spans[0]["parent_span_id"] == segment["span_id"]
 
-    assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.FUNCTION
     assert spans[1]["name"] == "bar"
     assert spans[1]["parent_span_id"] == segment["span_id"]
 
@@ -387,11 +388,13 @@ async def test_span_origin(
 
     segment = items.pop().payload
     assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.origin"] == "manual"
+    assert segment["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
     spans = [item.payload for item in items]
     assert len(spans) == 1
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.function.asyncio"
+    )
 
 
 @minimum_python_38
@@ -501,7 +504,9 @@ async def test_delayed_enable_integration(
 
     spans = [item.payload for item in items]
     assert len(spans) == 1
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.function.asyncio"
+    )
 
 
 @minimum_python_38
@@ -598,7 +603,9 @@ async def test_delayed_enable_integration_after_disabling(
 
     spans = [item.payload for item in items]
     assert len(spans) == 1
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.function.asyncio"
+    assert (
+        spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.function.asyncio"
+    )
 
 
 @minimum_python_39

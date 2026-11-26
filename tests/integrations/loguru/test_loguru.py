@@ -4,6 +4,7 @@ from unittest.mock import ANY, MagicMock, patch
 import pytest
 from loguru import logger
 from loguru._recattrs import RecordFile, RecordLevel
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import VERSION
@@ -48,7 +49,10 @@ def test_defaults_enabled(sentry_init, capture_items):
     assert len(logs) == 1
     assert logs[0].payload["body"] == "test"
     assert logs[0].payload["level"] == "error"
-    assert logs[0].payload["attributes"]["sentry.origin"] == "auto.log.loguru"
+    assert (
+        logs[0].payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.log.loguru"
+    )
 
 
 @pytest.mark.parametrize(
@@ -132,7 +136,10 @@ def test_levels(
     for log in logs:
         assert log.payload["level"] == expected_log_level
         assert log.payload["body"] == "test"
-        assert log.payload["attributes"]["sentry.origin"] == "auto.log.loguru"
+        assert (
+            log.payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.log.loguru"
+        )
 
 
 def test_breadcrumb_format(sentry_init, uninstall_integration, request):
@@ -196,11 +203,11 @@ def test_sentry_logs_warning(
     logs = [item.payload for item in items]
 
     attrs = logs[0]["attributes"]
-    assert "code.file.path" in attrs
-    assert "code.line.number" in attrs
-    assert attrs["logger.name"] == "tests.integrations.loguru.test_loguru"
-    assert attrs["sentry.environment"] == "production"
-    assert attrs["sentry.origin"] == "auto.log.loguru"
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attrs
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attrs
+    assert attrs[ATTRIBUTE_NAMES.LOGGER_NAME] == "tests.integrations.loguru.test_loguru"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT] == "production"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.log.loguru"
     assert logs[0]["attributes"]["sentry.severity_number"] == 13
     assert logs[0]["attributes"]["sentry.severity_text"] == "warn"
 
@@ -346,10 +353,10 @@ def test_logging_errors(
 
     logs = [item.payload for item in items]
     assert logs[0]["attributes"]["sentry.severity_text"] == "error"
-    assert "code.line.number" in logs[0]["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in logs[0]["attributes"]
 
     assert logs[1]["attributes"]["sentry.severity_text"] == "error"
-    assert "code.line.number" in logs[1]["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in logs[1]["attributes"]
 
     assert len(logs) == 2
 
@@ -400,7 +407,7 @@ def test_log_strips_project_root(
     logs = [item.payload for item in items]
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
-    assert attrs["code.file.path"] == "blah/path.py"
+    assert attrs[ATTRIBUTE_NAMES.CODE_FILE_PATH] == "blah/path.py"
 
 
 def test_log_keeps_full_path_if_not_in_project_root(
@@ -449,7 +456,7 @@ def test_log_keeps_full_path_if_not_in_project_root(
     logs = [item.payload for item in items]
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
-    assert attrs["code.file.path"] == "/blah/path.py"
+    assert attrs[ATTRIBUTE_NAMES.CODE_FILE_PATH] == "/blah/path.py"
 
 
 def test_logger_with_all_attributes(
@@ -470,52 +477,52 @@ def test_logger_with_all_attributes(
 
     attributes = logs[0]["attributes"]
 
-    assert "process.pid" in attributes
-    assert isinstance(attributes["process.pid"], int)
-    del attributes["process.pid"]
+    assert ATTRIBUTE_NAMES.PROCESS_PID in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.PROCESS_PID], int)
+    del attributes[ATTRIBUTE_NAMES.PROCESS_PID]
 
-    assert "sentry.release" in attributes
-    assert isinstance(attributes["sentry.release"], str)
-    del attributes["sentry.release"]
+    assert ATTRIBUTE_NAMES.SENTRY_RELEASE in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.SENTRY_RELEASE], str)
+    del attributes[ATTRIBUTE_NAMES.SENTRY_RELEASE]
 
-    assert "server.address" in attributes
-    assert isinstance(attributes["server.address"], str)
-    del attributes["server.address"]
+    assert ATTRIBUTE_NAMES.SERVER_ADDRESS in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.SERVER_ADDRESS], str)
+    del attributes[ATTRIBUTE_NAMES.SERVER_ADDRESS]
 
-    assert "thread.id" in attributes
-    assert isinstance(attributes["thread.id"], int)
-    del attributes["thread.id"]
+    assert ATTRIBUTE_NAMES.THREAD_ID in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.THREAD_ID], int)
+    del attributes[ATTRIBUTE_NAMES.THREAD_ID]
 
-    assert "code.file.path" in attributes
-    assert isinstance(attributes["code.file.path"], str)
-    del attributes["code.file.path"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.CODE_FILE_PATH], str)
+    del attributes[ATTRIBUTE_NAMES.CODE_FILE_PATH]
 
-    assert "code.function.name" in attributes
-    assert isinstance(attributes["code.function.name"], str)
-    del attributes["code.function.name"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION_NAME in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.CODE_FUNCTION_NAME], str)
+    del attributes[ATTRIBUTE_NAMES.CODE_FUNCTION_NAME]
 
-    assert "code.line.number" in attributes
-    assert isinstance(attributes["code.line.number"], int)
-    del attributes["code.line.number"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.CODE_LINE_NUMBER], int)
+    del attributes[ATTRIBUTE_NAMES.CODE_LINE_NUMBER]
 
-    assert "process.executable.name" in attributes
-    assert isinstance(attributes["process.executable.name"], str)
-    del attributes["process.executable.name"]
+    assert ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME], str)
+    del attributes[ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME]
 
-    assert "thread.name" in attributes
-    assert isinstance(attributes["thread.name"], str)
-    del attributes["thread.name"]
+    assert ATTRIBUTE_NAMES.THREAD_NAME in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.THREAD_NAME], str)
+    del attributes[ATTRIBUTE_NAMES.THREAD_NAME]
 
-    assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
+    assert attributes.pop(ATTRIBUTE_NAMES.SENTRY_SDK_NAME).startswith("sentry.python")
 
     # Assert on the remaining non-dynamic attributes.
     assert attributes == {
-        "logger.name": "tests.integrations.loguru.test_loguru",
-        "sentry.origin": "auto.log.loguru",
-        "sentry.environment": "production",
-        "process.runtime.name": ANY,
-        "process.runtime.version": ANY,
-        "sentry.sdk.version": VERSION,
+        ATTRIBUTE_NAMES.LOGGER_NAME: "tests.integrations.loguru.test_loguru",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.log.loguru",
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.PROCESS_RUNTIME_NAME: ANY,
+        ATTRIBUTE_NAMES.PROCESS_RUNTIME_VERSION: ANY,
+        ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: VERSION,
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",
     }
@@ -633,4 +640,4 @@ def test_no_parameters_no_template(
     logs = [item.payload for item in items]
 
     attributes = logs[0]["attributes"]
-    assert "sentry.message.template" not in attributes
+    assert ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE not in attributes

@@ -3,6 +3,7 @@ import warnings
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import get_client
@@ -325,7 +326,10 @@ def test_sentry_logs_collection_opt_in(sentry_init, capture_items):
     assert len(items) == 1
 
     log = items[0].payload
-    assert log["attributes"]["sentry.message.template"] == "this is %s a template %s"
+    assert (
+        log["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE]
+        == "this is %s a template %s"
+    )
     assert log["attributes"]["sentry.severity_number"] == 13
     assert log["attributes"]["sentry.severity_text"] == "warn"
 
@@ -475,14 +479,14 @@ def test_sentry_logs_warning(sentry_init, capture_items):
     sentry_sdk.flush()
     logs = [item.payload for item in items]
     attrs = logs[0]["attributes"]
-    assert attrs["sentry.message.template"] == "this is %s a template %s"
-    assert "code.file.path" in attrs
-    assert "code.line.number" in attrs
-    assert attrs["logger.name"] == "test-logger"
-    assert attrs["sentry.environment"] == "production"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE] == "this is %s a template %s"
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attrs
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attrs
+    assert attrs[ATTRIBUTE_NAMES.LOGGER_NAME] == "test-logger"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT] == "production"
     assert attrs["sentry.message.parameter.0"] == "1"
     assert attrs["sentry.message.parameter.1"] == "2"
-    assert attrs["sentry.origin"] == "auto.log.stdlib"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.log.stdlib"
     assert logs[0]["attributes"]["sentry.severity_number"] == 13
     assert logs[0]["attributes"]["sentry.severity_text"] == "warn"
 
@@ -539,16 +543,18 @@ def test_logging_errors(sentry_init, capture_envelopes, capture_items):
 
     logs = [item.payload for item in items]
     assert logs[0]["attributes"]["sentry.severity_text"] == "error"
-    assert "sentry.message.template" not in logs[0]["attributes"]
+    assert ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE not in logs[0]["attributes"]
     assert "sentry.message.parameter.0" not in logs[0]["attributes"]
-    assert "code.line.number" in logs[0]["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in logs[0]["attributes"]
 
     assert logs[1]["attributes"]["sentry.severity_text"] == "error"
-    assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
+    assert (
+        logs[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE] == "error is %s"
+    )
     assert (
         logs[1]["attributes"]["sentry.message.parameter.0"] == "Exception('test exc 2')"
     )
-    assert "code.line.number" in logs[1]["attributes"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in logs[1]["attributes"]
 
     assert len(logs) == 2
 
@@ -580,7 +586,7 @@ def test_log_strips_project_root(sentry_init, capture_items):
     logs = [item.payload for item in items]
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
-    assert attrs["code.file.path"] == "blah/path.py"
+    assert attrs[ATTRIBUTE_NAMES.CODE_FILE_PATH] == "blah/path.py"
 
 
 def test_logger_with_all_attributes(sentry_init, capture_items):
@@ -604,57 +610,57 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
 
     attributes = logs[0]["attributes"]
 
-    assert "process.pid" in attributes
-    assert isinstance(attributes["process.pid"], int)
-    del attributes["process.pid"]
+    assert ATTRIBUTE_NAMES.PROCESS_PID in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.PROCESS_PID], int)
+    del attributes[ATTRIBUTE_NAMES.PROCESS_PID]
 
-    assert "sentry.release" in attributes
-    assert isinstance(attributes["sentry.release"], str)
-    del attributes["sentry.release"]
+    assert ATTRIBUTE_NAMES.SENTRY_RELEASE in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.SENTRY_RELEASE], str)
+    del attributes[ATTRIBUTE_NAMES.SENTRY_RELEASE]
 
-    assert "server.address" in attributes
-    assert isinstance(attributes["server.address"], str)
-    del attributes["server.address"]
+    assert ATTRIBUTE_NAMES.SERVER_ADDRESS in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.SERVER_ADDRESS], str)
+    del attributes[ATTRIBUTE_NAMES.SERVER_ADDRESS]
 
-    assert "thread.id" in attributes
-    assert isinstance(attributes["thread.id"], int)
-    del attributes["thread.id"]
+    assert ATTRIBUTE_NAMES.THREAD_ID in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.THREAD_ID], int)
+    del attributes[ATTRIBUTE_NAMES.THREAD_ID]
 
-    assert "code.file.path" in attributes
-    assert isinstance(attributes["code.file.path"], str)
-    del attributes["code.file.path"]
+    assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.CODE_FILE_PATH], str)
+    del attributes[ATTRIBUTE_NAMES.CODE_FILE_PATH]
 
-    assert "code.function.name" in attributes
-    assert isinstance(attributes["code.function.name"], str)
-    del attributes["code.function.name"]
+    assert ATTRIBUTE_NAMES.CODE_FUNCTION_NAME in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.CODE_FUNCTION_NAME], str)
+    del attributes[ATTRIBUTE_NAMES.CODE_FUNCTION_NAME]
 
-    assert "code.line.number" in attributes
-    assert isinstance(attributes["code.line.number"], int)
-    del attributes["code.line.number"]
+    assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.CODE_LINE_NUMBER], int)
+    del attributes[ATTRIBUTE_NAMES.CODE_LINE_NUMBER]
 
-    assert "process.executable.name" in attributes
-    assert isinstance(attributes["process.executable.name"], str)
-    del attributes["process.executable.name"]
+    assert ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME], str)
+    del attributes[ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME]
 
-    assert "thread.name" in attributes
-    assert isinstance(attributes["thread.name"], str)
-    del attributes["thread.name"]
+    assert ATTRIBUTE_NAMES.THREAD_NAME in attributes
+    assert isinstance(attributes[ATTRIBUTE_NAMES.THREAD_NAME], str)
+    del attributes[ATTRIBUTE_NAMES.THREAD_NAME]
 
-    assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
+    assert attributes.pop(ATTRIBUTE_NAMES.SENTRY_SDK_NAME).startswith("sentry.python")
 
     # Assert on the remaining non-dynamic attributes.
     assert attributes == {
         "foo": "bar",
         "numeric": 42,
         "more_complex": "{'nested': 'data'}",
-        "logger.name": "test-logger",
-        "sentry.origin": "auto.log.stdlib",
-        "sentry.message.template": "log #%d",
-        "process.runtime.name": mock.ANY,
-        "process.runtime.version": mock.ANY,
+        ATTRIBUTE_NAMES.LOGGER_NAME: "test-logger",
+        ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.log.stdlib",
+        ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE: "log #%d",
+        ATTRIBUTE_NAMES.PROCESS_RUNTIME_NAME: mock.ANY,
+        ATTRIBUTE_NAMES.PROCESS_RUNTIME_VERSION: mock.ANY,
         "sentry.message.parameter.0": 1,
-        "sentry.environment": "production",
-        "sentry.sdk.version": VERSION,
+        ATTRIBUTE_NAMES.SENTRY_ENVIRONMENT: "production",
+        ATTRIBUTE_NAMES.SENTRY_SDK_VERSION: VERSION,
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",
     }
@@ -687,7 +693,7 @@ def test_sentry_logs_named_parameters(sentry_init, capture_items):
 
     # Check that the template is captured
     assert (
-        attrs["sentry.message.template"]
+        attrs[ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE]
         == "%(source)s call completed, %(input_tk)i input tk, %(output_tk)i output tk (model %(model)s, cost $%(cost).4f)"
     )
 
@@ -699,8 +705,8 @@ def test_sentry_logs_named_parameters(sentry_init, capture_items):
     assert attrs["sentry.message.parameter.cost"] == 0.0234
 
     # Check other standard attributes
-    assert attrs["logger.name"] == "test-logger"
-    assert attrs["sentry.origin"] == "auto.log.stdlib"
+    assert attrs[ATTRIBUTE_NAMES.LOGGER_NAME] == "test-logger"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.log.stdlib"
     assert logs[0]["attributes"]["sentry.severity_number"] == 9  # info level
     assert logs[0]["attributes"]["sentry.severity_text"] == "info"
 
@@ -755,4 +761,4 @@ def test_sentry_logs_no_parameters_no_template(sentry_init, capture_items):
     assert len(logs) == 1
 
     attrs = logs[0]["attributes"]
-    assert "sentry.message.template" not in attrs
+    assert ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE not in attrs

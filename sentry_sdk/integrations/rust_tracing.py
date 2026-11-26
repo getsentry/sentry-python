@@ -34,6 +34,8 @@ import json
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
@@ -204,8 +206,8 @@ class RustTracingLayer:
         sentry_span = sentry_sdk.start_span(
             name=sentry_span_name,
             attributes={
-                "sentry.op": "function",
-                "sentry.origin": self.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: "function",
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: self.origin,
             },
         )
         fields = metadata.get("fields", [])

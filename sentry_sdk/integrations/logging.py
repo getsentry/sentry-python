@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from fnmatch import fnmatch
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.client import BaseClient
 from sentry_sdk.integrations import Integration
@@ -414,7 +416,7 @@ class LogsHandler(_BaseHandler):
         project_root = client.options["project_root"]
 
         attrs: "Any" = self._extra_from_record(record)
-        attrs["sentry.origin"] = "auto.log.stdlib"
+        attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] = "auto.log.stdlib"
 
         parameters_set = False
         if record.args is not None:
@@ -438,31 +440,33 @@ class LogsHandler(_BaseHandler):
         if parameters_set and isinstance(record.msg, str):
             # only include template if there is at least one
             # sentry.message.parameter.X set
-            attrs["sentry.message.template"] = record.msg
+            attrs[ATTRIBUTE_NAMES.SENTRY_MESSAGE_TEMPLATE] = record.msg
 
         if record.lineno:
-            attrs["code.line.number"] = record.lineno
+            attrs[ATTRIBUTE_NAMES.CODE_LINE_NUMBER] = record.lineno
 
         if record.pathname:
             if project_root is not None and record.pathname.startswith(project_root):
-                attrs["code.file.path"] = record.pathname[len(project_root) + 1 :]
+                attrs[ATTRIBUTE_NAMES.CODE_FILE_PATH] = record.pathname[
+                    len(project_root) + 1 :
+                ]
             else:
-                attrs["code.file.path"] = record.pathname
+                attrs[ATTRIBUTE_NAMES.CODE_FILE_PATH] = record.pathname
 
         if record.funcName:
-            attrs["code.function.name"] = record.funcName
+            attrs[ATTRIBUTE_NAMES.CODE_FUNCTION_NAME] = record.funcName
 
         if record.thread:
-            attrs["thread.id"] = record.thread
+            attrs[ATTRIBUTE_NAMES.THREAD_ID] = record.thread
         if record.threadName:
-            attrs["thread.name"] = record.threadName
+            attrs[ATTRIBUTE_NAMES.THREAD_NAME] = record.threadName
 
         if record.process:
-            attrs["process.pid"] = record.process
+            attrs[ATTRIBUTE_NAMES.PROCESS_PID] = record.process
         if record.processName:
-            attrs["process.executable.name"] = record.processName
+            attrs[ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME] = record.processName
         if record.name:
-            attrs["logger.name"] = record.name
+            attrs[ATTRIBUTE_NAMES.LOGGER_NAME] = record.name
 
         sentry_sdk.get_current_scope()._capture_log(
             {

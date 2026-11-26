@@ -2,6 +2,7 @@ from string import Template
 from typing import Dict
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -95,9 +96,9 @@ def test_on_new_span_on_close(
 
     # Ensure the span metadata is wired up
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == "function"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
     assert (
-        span["attributes"]["sentry.origin"]
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
         == "auto.function.rust_tracing.test_on_new_span_on_close"
     )
     assert span["name"] == "_bindings::fibonacci"
@@ -160,15 +161,15 @@ def test_nested_on_new_span_on_close(
 
     # Ensure the span metadata is wired up for all spans
     first_span, second_span, _ = spans
-    assert first_span["attributes"]["sentry.op"] == "function"
+    assert first_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
     assert (
-        first_span["attributes"]["sentry.origin"]
+        first_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
         == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
     )
     assert first_span["name"] == "_bindings::fibonacci"
-    assert second_span["attributes"]["sentry.op"] == "function"
+    assert second_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
     assert (
-        second_span["attributes"]["sentry.origin"]
+        second_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
         == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
     )
     assert second_span["name"] == "_bindings::fibonacci"
@@ -498,9 +499,11 @@ def test_include_tracing_fields(
         span_after_record = sentry_sdk.get_current_span()._to_json()
 
         if tracing_fields_expected:
-            assert span_after_record["attributes"]["sentry.op"] == "function"
             assert (
-                span_after_record["attributes"]["sentry.origin"]
+                span_after_record["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
+            )
+            assert (
+                span_after_record["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
                 == "auto.function.rust_tracing.test_record"
             )
             assert span_after_record["attributes"]["use_memoized"] is True
@@ -508,9 +511,11 @@ def test_include_tracing_fields(
             assert span_after_record["attributes"]["index"] == 10
 
         else:
-            assert span_after_record["attributes"]["sentry.op"] == "function"
             assert (
-                span_after_record["attributes"]["sentry.origin"]
+                span_after_record["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == "function"
+            )
+            assert (
+                span_after_record["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
                 == "auto.function.rust_tracing.test_record"
             )
             assert span_after_record["attributes"]["use_memoized"] == "[Filtered]"

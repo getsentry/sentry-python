@@ -1,6 +1,8 @@
 import enum
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import (
@@ -158,31 +160,33 @@ def loguru_handler(message: "Message") -> None:
         record["level"].no, SEVERITY_TO_OTEL_SEVERITY
     )
 
-    attrs: "dict[str, Any]" = {"sentry.origin": "auto.log.loguru"}
+    attrs: "dict[str, Any]" = {ATTRIBUTE_NAMES.SENTRY_ORIGIN: "auto.log.loguru"}
 
     project_root = client.options["project_root"]
     if record.get("file"):
         if project_root is not None and record["file"].path.startswith(project_root):
-            attrs["code.file.path"] = record["file"].path[len(project_root) + 1 :]
+            attrs[ATTRIBUTE_NAMES.CODE_FILE_PATH] = record["file"].path[
+                len(project_root) + 1 :
+            ]
         else:
-            attrs["code.file.path"] = record["file"].path
+            attrs[ATTRIBUTE_NAMES.CODE_FILE_PATH] = record["file"].path
 
     if record.get("line") is not None:
-        attrs["code.line.number"] = record["line"]
+        attrs[ATTRIBUTE_NAMES.CODE_LINE_NUMBER] = record["line"]
 
     if record.get("function"):
-        attrs["code.function.name"] = record["function"]
+        attrs[ATTRIBUTE_NAMES.CODE_FUNCTION_NAME] = record["function"]
 
     if record.get("thread"):
-        attrs["thread.name"] = record["thread"].name
-        attrs["thread.id"] = record["thread"].id
+        attrs[ATTRIBUTE_NAMES.THREAD_NAME] = record["thread"].name
+        attrs[ATTRIBUTE_NAMES.THREAD_ID] = record["thread"].id
 
     if record.get("process"):
-        attrs["process.pid"] = record["process"].id
-        attrs["process.executable.name"] = record["process"].name
+        attrs[ATTRIBUTE_NAMES.PROCESS_PID] = record["process"].id
+        attrs[ATTRIBUTE_NAMES.PROCESS_EXECUTABLE_NAME] = record["process"].name
 
     if record.get("name"):
-        attrs["logger.name"] = record["name"]
+        attrs[ATTRIBUTE_NAMES.LOGGER_NAME] = record["name"]
 
     extra = record.get("extra")
     if isinstance(extra, dict):
