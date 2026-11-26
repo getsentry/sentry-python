@@ -20,6 +20,7 @@ import logging
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -161,15 +162,15 @@ async def test_fastmcp_tool_sync(
 
     # Verify span structure
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
-    assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
     assert span["name"] == "tools/call add_numbers"
-    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
-    assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "add_numbers"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_TRANSPORT] == "stdio"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -218,15 +219,15 @@ async def test_fastmcp_tool_sync_no_sensitive_data(
 
     # Verify span structure
     span = spans[0]
-    assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
-    assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
     assert span["name"] == "tools/call add_numbers"
-    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "add_numbers"
-    assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "add_numbers"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_TRANSPORT] == "stdio"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in span["attributes"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -285,21 +286,21 @@ async def test_fastmcp_tool_async(sentry_init, capture_items, FastMCP, json_rpc)
     spans = [
         span
         for span in spans
-        if span["attributes"].get("mcp.method.name") == "tools/call"
+        if span["attributes"].get(ATTRIBUTE_NAMES.MCP_METHOD_NAME) == "tools/call"
     ]
     assert len(spans) == 1
     span = spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
-    assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
     assert span["name"] == "tools/call multiply_numbers"
-    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "multiply_numbers"
-    assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "multiply_numbers"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_TRANSPORT] == "http"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert span["attributes"][SPANDATA.MCP_SESSION_ID] == session_id
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_SESSION_ID] == session_id
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT in span["attributes"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -360,21 +361,21 @@ async def test_fastmcp_tool_async_no_sensitive_data(
     spans = [
         span
         for span in spans
-        if span["attributes"].get("mcp.method.name") == "tools/call"
+        if span["attributes"].get(ATTRIBUTE_NAMES.MCP_METHOD_NAME) == "tools/call"
     ]
     assert len(spans) == 1
     span = spans[0]
 
-    assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
-    assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
     assert span["name"] == "tools/call multiply_numbers"
-    assert span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "multiply_numbers"
-    assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert span["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "multiply_numbers"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_TRANSPORT] == "http"
     assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert span["attributes"][SPANDATA.MCP_SESSION_ID] == session_id
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_SESSION_ID] == session_id
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in span["attributes"]
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -414,7 +415,11 @@ async def test_fastmcp_tool_with_error(
     sentry_sdk.flush()
     # Check span was created
     spans = [item.payload for item in items if item.type == "span"]
-    tool_spans = [s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER]
+    tool_spans = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.MCP_SERVER
+    ]
 
     assert len(tool_spans) == 1
 
@@ -473,11 +478,17 @@ async def test_fastmcp_tool_with_complex_return(
     sentry_sdk.flush()
     # Verify span was created with complex data
     spans = [item.payload for item in items]
-    tool_spans = [s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER]
+    tool_spans = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.MCP_SERVER
+    ]
     assert len(tool_spans) == 1
-    assert tool_spans[0]["attributes"]["sentry.op"] == OP.MCP_SERVER
-    assert tool_spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "get_user_data"
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT in tool_spans[0]["attributes"]
+    assert tool_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert (
+        tool_spans[0]["attributes"][ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "get_user_data"
+    )
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT in tool_spans[0]["attributes"]
 
 
 # =============================================================================
@@ -541,15 +552,19 @@ async def test_fastmcp_prompt_sync(
         # Verify prompt span was created
         spans = [item.payload for item in items]
         prompt_spans = [
-            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+            s
+            for s in spans
+            if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.MCP_SERVER
         ]
         assert len(prompt_spans) == 1
         span = prompt_spans[0]
-        assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
         assert span["name"] == "prompts/get code_help_prompt"
-        assert span["attributes"][SPANDATA.GEN_AI_PROMPT_NAME] == "code_help_prompt"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROMPT_NAME] == "code_help_prompt"
+        )
 
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["attributes"]
+        assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -608,15 +623,21 @@ async def test_fastmcp_prompt_sync_no_sensitive_data(
         # Verify prompt span was created
         spans = [item.payload for item in items]
         prompt_spans = [
-            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+            s
+            for s in spans
+            if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.MCP_SERVER
         ]
         assert len(prompt_spans) == 1
         span = prompt_spans[0]
-        assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
         assert span["name"] == "prompts/get code_help_prompt"
-        assert span["attributes"][SPANDATA.GEN_AI_PROMPT_NAME] == "code_help_prompt"
+        assert (
+            span["attributes"][ATTRIBUTE_NAMES.GEN_AI_PROMPT_NAME] == "code_help_prompt"
+        )
 
-        assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["attributes"]
+        assert (
+            ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["attributes"]
+        )
 
 
 # =============================================================================
@@ -668,13 +689,15 @@ async def test_fastmcp_resource_sync(
         # Verify resource span was created
         spans = [item.payload for item in items]
         resource_spans = [
-            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+            s
+            for s in spans
+            if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.MCP_SERVER
         ]
         assert len(resource_spans) == 1
         span = resource_spans[0]
-        assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
         assert span["name"] == "resources/read file:///test.txt"
-        assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
+        assert span["attributes"][ATTRIBUTE_NAMES.MCP_RESOURCE_PROTOCOL] == "file"
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -732,12 +755,13 @@ async def test_fastmcp_resource_async(sentry_init, capture_items, FastMCP, json_
         spans = [
             span
             for span in spans
-            if span["attributes"].get("mcp.method.name") == "resources/read"
+            if span["attributes"].get(ATTRIBUTE_NAMES.MCP_METHOD_NAME)
+            == "resources/read"
         ]
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+        assert span["attributes"][ATTRIBUTE_NAMES.MCP_RESOURCE_PROTOCOL] == "https"
 
 
 # =============================================================================
@@ -782,9 +806,13 @@ async def test_fastmcp_span_origin(
     spans = [item.payload for item in items]
 
     # Verify MCP span has correct origin
-    mcp_spans = [s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER]
+    mcp_spans = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.MCP_SERVER
+    ]
     assert len(mcp_spans) == 1
-    assert mcp_spans[0]["attributes"]["sentry.origin"] == "auto.ai.mcp"
+    assert mcp_spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
 
 # =============================================================================
@@ -840,13 +868,13 @@ def test_fastmcp_http_transport(sentry_init, capture_items, FastMCP, json_rpc):
     spans = [
         span
         for span in spans
-        if span["attributes"].get("mcp.method.name") == "tools/call"
+        if span["attributes"].get(ATTRIBUTE_NAMES.MCP_METHOD_NAME) == "tools/call"
     ]
     assert len(spans) == 1
     span = spans[0]
 
     # Check that HTTP transport is detected
-    assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "http"
+    assert span["attributes"].get(ATTRIBUTE_NAMES.MCP_TRANSPORT) == "http"
 
 
 @pytest.mark.asyncio
@@ -884,10 +912,14 @@ async def test_fastmcp_stdio_transport(
     sentry_sdk.flush()
     # Find MCP spans
     spans = [item.payload for item in items]
-    mcp_spans = [s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER]
+    mcp_spans = [
+        s
+        for s in spans
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.MCP_SERVER
+    ]
 
     assert len(mcp_spans) >= 1
     span = mcp_spans[0]
     # Check that stdio transport is detected
 
-    assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
+    assert span["attributes"].get(ATTRIBUTE_NAMES.MCP_TRANSPORT) == "stdio"

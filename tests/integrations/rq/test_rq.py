@@ -3,9 +3,10 @@ from unittest import mock
 import pytest
 import rq
 from fakeredis import FakeRedis
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import parse_version
 from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
@@ -174,18 +175,21 @@ def test_worker_span_with_error(
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PROCESS
     )
 
     assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
     assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
-    assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
     assert (
-        span["attributes"]["sentry.origin"]
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP]
+        == error_event["contexts"]["trace"]["op"]
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
         == error_event["contexts"]["trace"]["origin"]
     )
     assert (
-        span["attributes"][SPANDATA.CODE_FUNCTION_NAME]
+        span["attributes"][ATTRIBUTE_NAMES.CODE_FUNCTION_NAME]
         == "tests.integrations.rq.test_rq.chew_up_shoes"
     )
 
@@ -226,7 +230,7 @@ def test_tracing_enabled(
     with sentry_sdk.start_span(
         name="custom parent",
         attributes={
-            "sentry.op": "rq transaction",
+            ATTRIBUTE_NAMES.SENTRY_OP: "rq transaction",
         },
     ) as span:
         queue.enqueue(crashing_job, foo=None)
@@ -241,14 +245,17 @@ def test_tracing_enabled(
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PROCESS
     )
 
     assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
     assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
-    assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
     assert (
-        span["attributes"]["sentry.origin"]
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP]
+        == error_event["contexts"]["trace"]["op"]
+    )
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
         == error_event["contexts"]["trace"]["origin"]
     )
 
@@ -294,12 +301,12 @@ def test_worker_span_no_error(
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PROCESS
     )
 
-    assert span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PROCESS
     assert span["name"] == "tests.integrations.rq.test_rq.do_trick"
-    assert span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == queue.name
+    assert span["attributes"][ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME] == queue.name
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
@@ -378,7 +385,7 @@ def test_span_origin(
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PROCESS
     )
 
-    assert span["attributes"]["sentry.origin"] == "auto.queue.rq"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.queue.rq"

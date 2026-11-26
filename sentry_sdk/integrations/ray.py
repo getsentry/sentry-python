@@ -2,6 +2,8 @@ import functools
 import inspect
 import sys
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -95,9 +97,9 @@ def _patch_ray_remote() -> None:
                 with sentry_sdk.start_span(
                     name="unknown Ray task" if function_name is None else function_name,
                     attributes={
-                        "sentry.op": OP.QUEUE_PROCESS,
-                        "sentry.origin": RayIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.TASK,
+                        ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: RayIntegration.origin,
+                        ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.TASK,
                     },
                     parent_span=None,
                 ):
@@ -145,8 +147,8 @@ def _patch_ray_remote() -> None:
                 with sentry_sdk.start_span(
                     name="unknown Ray task" if function_name is None else function_name,
                     attributes={
-                        "sentry.op": OP.QUEUE_PUBLISH,
-                        "sentry.origin": RayIntegration.origin,
+                        ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PUBLISH,
+                        ATTRIBUTE_NAMES.SENTRY_ORIGIN: RayIntegration.origin,
                     },
                 ):
                     tracing = {

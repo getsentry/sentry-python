@@ -3,9 +3,11 @@ from datetime import datetime
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
 from sentry_sdk.api import get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.crons import monitor
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import (
@@ -105,9 +107,9 @@ def patch_enqueue() -> None:
         with sentry_sdk.start_span(
             name=span_name,
             attributes={
-                "sentry.op": OP.QUEUE_PUBLISH,
-                "sentry.origin": HueyIntegration.origin,
-                SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PUBLISH,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: HueyIntegration.origin,
+                ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME: self.name,
             },
         ):
             if not isinstance(item, no_headers_types):
@@ -203,13 +205,15 @@ def patch_execute() -> None:
             span_ctx = sentry_sdk.start_span(
                 name=task.name,
                 attributes={
-                    "sentry.op": OP.QUEUE_PROCESS,
-                    "sentry.origin": HueyIntegration.origin,
-                    "sentry.segment.name.source": SegmentNameSource.TASK,
-                    SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
-                    "messaging.message.id": task.id,
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: HueyIntegration.origin,
+                    ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.TASK,
+                    ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME: self.name,
+                    ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID: task.id,
                     "messaging.message.system": "huey",
-                    "messaging.message.retry.count": (task.default_retries or 0)
+                    ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RETRY_COUNT: (
+                        task.default_retries or 0
+                    )
                     - task.retries,
                 },
                 parent_span=None,

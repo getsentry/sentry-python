@@ -8,10 +8,11 @@ from arq.connections import ArqRedis
 from arq.jobs import Job
 from arq.utils import timestamp_ms
 from fakeredis.aioredis import FakeRedis
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import get_client
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.arq import ArqIntegration
 from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
@@ -247,7 +248,7 @@ async def test_job_retry(
     # (queue.publish) span is created for it; only the consumer segment
     # is emitted. The consumer segment is preceded by the redis spans for
     # the re-enqueue, so it lands at index 2.
-    assert spans[2]["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PROCESS
     assert spans[2]["status"] == "ok"
     assert spans[2]["name"] == "retry_job"
 
@@ -256,7 +257,7 @@ async def test_job_retry(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[5]["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
+    assert spans[5]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PROCESS
     assert spans[5]["status"] == "ok"
     assert spans[5]["name"] == "retry_job"
 
@@ -329,13 +330,16 @@ async def test_worker_jobs(
     task_spans = [
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == OP.QUEUE_PROCESS
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PROCESS
     ]
 
     division_span = next(span for span in task_spans if span["name"] == "division")
-    assert division_span["attributes"]["sentry.segment.name.source"] == "task"
     assert (
-        division_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
+        division_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "task"
+    )
+    assert (
+        division_span["attributes"][ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME]
         == worker.queue_name
     )
 
@@ -413,7 +417,7 @@ async def test_enqueue_job(
     assert spans[2]["trace_id"] == span.trace_id
     assert spans[2]["span_id"] == span.span_id
 
-    assert spans[1]["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PUBLISH
     assert spans[1]["name"] == "dummy_job"
 
 
@@ -467,8 +471,8 @@ async def test_span_origin_producer(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[2]["attributes"]["sentry.origin"] == "manual"
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.queue.arq"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.queue.arq"
 
 
 @pytest.mark.asyncio
@@ -500,10 +504,10 @@ async def test_span_origin_consumer(
     # No producer (queue.publish) span is created for the re-enqueue
     # triggered by the retry, since it happens without an active span, so
     # the consumer segment lands at index 2.
-    assert spans[2]["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
-    assert spans[2]["attributes"]["sentry.origin"] == "auto.queue.arq"
-    assert spans[1]["attributes"]["sentry.origin"] == "auto.db.redis"
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.db.redis"
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PROCESS
+    assert spans[2]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.queue.arq"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"
 
 
 @pytest.mark.asyncio

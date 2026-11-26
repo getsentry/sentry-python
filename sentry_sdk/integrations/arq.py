@@ -2,8 +2,10 @@ import sys
 import time
 from functools import wraps
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.crons import monitor
 from sentry_sdk.crons.utils import _get_timezone_name
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -95,8 +97,8 @@ def patch_enqueue_job() -> None:
         with sentry_sdk.start_span(
             name=function,
             attributes={
-                "sentry.op": OP.QUEUE_PUBLISH,
-                "sentry.origin": ArqIntegration.origin,
+                ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PUBLISH,
+                ATTRIBUTE_NAMES.SENTRY_ORIGIN: ArqIntegration.origin,
             },
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
@@ -120,16 +122,16 @@ def patch_run_job() -> None:
             with sentry_sdk.start_span(
                 name="unknown arq task",
                 attributes={
-                    "sentry.op": OP.QUEUE_PROCESS,
-                    "sentry.origin": ArqIntegration.origin,
-                    "sentry.segment.name.source": SegmentNameSource.TASK,
-                    SPANDATA.MESSAGING_MESSAGE_ID: job_id,
+                    ATTRIBUTE_NAMES.SENTRY_OP: OP.QUEUE_PROCESS,
+                    ATTRIBUTE_NAMES.SENTRY_ORIGIN: ArqIntegration.origin,
+                    ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE: SegmentNameSource.TASK,
+                    ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID: job_id,
                 },
                 parent_span=None,
             ) as span:
                 if self.queue_name is not None:
                     span.set_attribute(
-                        SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name
+                        ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME, self.queue_name
                     )
                 return await old_run_job(self, job_id, score)
 

@@ -22,6 +22,7 @@ from unittest import mock
 
 import anyio
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 from sentry_sdk.utils import package_version
 
@@ -82,11 +83,11 @@ def _find_mcp_span(items, method_name=None):
         if item.type != "span":
             continue
         attrs = item.payload.get("attributes", {})
-        if attrs.get("sentry.op") != OP.MCP_SERVER:
+        if attrs.get(ATTRIBUTE_NAMES.SENTRY_OP) != OP.MCP_SERVER:
             continue
         if (
             method_name is not None
-            and attrs.get(SPANDATA.MCP_METHOD_NAME) != method_name
+            and attrs.get(ATTRIBUTE_NAMES.MCP_METHOD_NAME) != method_name
         ):
             continue
         return item.payload
@@ -168,8 +169,8 @@ async def test_tool_handler_constructor_registration(sentry_init, capture_items,
     assert span is not None
     data = span["attributes"]
 
-    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "calculate"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "calculate"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-ctor"
 
 
@@ -203,9 +204,9 @@ async def test_mcpserver_high_level_tool_instrumented(
     sentry_sdk.flush()
     span = _find_mcp_span(items, method_name="tools/call")
     assert span is not None
-    assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
     assert span["name"] == "tools/call add"
-    assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert span["attributes"][ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
 
 
 @pytest.mark.asyncio
@@ -238,7 +239,8 @@ async def test_wrapping_handler_is_idempotent(sentry_init, capture_items, stdio)
         item.payload
         for item in items
         if item.type == "span"
-        and item.payload.get("attributes", {}).get("sentry.op") == OP.MCP_SERVER
+        and item.payload.get("attributes", {}).get(ATTRIBUTE_NAMES.SENTRY_OP)
+        == OP.MCP_SERVER
     ]
 
     assert len(mcp_spans) == 1
@@ -298,20 +300,20 @@ async def test_tool_handler_stdio(
     assert span is not None
     assert span["name"] == "tools/call calculate"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "calculate"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "calculate"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "stdio"
+    assert data[ATTRIBUTE_NAMES.NETWORK_TRANSPORT] == "pipe"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-123"
-    assert SPANDATA.MCP_SESSION_ID not in data
+    assert ATTRIBUTE_NAMES.MCP_SESSION_ID not in data
     assert data["mcp.request.argument.x"] == "10"
     assert data["mcp.request.argument.y"] == "5"
 
-    assert data[SPANDATA.GEN_AI_TOOL_CALL_RESULT] == json.dumps(
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT] == json.dumps(
         {
             "result": "success",
             "value": 42,
@@ -373,18 +375,18 @@ async def test_tool_handler_stdio_no_sensitive_data(
     assert span is not None
     assert span["name"] == "tools/call calculate"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "calculate"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "calculate"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "stdio"
+    assert data[ATTRIBUTE_NAMES.NETWORK_TRANSPORT] == "pipe"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-123"
-    assert SPANDATA.MCP_SESSION_ID not in data
+    assert ATTRIBUTE_NAMES.MCP_SESSION_ID not in data
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in data
 
 
 @pytest.mark.asyncio
@@ -447,19 +449,21 @@ async def test_tool_handler_streamable_http(sentry_init, capture_items, json_rpc
     assert span is not None
     assert span["name"] == "tools/call process"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "process"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "http"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "process"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "http"
+    assert data[ATTRIBUTE_NAMES.NETWORK_TRANSPORT] == "tcp"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert data[SPANDATA.MCP_SESSION_ID] == session_id
+    assert data[ATTRIBUTE_NAMES.MCP_SESSION_ID] == session_id
     assert data["mcp.request.argument.data"] == "test"
 
-    assert data[SPANDATA.GEN_AI_TOOL_CALL_RESULT] == json.dumps({"status": "completed"})
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT] == json.dumps(
+        {"status": "completed"}
+    )
 
 
 @pytest.mark.asyncio
@@ -524,18 +528,18 @@ async def test_tool_handler_streamable_http_no_sensitive_data(
     assert span is not None
     assert span["name"] == "tools/call process"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.GEN_AI_TOOL_NAME] == "process"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert data[SPANDATA.MCP_TRANSPORT] == "http"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_NAME] == "process"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "tools/call"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "http"
+    assert data[ATTRIBUTE_NAMES.NETWORK_TRANSPORT] == "tcp"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert data[SPANDATA.MCP_SESSION_ID] == session_id
+    assert data[ATTRIBUTE_NAMES.MCP_SESSION_ID] == session_id
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in data
 
 
 @pytest.mark.asyncio
@@ -586,10 +590,10 @@ async def test_tool_handler_stateless_streamable_http(
     assert span is not None
     data = span["attributes"]
 
-    assert data[SPANDATA.MCP_TRANSPORT] == "http"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "http"
+    assert data[ATTRIBUTE_NAMES.NETWORK_TRANSPORT] == "tcp"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-789"
-    assert SPANDATA.MCP_SESSION_ID not in data
+    assert ATTRIBUTE_NAMES.MCP_SESSION_ID not in data
 
 
 @pytest.mark.asyncio
@@ -692,21 +696,24 @@ async def test_prompt_handler_stdio(
     assert span is not None
     assert span["name"] == "prompts/get code_help"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.GEN_AI_PROMPT_NAME] == "code_help"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_PROMPT_NAME] == "code_help"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "prompts/get"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
     assert data["mcp.request.argument.language"] == "python"
 
     # Message count is always captured
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Tell me about Python"
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
+    assert (
+        data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT]
+        == "Tell me about Python"
+    )
 
 
 @pytest.mark.asyncio
@@ -765,20 +772,20 @@ async def test_prompt_handler_stdio_no_sensitive_data(
     assert span is not None
     assert span["name"] == "prompts/get code_help"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.GEN_AI_PROMPT_NAME] == "code_help"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_PROMPT_NAME] == "code_help"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "prompts/get"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
 
     # Message count is always captured
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
 
 @pytest.mark.asyncio
@@ -843,13 +850,13 @@ async def test_prompt_handler_streamable_http(sentry_init, capture_items, json_r
     assert span is not None
     assert span["name"] == "prompts/get mcp_info"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # For multi-message prompts, count is always captured
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
 
 @pytest.mark.asyncio
@@ -916,13 +923,13 @@ async def test_prompt_handler_streamable_http_no_sensitive_data(
     assert span is not None
     assert span["name"] == "prompts/get mcp_info"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # For multi-message prompts, count is always captured
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
 
 @pytest.mark.asyncio
@@ -1008,17 +1015,17 @@ async def test_resource_handler_stdio(sentry_init, capture_items, stdio):
     assert span is not None
     assert span["name"] == "resources/read file:///path/to/file.txt"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
     # Check span data
-    assert data[SPANDATA.MCP_RESOURCE_URI] == "file:///path/to/file.txt"
-    assert data[SPANDATA.MCP_METHOD_NAME] == "resources/read"
-    assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert data[ATTRIBUTE_NAMES.MCP_RESOURCE_URI] == "file:///path/to/file.txt"
+    assert data[ATTRIBUTE_NAMES.MCP_METHOD_NAME] == "resources/read"
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-resource"
-    assert data[SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
+    assert data[ATTRIBUTE_NAMES.MCP_RESOURCE_PROTOCOL] == "file"
     # Resources don't capture result content
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in data
 
 
 @pytest.mark.asyncio
@@ -1075,12 +1082,12 @@ async def test_resource_handler_streamable_http(sentry_init, capture_items, json
     assert span is not None
     assert span["name"] == "resources/read https://example.com/resource"
     data = span["attributes"]
-    assert data["sentry.op"] == OP.MCP_SERVER
-    assert data["sentry.origin"] == "auto.ai.mcp"
+    assert data[ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER
+    assert data[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.ai.mcp"
 
-    assert data[SPANDATA.MCP_RESOURCE_URI] == "https://example.com/resource"
-    assert data[SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
-    assert data[SPANDATA.MCP_SESSION_ID] == session_id
+    assert data[ATTRIBUTE_NAMES.MCP_RESOURCE_URI] == "https://example.com/resource"
+    assert data[ATTRIBUTE_NAMES.MCP_RESOURCE_PROTOCOL] == "https"
+    assert data[ATTRIBUTE_NAMES.MCP_SESSION_ID] == session_id
 
 
 @pytest.mark.asyncio
@@ -1166,7 +1173,7 @@ async def test_tool_result_extraction_tuple(
     assert span is not None
     data = span["attributes"]
 
-    assert data[SPANDATA.GEN_AI_TOOL_CALL_RESULT] == json.dumps(
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT] == json.dumps(
         {
             "key": "value",
             "count": 5,
@@ -1218,7 +1225,7 @@ async def test_tool_result_extraction_tuple_no_sensitive_data(
     assert span is not None
     data = span["attributes"]
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in data
 
 
 @pytest.mark.asyncio
@@ -1269,7 +1276,7 @@ async def test_tool_result_extraction_unstructured(
     assert span is not None
     data = span["attributes"]
 
-    assert data[SPANDATA.GEN_AI_TOOL_CALL_RESULT] == "First part Second part"
+    assert data[ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT] == "First part Second part"
 
 
 @pytest.mark.asyncio
@@ -1320,7 +1327,7 @@ async def test_tool_result_extraction_unstructured_no_sensitive_data(
     assert span is not None
     data = span["attributes"]
 
-    assert SPANDATA.GEN_AI_TOOL_CALL_RESULT not in data
+    assert ATTRIBUTE_NAMES.GEN_AI_TOOL_CALL_RESULT not in data
 
 
 @pytest.mark.asyncio
@@ -1395,10 +1402,13 @@ async def test_multiple_handlers(sentry_init, capture_items, stdio):
         item.payload
         for item in items
         if item.type == "span"
-        and item.payload.get("attributes", {}).get("sentry.op") == OP.MCP_SERVER
+        and item.payload.get("attributes", {}).get(ATTRIBUTE_NAMES.SENTRY_OP)
+        == OP.MCP_SERVER
     ]
     assert len(mcp_spans) == 3
-    assert all(s["attributes"]["sentry.op"] == OP.MCP_SERVER for s in mcp_spans)
+    assert all(
+        s["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.MCP_SERVER for s in mcp_spans
+    )
     span_names = [s["name"] for s in mcp_spans]
     assert "tools/call tool_a" in span_names
     assert "tools/call tool_b" in span_names
@@ -1454,10 +1464,10 @@ async def test_prompt_with_dict_result(
     data = span["attributes"]
 
     # Message count is always captured
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Hello from dict"
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_ROLE] == "user"
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT] == "Hello from dict"
 
 
 @pytest.mark.asyncio
@@ -1509,10 +1519,10 @@ async def test_prompt_with_dict_result_no_sensitive_data(
     data = span["attributes"]
 
     # Message count is always captured
-    assert data[SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
+    assert data[ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
 
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_ROLE not in data
+    assert ATTRIBUTE_NAMES.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in data
 
 
 @pytest.mark.asyncio
@@ -1640,9 +1650,9 @@ async def test_sse_transport_detection_v2(sentry_init, capture_items, json_rpc_s
     assert span is not None
     data = span["attributes"]
 
-    assert data[SPANDATA.MCP_TRANSPORT] == "sse"
-    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
-    assert data[SPANDATA.MCP_SESSION_ID] == session_id
+    assert data[ATTRIBUTE_NAMES.MCP_TRANSPORT] == "sse"
+    assert data[ATTRIBUTE_NAMES.NETWORK_TRANSPORT] == "tcp"
+    assert data[ATTRIBUTE_NAMES.MCP_SESSION_ID] == session_id
 
 
 @pytest.mark.asyncio
