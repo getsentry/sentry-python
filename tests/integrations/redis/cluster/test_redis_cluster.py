@@ -2,10 +2,11 @@ from unittest.mock import MagicMock
 
 import pytest
 import redis
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis import RedisIntegration
 
 
@@ -94,14 +95,14 @@ def test_rediscluster_basic(
     span = redis_spans[-1]
     assert span["name"] == description
     attrs = span["attributes"]
-    assert attrs["sentry.op"] == OP.DB_QUERY
-    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
+    assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "redis-py"
     # ClusterNode converts localhost to 127.0.0.1
-    assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
-    assert attrs[SPANDATA.SERVER_PORT] == 6379
-    assert attrs[SPANDATA.DB_OPERATION_NAME] == "SET"
-    assert attrs["db.redis.key"] == "bar"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "127.0.0.1"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == 6379
+    assert attrs[ATTRIBUTE_NAMES.DB_OPERATION_NAME] == "SET"
+    assert attrs[ATTRIBUTE_NAMES.DB_REDIS_KEY] == "bar"
 
 
 def test_rediscluster_pipeline(sentry_init, capture_items):
@@ -132,12 +133,12 @@ def test_rediscluster_pipeline(sentry_init, capture_items):
     pipeline_span = redis_spans[-1]
     assert pipeline_span["name"] == "redis.pipeline.execute"
     attrs = pipeline_span["attributes"]
-    assert attrs["sentry.op"] == OP.DB_QUERY
-    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
+    assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "redis-py"
     # ClusterNode converts localhost to 127.0.0.1
-    assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
-    assert attrs[SPANDATA.SERVER_PORT] == 6379
+    assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "127.0.0.1"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == 6379
 
 
 def test_rediscluster_span_origin(
@@ -170,8 +171,8 @@ def test_rediscluster_span_origin(
     redis_spans = payloads[:-1]
 
     assert parent_span["name"] == "custom parent"
-    assert parent_span["attributes"]["sentry.origin"] == "manual"
+    assert parent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
     assert len(redis_spans) >= 2
 
     for span in redis_spans:
-        assert span["attributes"]["sentry.origin"] == "auto.db.redis"
+        assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"

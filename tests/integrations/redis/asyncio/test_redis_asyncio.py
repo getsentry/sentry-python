@@ -1,9 +1,10 @@
 import pytest
 from fakeredis.aioredis import FakeRedis
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis import RedisIntegration
 
 
@@ -60,14 +61,14 @@ async def test_async_redis_pipeline(sentry_init, capture_items):
     assert parent_span["name"] == "custom parent"
     assert pipeline_span["name"] == "redis.pipeline.execute"
     attrs = pipeline_span["attributes"]
-    assert attrs["sentry.op"] == OP.DB_QUERY
-    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
-    assert attrs[SPANDATA.DB_NAMESPACE] == "0"
-    assert attrs[SPANDATA.SERVER_ADDRESS] == (
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
+    assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "redis-py"
+    assert attrs[ATTRIBUTE_NAMES.DB_NAMESPACE] == "0"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == (
         connection.connection_pool.connection_kwargs.get("host")
     )
-    assert attrs[SPANDATA.SERVER_PORT] == 6379
+    assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == 6379
 
 
 @pytest.mark.asyncio
@@ -95,6 +96,6 @@ async def test_async_span_origin(sentry_init, capture_items):
     set_span, pipeline_span, parent_span = [item.payload for item in items]
 
     assert parent_span["name"] == "custom parent"
-    assert parent_span["attributes"]["sentry.origin"] == "manual"
-    assert set_span["attributes"]["sentry.origin"] == "auto.db.redis"
-    assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"
+    assert parent_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
+    assert set_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"
+    assert pipeline_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"

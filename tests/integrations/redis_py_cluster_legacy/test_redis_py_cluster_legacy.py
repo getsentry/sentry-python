@@ -2,10 +2,11 @@ from unittest import mock
 
 import pytest
 import rediscluster
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis import RedisIntegration
 
 MOCK_CONNECTION_POOL = mock.MagicMock()
@@ -76,14 +77,14 @@ def test_rediscluster_basic(sentry_init, capture_items, data_collection, descrip
     assert span["name"] == description
 
     attrs = span["attributes"]
-    assert attrs["sentry.op"] == OP.DB_QUERY
-    assert attrs["sentry.origin"] == "auto.db.redis"
-    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-    assert attrs[SPANDATA.DB_NAMESPACE] == "1"
-    assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
-    assert attrs[SPANDATA.SERVER_PORT] == 63791
-    assert attrs[SPANDATA.DB_OPERATION_NAME] == "SET"
-    assert attrs["db.redis.key"] == "bar"
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_NAMESPACE] == "1"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == 63791
+    assert attrs[ATTRIBUTE_NAMES.DB_OPERATION_NAME] == "SET"
+    assert attrs[ATTRIBUTE_NAMES.DB_REDIS_KEY] == "bar"
 
 
 def test_rediscluster_pipeline(sentry_init, capture_items):
@@ -107,9 +108,9 @@ def test_rediscluster_pipeline(sentry_init, capture_items):
     assert span["name"] == "redis.pipeline.execute"
 
     attrs = span["attributes"]
-    assert attrs["sentry.op"] == OP.DB_QUERY
-    assert attrs["sentry.origin"] == "auto.db.redis"
-    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-    assert attrs[SPANDATA.DB_NAMESPACE] == "1"
-    assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
-    assert attrs[SPANDATA.SERVER_PORT] == 63791
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == OP.DB_QUERY
+    assert attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "redis"
+    assert attrs[ATTRIBUTE_NAMES.DB_NAMESPACE] == "1"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+    assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == 63791

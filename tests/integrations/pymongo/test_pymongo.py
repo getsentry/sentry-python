@@ -1,6 +1,7 @@
 import pytest
 from mockupdb import MockupDB, OpQuery
 from pymongo import MongoClient
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -80,28 +81,31 @@ def test_segment(
 
     for span in find, insert_success, insert_fail:
         attrs = span["attributes"]
-        assert attrs["db.system.name"] == "mongodb"
-        assert attrs[SPANDATA.DB_DRIVER_NAME] == "pymongo"
-        assert attrs["db.namespace"] == "test_db"
-        assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
-        assert attrs[SPANDATA.SERVER_PORT] == mongo_server.port
-        assert attrs["sentry.op"] == "db"
-        assert attrs["sentry.origin"] == "auto.db.pymongo"
+        assert attrs[ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "mongodb"
+        assert attrs[ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "pymongo"
+        assert attrs[ATTRIBUTE_NAMES.DB_NAMESPACE] == "test_db"
+        assert attrs[ATTRIBUTE_NAMES.SERVER_ADDRESS] == "localhost"
+        assert attrs[ATTRIBUTE_NAMES.SERVER_PORT] == mongo_server.port
+        assert attrs[ATTRIBUTE_NAMES.SENTRY_OP] == "db"
+        assert attrs[ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.pymongo"
 
-    assert find["attributes"]["db.operation.name"] == "find"
-    assert insert_success["attributes"]["db.operation.name"] == "insert"
-    assert insert_fail["attributes"]["db.operation.name"] == "insert"
+    assert find["attributes"][ATTRIBUTE_NAMES.DB_OPERATION_NAME] == "find"
+    assert insert_success["attributes"][ATTRIBUTE_NAMES.DB_OPERATION_NAME] == "insert"
+    assert insert_fail["attributes"][ATTRIBUTE_NAMES.DB_OPERATION_NAME] == "insert"
 
     assert find["name"].startswith('{"find')
     assert insert_success["name"].startswith('{"insert')
     assert insert_fail["name"].startswith('{"insert')
 
-    assert find["attributes"]["db.collection.name"] == "test_collection"
-    assert insert_success["attributes"]["db.collection.name"] == "test_collection"
-    assert insert_fail["attributes"]["db.collection.name"] == "erroneous"
+    assert find["attributes"][ATTRIBUTE_NAMES.DB_COLLECTION_NAME] == "test_collection"
+    assert (
+        insert_success["attributes"][ATTRIBUTE_NAMES.DB_COLLECTION_NAME]
+        == "test_collection"
+    )
+    assert insert_fail["attributes"][ATTRIBUTE_NAMES.DB_COLLECTION_NAME] == "erroneous"
 
     for span in find, insert_success, insert_fail:
-        assert span["attributes"][SPANDATA.DB_QUERY_TEXT] == span["name"]
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_QUERY_TEXT] == span["name"]
 
     if expect_query_values:
         assert "1" in find["name"]
@@ -476,7 +480,7 @@ def test_span_origin(sentry_init, capture_items, mongo_server):
     assert len(spans) == 2
     (db_span, segment) = spans
     assert segment["name"] == "test_segment"
-    assert db_span["attributes"]["sentry.origin"] == "auto.db.pymongo"
+    assert db_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.pymongo"
 
 
 def test_status_on_success(sentry_init, capture_items, mongo_server):

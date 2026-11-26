@@ -3,6 +3,7 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
@@ -132,13 +133,13 @@ def test_transactions(
     sqlalchemy_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.origin"] == "auto.db.sqlalchemy"
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.sqlalchemy"
     ]
     for span in sqlalchemy_spans:
-        assert span["attributes"][SPANDATA.DB_SYSTEM_NAME] == "sqlite"
-        assert span["attributes"][SPANDATA.DB_DRIVER_NAME] == "pysqlite"
-        assert span["attributes"][SPANDATA.DB_NAMESPACE] == ":memory:"
-        assert SPANDATA.SERVER_PORT not in span["attributes"]
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "sqlite"
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "pysqlite"
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_NAMESPACE] == ":memory:"
+        assert ATTRIBUTE_NAMES.SERVER_PORT not in span["attributes"]
 
     assert (
         render_span_tree(spans)
@@ -214,13 +215,13 @@ def test_transactions_no_engine_url(
     sqlalchemy_spans = [
         span
         for span in spans
-        if span["attributes"]["sentry.origin"] == "auto.db.sqlalchemy"
+        if span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.sqlalchemy"
     ]
     for span in sqlalchemy_spans:
-        assert span["attributes"][SPANDATA.DB_SYSTEM_NAME] == "sqlite"
-        assert span["attributes"][SPANDATA.DB_DRIVER_NAME] == "pysqlite"
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_SYSTEM_NAME] == "sqlite"
+        assert span["attributes"][ATTRIBUTE_NAMES.DB_DRIVER_NAME] == "pysqlite"
         assert SPANDATA.DB_NAME not in span["attributes"]
-        assert SPANDATA.SERVER_PORT not in span["attributes"]
+        assert ATTRIBUTE_NAMES.SERVER_PORT not in span["attributes"]
 
 
 def test_long_sql_query_preserved(
@@ -302,15 +303,15 @@ def test_query_source_disabled(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
-            "SELECT person"
-        ):
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db" and span[
+            "name"
+        ].startswith("SELECT person"):
             attributes = span["attributes"]
 
-            assert SPANDATA.CODE_LINE_NUMBER not in attributes
-            assert SPANDATA.CODE_NAMESPACE not in attributes
-            assert SPANDATA.CODE_FILE_PATH not in attributes
-            assert SPANDATA.CODE_FUNCTION not in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION not in attributes
             break
     else:
         raise AssertionError("No db span found")
@@ -359,15 +360,15 @@ def test_query_source_enabled(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
-            "SELECT person"
-        ):
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db" and span[
+            "name"
+        ].startswith("SELECT person"):
             attributes = span["attributes"]
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
             break
     else:
         raise AssertionError("No db span found")
@@ -409,30 +410,32 @@ def test_query_source(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
-            "SELECT person"
-        ):
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db" and span[
+            "name"
+        ].startswith("SELECT person"):
             attributes = span["attributes"]
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
             assert (
-                attributes.get(SPANDATA.CODE_NAMESPACE)
+                attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
                 == "tests.integrations.sqlalchemy.test_sqlalchemy"
             )
-            assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
                 "tests/integrations/sqlalchemy/test_sqlalchemy.py"
             )
 
-            is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+            is_relative_path = (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
+            )
             assert is_relative_path
 
-            assert attributes.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION) == "test_query_source"
             break
     else:
         raise AssertionError("No db span found")
@@ -483,31 +486,34 @@ def test_query_source_with_module_in_search_path(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
-            "SELECT person"
-        ):
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db" and span[
+            "name"
+        ].startswith("SELECT person"):
             attributes = span["attributes"]
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
             assert (
-                attributes.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
+                attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
+                == "sqlalchemy_helpers.helpers"
             )
             assert (
-                attributes.get(SPANDATA.CODE_FILE_PATH)
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)
                 == "sqlalchemy_helpers/helpers.py"
             )
 
-            is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+            is_relative_path = (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
+            )
             assert is_relative_path
 
             assert (
-                attributes.get(SPANDATA.CODE_FUNCTION)
+                attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION)
                 == "query_first_model_from_session"
             )
             break
@@ -569,15 +575,15 @@ def test_no_query_source_if_duration_too_short(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
-            "SELECT person"
-        ):
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db" and span[
+            "name"
+        ].startswith("SELECT person"):
             attributes = span["attributes"]
 
-            assert SPANDATA.CODE_LINE_NUMBER not in attributes
-            assert SPANDATA.CODE_NAMESPACE not in attributes
-            assert SPANDATA.CODE_FILE_PATH not in attributes
-            assert SPANDATA.CODE_FUNCTION not in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER not in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH not in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION not in attributes
             break
     else:
         raise AssertionError("No db span found")
@@ -638,31 +644,33 @@ def test_query_source_if_duration_over_threshold(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
     for span in spans:
-        if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
-            "SELECT person"
-        ):
+        if span["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == "db" and span[
+            "name"
+        ].startswith("SELECT person"):
             attributes = span["attributes"]
 
-            assert SPANDATA.CODE_LINE_NUMBER in attributes
-            assert SPANDATA.CODE_NAMESPACE in attributes
-            assert SPANDATA.CODE_FILE_PATH in attributes
-            assert SPANDATA.CODE_FUNCTION in attributes
+            assert ATTRIBUTE_NAMES.CODE_LINE_NUMBER in attributes
+            assert ATTRIBUTE_NAMES.CODE_NAMESPACE in attributes
+            assert ATTRIBUTE_NAMES.CODE_FILE_PATH in attributes
+            assert ATTRIBUTE_NAMES.CODE_FUNCTION in attributes
 
-            assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
-            assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+            assert type(attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER)) == int
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_LINE_NUMBER) > 0
             assert (
-                attributes.get(SPANDATA.CODE_NAMESPACE)
+                attributes.get(ATTRIBUTE_NAMES.CODE_NAMESPACE)
                 == "tests.integrations.sqlalchemy.test_sqlalchemy"
             )
-            assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+            assert attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH).endswith(
                 "tests/integrations/sqlalchemy/test_sqlalchemy.py"
             )
 
-            is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+            is_relative_path = (
+                attributes.get(ATTRIBUTE_NAMES.CODE_FILE_PATH)[0] != os.sep
+            )
             assert is_relative_path
 
             assert (
-                attributes.get(SPANDATA.CODE_FUNCTION)
+                attributes.get(ATTRIBUTE_NAMES.CODE_FUNCTION)
                 == "test_query_source_if_duration_over_threshold"
             )
             break
@@ -690,5 +698,5 @@ def test_span_origin(
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert spans[0]["attributes"]["sentry.origin"] == "auto.db.sqlalchemy"
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
+    assert spans[0]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.db.sqlalchemy"
+    assert spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
