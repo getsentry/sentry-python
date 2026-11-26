@@ -11,6 +11,7 @@ from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
 from sentry_sdk.integrations.google_genai.utils import extract_contents_messages
+from sentry_sdk.traces import _AgentFrameworkChatGenerationContext
 
 
 @pytest.fixture
@@ -3164,3 +3165,134 @@ async def test_async_embed_content_data_collection(
 
     assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+
+
+@pytest.mark.asyncio
+async def test_async_generate_content_inside_agent_framework_span(
+    sentry_init,
+    capture_items,
+    mock_genai_client,
+):
+    """Async generate_content inside an agent-framework chat span returns the
+    response instead of an un-awaited coroutine (getsentry/sentry-python#8414).
+
+    The agent-framework integration (e.g. PydanticAIIntegration) enters a chat
+    generation span, which sets the `_agent_framework_chat_generation_entered`
+    scope flag so lower-level client spans are suppressed. The async wrappers
+    must still await the wrapped call on that early-return path.
+    """
+    sentry_init(
+        integrations=[GoogleGenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+    items = capture_items("span")
+
+    with _AgentFrameworkChatGenerationContext(
+        name="chat gemini-1.5-flash",
+        attributes={"sentry.op": OP.GEN_AI_CHAT},
+    ):
+        with mock.patch.object(
+            mock_genai_client._api_client,
+            "async_request",
+            return_value=mock_http_response,
+        ):
+            response = await mock_genai_client.aio.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=["Tell me a joke"],
+            )
+
+    assert response.text == "Hello! How can I help you today?"
+
+    # The framework span owns the generation: no extra chat span is created.
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    assert spans[0]["name"] == "chat gemini-1.5-flash"
+
+
+@pytest.mark.asyncio
+async def test_async_generate_content_stream_inside_agent_framework_span(
+    sentry_init,
+    capture_items,
+    mock_genai_client,
+):
+    """Async generate_content_stream inside an agent-framework chat span
+    returns an async iterator instead of an un-awaited coroutine
+    (getsentry/sentry-python#8414)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    stream_chunks = [
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [{"text": "Hello! "}],
+                    },
+                }
+            ],
+            "responseId": "response-id-stream-123",
+            "modelVersion": "gemini-1.5-flash",
+        },
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [{"text": "How can I "}],
+                    },
+                }
+            ],
+        },
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [{"text": "help you today?"}],
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+        },
+    ]
+
+    async def fake_async_request_streamed(*args, **kwargs):
+        async def _chunks():
+            for chunk_json in stream_chunks:
+                yield create_mock_http_response(chunk_json)
+
+        return _chunks()
+
+    items = capture_items("span")
+
+    with _AgentFrameworkChatGenerationContext(
+        name="chat gemini-1.5-flash",
+        attributes={"sentry.op": OP.GEN_AI_CHAT},
+    ):
+        with mock.patch.object(
+            mock_genai_client._api_client,
+            "async_request_streamed",
+            side_effect=fake_async_request_streamed,
+        ):
+            stream = await mock_genai_client.aio.models.generate_content_stream(
+                model="gemini-1.5-flash",
+                contents=["Stream me a response"],
+            )
+            collected_chunks = [chunk async for chunk in stream]
+
+    assert len(collected_chunks) == 3
+    assert collected_chunks[0].candidates[0].content.parts[0].text == "Hello! "
+    assert collected_chunks[1].candidates[0].content.parts[0].text == "How can I "
+    assert collected_chunks[2].candidates[0].content.parts[0].text == "help you today?"
+
+    # The framework span owns the generation: no extra chat span is created.
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+    assert spans[0]["name"] == "chat gemini-1.5-flash"

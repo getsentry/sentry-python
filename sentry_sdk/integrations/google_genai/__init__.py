@@ -137,7 +137,7 @@ def _wrap_async_generate_content_stream(
             return await f(self, *args, **kwargs)
 
         if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
-            return f(self, *args, **kwargs)
+            return await f(self, *args, **kwargs)
 
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
@@ -240,7 +240,7 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
             return await f(self, *args, **kwargs)
 
         if sentry_sdk.get_current_scope()._agent_framework_chat_generation_entered:
-            return f(self, *args, **kwargs)
+            return await f(self, *args, **kwargs)
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
