@@ -319,7 +319,7 @@ class ContinuousScheduler:
                 # Move the new profiles into the active_profiles set.
                 #
                 # We cannot directly add the to active_profiles set
-                # in `start_profiling` because it is called from other
+                # in `auto_start` because it is called from other
                 # threads which can cause a RuntimeError when it the
                 # set sizes changes during iteration without a lock.
                 #
