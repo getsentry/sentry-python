@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest.dependency-groups]
 aws = [
     { name = "certifi" },
+    { name = "sentry-conventions", specifier = ">=0.36.0" },
     { name = "urllib3" },
     { name = "urllib3", marker = "python_full_version < '3.10'", specifier = "<1.27" },
 ]
@@ -22,6 +23,7 @@ dev = [
 ]
 docs = [
     { name = "gevent" },
+    { name = "sentry-conventions", specifier = ">=0.36.0" },
     { name = "shibuya" },
     { name = "sphinx" },
     { name = "sphinx-autodoc-typehints", extras = ["type-comments"], specifier = ">=2.3.0" },
@@ -63,6 +65,7 @@ typing = [
     { name = "pydantic-ai-slim", specifier = ">=2.23.0" },
     { name = "pymongo" },
     { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "sentry-conventions", specifier = ">=0.36.0" },
     { name = "starlette", specifier = ">=1.3.1" },
     { name = "statsig" },
     { name = "strawberry-graphql" },
@@ -3071,6 +3074,14 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ec/a0/3d3f51a1304c0e8c93e06a23308f566f2d52d62f92dac903b85ef79dea6f/semver-3.1.2.tar.gz", hash = "sha256:bea193552413194252d33ff26ce0962b76669bd1c6fb17e8e203ac37f072feaf", size = 293659, upload-time = "2026-11-15T17:01:42.931Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/60/27e29790ff15ea0a485b8dc200d514328294f956e4abc3d43d88c0b5338d/semver-3.1.2-py3-none-any.whl", hash = "sha256:45d107c3fa880910441dfab9d555046cba2829a25feeadfe4a1566439635c510", size = 19100, upload-time = "2026-11-15T17:01:41.321Z" },
+]
+
+[[package]]
+name = "sentry-conventions"
+version = "0.36.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/31/e5af8143ca4c0dc517b1dc5328639fc97ae6325b6f9fa2f4610542d05a55/sentry_conventions-0.36.0-py3-none-any.whl", hash = "sha256:052094cdd4571ca95d81bfa862be8940db1cdf262ee0d192bc031a40e7f6657c", size = 163091, upload-time = "2026-11-23T13:30:14.822Z" },
 ]
 
 [[package]]

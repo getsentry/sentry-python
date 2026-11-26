@@ -42,6 +42,7 @@ setup(
     install_requires=[
         "urllib3>=1.26.11",
         "certifi",
+        "sentry-conventions>=0.36.0",
     ],
     extras_require={
         # Only add an extra if our integration needs something additional to
