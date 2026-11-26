@@ -7,6 +7,7 @@ import pytest
 from celery import VERSION, Celery
 from celery.bin import worker
 from celery.exceptions import Ignore, Reject, Retry
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -289,7 +290,10 @@ def test_transaction_events(
 
     assert execution_span["name"] == "dummy_task"
     assert execution_span["is_segment"] is True
-    assert execution_span["attributes"]["sentry.segment.name.source"] == "task"
+    assert (
+        execution_span["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE]
+        == "task"
+    )
     assert execution_span["trace_id"] == span.trace_id
     if task_fails:
         assert execution_span["status"] == "error"
@@ -298,15 +302,17 @@ def test_transaction_events(
 
     assert process_span["name"] == "dummy_task"
     assert process_span["trace_id"] == span.trace_id
-    assert process_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
+    assert process_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PROCESS
     assert process_span["parent_span_id"] == execution_span["span_id"]
 
     assert submission_span["name"] == "submission"
     assert submission_span["is_segment"] is True
 
     assert submit_span["name"] == "dummy_task"
-    assert submit_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
-    assert submit_span["attributes"]["sentry.origin"] == "auto.queue.celery"
+    assert submit_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PUBLISH
+    assert (
+        submit_span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "auto.queue.celery"
+    )
     assert submit_span["parent_span_id"] == submission_span["span_id"] == span.span_id
     assert submit_span["trace_id"] == span.trace_id
 
@@ -435,7 +441,7 @@ def test_control_flow_exceptions_not_errors(init_celery, capture_items, exceptio
     assert not [item for item in items if item.type == "event"]
 
     process_span, execution_span = [item.payload for item in items]
-    assert process_span["attributes"]["sentry.op"] == OP.QUEUE_PROCESS
+    assert process_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PROCESS
     assert process_span["status"] == "ok"
     assert execution_span["is_segment"] is True
     assert execution_span["status"] == "ok"
@@ -672,7 +678,8 @@ def test_messaging_destination_name_default_exchange(
 
     process_span, _execution_span = items
     assert (
-        process_span.payload["attributes"]["messaging.destination.name"] == routing_key
+        process_span.payload["attributes"][ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME]
+        == routing_key
     )
 
 
@@ -701,7 +708,10 @@ def test_messaging_destination_name_nondefault_exchange(
     sentry_sdk.flush()
 
     process_span, _execution_span = items
-    assert "messaging.destination.name" not in process_span.payload["attributes"]
+    assert (
+        ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME
+        not in process_span.payload["attributes"]
+    )
 
 
 def test_messaging_id(init_celery, capture_items):
@@ -719,7 +729,7 @@ def test_messaging_id(init_celery, capture_items):
     sentry_sdk.flush()
 
     process_span, _execution_span = items
-    assert "messaging.message.id" in process_span.payload["attributes"]
+    assert ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID in process_span.payload["attributes"]
 
 
 def test_retry_count_zero(init_celery, capture_items):
@@ -737,7 +747,12 @@ def test_retry_count_zero(init_celery, capture_items):
     sentry_sdk.flush()
 
     process_span, _execution_span = items
-    assert process_span.payload["attributes"]["messaging.message.retry.count"] == 0
+    assert (
+        process_span.payload["attributes"][
+            ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RETRY_COUNT
+        ]
+        == 0
+    )
 
 
 @mock.patch("celery.app.task.Task.request")
@@ -758,7 +773,12 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_items):
     sentry_sdk.flush()
 
     process_span, _execution_span = items
-    assert process_span.payload["attributes"]["messaging.message.retry.count"] == 3
+    assert (
+        process_span.payload["attributes"][
+            ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RETRY_COUNT
+        ]
+        == 3
+    )
 
 
 @pytest.mark.parametrize("system", ("redis", "amqp"))
@@ -780,7 +800,9 @@ def test_messaging_system(system, init_celery, capture_items):
     sentry_sdk.flush()
 
     process_span, _execution_span = items
-    assert process_span.payload["attributes"]["messaging.system"] == system
+    assert (
+        process_span.payload["attributes"][ATTRIBUTE_NAMES.MESSAGING_SYSTEM] == system
+    )
 
 
 @pytest.mark.parametrize("system", ("amqp", "redis"))
@@ -810,13 +832,20 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
 
     span_items = [item.payload for item in items]
     publish_span = next(
-        s for s in span_items if s["attributes"].get("sentry.op") == OP.QUEUE_PUBLISH
+        s
+        for s in span_items
+        if s["attributes"].get(ATTRIBUTE_NAMES.SENTRY_OP) == OP.QUEUE_PUBLISH
     )
 
-    assert publish_span["attributes"]["messaging.system"] == system
-    assert publish_span["attributes"]["messaging.destination.name"] == "celery"
-    assert "messaging.message.id" in publish_span["attributes"]
-    assert publish_span["attributes"]["messaging.message.retry.count"] == 0
+    assert publish_span["attributes"][ATTRIBUTE_NAMES.MESSAGING_SYSTEM] == system
+    assert (
+        publish_span["attributes"][ATTRIBUTE_NAMES.MESSAGING_DESTINATION_NAME]
+        == "celery"
+    )
+    assert ATTRIBUTE_NAMES.MESSAGING_MESSAGE_ID in publish_span["attributes"]
+    assert (
+        publish_span["attributes"][ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RETRY_COUNT] == 0
+    )
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
 
@@ -836,8 +865,16 @@ def test_receive_latency(init_celery, capture_items):
     sentry_sdk.flush()
 
     process_span, _execution_span = items
-    assert "messaging.message.receive.latency" in process_span.payload["attributes"]
-    assert process_span.payload["attributes"]["messaging.message.receive.latency"] > 0
+    assert (
+        ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RECEIVE_LATENCY
+        in process_span.payload["attributes"]
+    )
+    assert (
+        process_span.payload["attributes"][
+            ATTRIBUTE_NAMES.MESSAGING_MESSAGE_RECEIVE_LATENCY
+        ]
+        > 0
+    )
 
 
 def tests_span_origin_consumer(init_celery, capture_items):
@@ -856,8 +893,14 @@ def tests_span_origin_consumer(init_celery, capture_items):
     sentry_sdk.flush()
 
     process_span, execution_span = items
-    assert execution_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
-    assert process_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
+    assert (
+        execution_span.payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.queue.celery"
+    )
+    assert (
+        process_span.payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+        == "auto.queue.celery"
+    )
 
 
 def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
@@ -886,10 +929,13 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
 
     parent = items.pop(-1).payload
     assert parent["name"] == "custom parent"
-    assert parent["attributes"]["sentry.origin"] == "manual"
+    assert parent["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN] == "manual"
 
     for item in items:
-        assert item.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
+        assert (
+            item.payload["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]
+            == "auto.queue.celery"
+        )
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
 
@@ -942,7 +988,7 @@ def test_send_task_wrapped(
     assert outer["is_segment"] is True
 
     assert submit_span["name"] == "very_creative_task_name"
-    assert submit_span["attributes"]["sentry.op"] == OP.QUEUE_PUBLISH
+    assert submit_span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP] == OP.QUEUE_PUBLISH
     assert submit_span["trace_id"] == outer_span.trace_id
     assert submit_span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
 

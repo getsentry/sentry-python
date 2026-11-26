@@ -6,6 +6,7 @@ import uuid
 
 import pytest
 import ray
+from sentry_conventions.attributes import ATTRIBUTE_NAMES
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -140,7 +141,7 @@ def example_task():
     with sentry_sdk.start_span(
         name="example task step",
         attributes={
-            "sentry.op": "task",
+            ATTRIBUTE_NAMES.SENTRY_OP: "task",
         },
     ):
         ...
@@ -149,7 +150,7 @@ def example_task():
 # RayIntegration must leave variadic keyword arguments at the end
 def example_task_with_kwargs(**kwargs):
     with sentry_sdk.start_span(
-        name="example task step", attributes={"sentry.op": "task"}
+        name="example task step", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"}
     ):
         ...
 
@@ -198,7 +199,7 @@ def test_tracing_in_ray_tasks(
         )
 
         with sentry_sdk.start_span(
-            name="ray test parent", attributes={"sentry.op": "task"}
+            name="ray test parent", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"}
         ):
             future = example_task.remote()
             ray.get(future)
@@ -220,20 +221,24 @@ def test_tracing_in_ray_tasks(
 
     assert worker_spans[1]["name"] == f"tests.integrations.ray.test_ray.{task.__name__}"
     assert (
-        worker_spans[1]["attributes"]["sentry.segment.name.source"]["value"]
+        worker_spans[1]["attributes"][ATTRIBUTE_NAMES.SENTRY_SEGMENT_NAME_SOURCE][
+            "value"
+        ]
         == SegmentNameSource.TASK
     )
 
     span = client_spans[0]
-    assert span["attributes"]["sentry.op"]["value"] == OP.QUEUE_PUBLISH
-    assert span["attributes"]["sentry.origin"]["value"] == "auto.queue.ray"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP]["value"] == OP.QUEUE_PUBLISH
+    assert (
+        span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]["value"] == "auto.queue.ray"
+    )
     assert span["name"] == f"tests.integrations.ray.test_ray.{task.__name__}"
     assert span["parent_span_id"] == client_spans[1]["span_id"]
     assert span["trace_id"] == client_spans[1]["trace_id"]
 
     span = worker_spans[0]
-    assert span["attributes"]["sentry.op"]["value"] == "task"
-    assert span["attributes"]["sentry.origin"]["value"] == "manual"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_OP]["value"] == "task"
+    assert span["attributes"][ATTRIBUTE_NAMES.SENTRY_ORIGIN]["value"] == "manual"
     assert span["name"] == "example task step"
     assert span["parent_span_id"] == worker_spans[1]["span_id"]
     assert span["trace_id"] == worker_spans[1]["trace_id"]
@@ -267,7 +272,7 @@ def test_errors_in_ray_tasks(sentry_init):
             1 / 0
 
         with sentry_sdk.start_span(
-            name="ray test parent", attributes={"sentry.op": "task"}
+            name="ray test parent", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"}
         ):
             with pytest.raises(ZeroDivisionError):
                 future = example_task.remote()
@@ -312,7 +317,8 @@ def test_tracing_in_ray_actors(
 
             def increment(self):
                 with sentry_sdk.start_span(
-                    name="example actor execution", attributes={"sentry.op": "task"}
+                    name="example actor execution",
+                    attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"},
                 ):
                     self.n += 1
     else:
@@ -324,7 +330,8 @@ def test_tracing_in_ray_actors(
 
             def increment(self):
                 with sentry_sdk.start_span(
-                    name="example actor execution", attributes={"sentry.op": "task"}
+                    name="example actor execution",
+                    attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"},
                 ):
                     self.n += 1
 
@@ -341,7 +348,7 @@ def test_tracing_in_ray_actors(
         )
 
         with sentry_sdk.start_span(
-            name="ray test parent", attributes={"sentry.op": "task"}
+            name="ray test parent", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"}
         ):
             counter = Counter.remote()
             future = counter.increment.remote()
@@ -398,14 +405,15 @@ def test_errors_in_ray_actors(sentry_init):
 
             def increment(self):
                 with sentry_sdk.start_span(
-                    name="example actor execution", attributes={"sentry.op": "task"}
+                    name="example actor execution",
+                    attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"},
                 ):
                     1 / 0
 
                 return sentry_sdk.get_client().transport.envelopes
 
         with sentry_sdk.start_span(
-            name="ray test parent", attributes={"sentry.op": "task"}
+            name="ray test parent", attributes={ATTRIBUTE_NAMES.SENTRY_OP: "task"}
         ):
             with pytest.raises(ZeroDivisionError):
                 counter = Counter.remote()
