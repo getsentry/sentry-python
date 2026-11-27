@@ -42,7 +42,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, ContextManager, Dict, Optional, Tuple
+    from typing import Any, Callable, ContextManager, Dict, Optional, Tuple
 
     from sentry_sdk._types import Attributes, Event, Hint
 
@@ -87,7 +87,7 @@ def _looks_like_asgi3(app: "Any") -> bool:
 class SentryAsgiMiddleware:
     __slots__ = (
         "app",
-        "__call__",
+        "_asgi_version",
         "mechanism_type",
         "span_origin",
         "http_methods_to_capture",
@@ -131,10 +131,16 @@ class SentryAsgiMiddleware:
             else:
                 asgi_version = 2
 
-        if asgi_version == 3:
-            self.__call__ = self._run_asgi3
-        elif asgi_version == 2:
-            self.__call__ = self._run_asgi2  # type: ignore
+        self._asgi_version = asgi_version
+
+    @property
+    def __call__(self) -> "Callable[..., Any]":
+        # Binding on access preserves coroutine detection without a reference cycle.
+        if self._asgi_version == 3:
+            return self._run_asgi3
+        if self._asgi_version == 2:
+            return self._run_asgi2
+        raise AttributeError("__call__")
 
     def _capture_lifespan_exception(self, exc: Exception) -> None:
         """Capture exceptions raise in application lifespan handlers.

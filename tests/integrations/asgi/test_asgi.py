@@ -1,3 +1,6 @@
+import gc
+import inspect
+import weakref
 from collections import Counter
 
 import pytest
@@ -540,6 +543,49 @@ def test_looks_like_asgi3(asgi3_app):
     assert _looks_like_asgi3(asgi3)
     asgi2 = MockAsgi2App()
     assert not _looks_like_asgi3(asgi2)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asgi_version", (2, 3))
+async def test_middleware_releases_the_application_after_asgi_call(asgi_version):
+    async def invoke():
+        async def handle(receive, send):
+            assert (await receive())["type"] == "lifespan.startup"
+            await send({"type": "lifespan.startup.complete"})
+
+        async def asgi3(scope, receive, send):
+            await handle(receive, send)
+
+        def asgi2(scope):
+            return handle
+
+        async def receive():
+            return {"type": "lifespan.startup"}
+
+        messages = []
+
+        async def send(message):
+            messages.append(message)
+
+        scope = {"type": "lifespan"}
+        app = asgi3 if asgi_version == 3 else asgi2
+        middleware = SentryAsgiMiddleware(app)
+        assert inspect.iscoroutinefunction(middleware.__call__) == (asgi_version == 3)
+        if asgi_version == 3:
+            await middleware(scope, receive, send)
+        else:
+            await middleware(scope)(receive, send)
+        assert messages == [{"type": "lifespan.startup.complete"}]
+        return weakref.ref(app)
+
+    gc_was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        app_ref = await invoke()
+        assert app_ref() is None
+    finally:
+        if gc_was_enabled:
+            gc.enable()
 
 
 def test_get_ip_x_forwarded_for():
