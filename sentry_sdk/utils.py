@@ -331,10 +331,19 @@ class Dsn:
             org_id_match = Dsn.ORG_ID_REGEX.match(self.host)
             self.org_id = org_id_match.group(1) if org_id_match else None
 
-        if parts.port is None:
+        try:
+            # `urlsplit` parses the port lazily and raises a bare `ValueError`
+            # for ports that are not an integer in the range 0-65535.
+            port = parts.port
+        except ValueError:
+            raise BadDsn(
+                "Invalid port in DSN (%r)" % (parts.netloc.rpartition("@")[-1],)
+            )
+
+        if port is None:
             self.port: int = self.scheme == "https" and 443 or 80
         else:
-            self.port = parts.port
+            self.port = port
 
         if not parts.username:
             raise BadDsn("Missing public key")
