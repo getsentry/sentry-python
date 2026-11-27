@@ -156,6 +156,11 @@ def test_parse_invalid_dsn(dsn):
         ("foo://barbaz@sentry.io", "Unsupported scheme 'foo'"),
         ("https://foobar@", "Missing hostname"),
         ("https://@sentry.io", "Missing public key"),
+        ("https://foobar@example.com:foo/1", "Invalid port in DSN ('example.com:foo')"),
+        (
+            "https://foobar@example.com:65536/1",
+            "Invalid port in DSN ('example.com:65536')",
+        ),
     ],
 )
 def test_dsn_validations(dsn, error_message):
