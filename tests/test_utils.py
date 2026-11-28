@@ -1257,6 +1257,90 @@ def test_get_lines_from_file_frame_context_lines(
     assert len(post_context) == expected_context_lines
 
 
+def test_get_lines_from_file_prefers_linecache_over_loader(
+    sentry_init, tmp_path, monkeypatch
+):
+    import importlib.machinery
+    import importlib.util
+    import linecache
+
+    sentry_init()
+
+    source_file = tmp_path / "sample_mod.py"
+    lines = ["def fn0():\n", "    raise ValueError('boom')\n"]
+    for i in range(1, 5):
+        lines.append(f"def fn{i}():\n    return fn{i - 1}()\n")
+    source_file.write_text("".join(lines), encoding="utf-8")
+    linecache.checkcache(str(source_file))
+
+    loader_calls = 0
+
+    class CountingLoader:
+        def get_source(self, module):
+            nonlocal loader_calls
+            loader_calls += 1
+            return "fallback0\nfallback1\nfallback2\n"
+
+    pre, ctx, post = get_lines_from_file(
+        str(source_file), 1, loader=CountingLoader(), module="sample_mod"
+    )
+    assert pre == ["def fn0():"]
+    assert ctx == "    raise ValueError('boom')"
+    assert post[:2] == ["def fn1():", "    return fn0()"]
+    assert loader_calls == 0
+
+    # Non-filesystem modules still fall back to loader.get_source.
+    pre, ctx, post = get_lines_from_file(
+        str(tmp_path / "missing_virtual.py"),
+        1,
+        loader=CountingLoader(),
+        module="virtual_mod",
+    )
+    assert (pre, ctx, post) == (["fallback0"], "fallback1", ["fallback2"])
+    assert loader_calls == 1
+
+    # Multi-frame exception in a file-backed module does not call get_source.
+    get_source_calls = 0
+    orig_get_source = importlib.machinery.SourceFileLoader.get_source
+
+    def spy_get_source(self, fullname):
+        nonlocal get_source_calls
+        get_source_calls += 1
+        return orig_get_source(self, fullname)
+
+    monkeypatch.setattr(
+        importlib.machinery.SourceFileLoader, "get_source", spy_get_source
+    )
+
+    spec = importlib.util.spec_from_file_location("sample_mod_test", str(source_file))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    events = []
+    client = sentry_sdk.get_client()
+    orig_capture_envelope = client.transport.capture_envelope
+
+    def capture(envelope):
+        event = envelope.get_event()
+        if event is not None:
+            events.append(event)
+        return orig_capture_envelope(envelope)
+
+    monkeypatch.setattr(client.transport, "capture_envelope", capture)
+
+    try:
+        mod.fn4()
+    except ValueError:
+        sentry_sdk.capture_exception()
+
+    assert len(events) == 1
+    frames = events[0]["exception"]["values"][0]["stacktrace"]["frames"]
+    mod_frames = [f for f in frames if f.get("filename", "").endswith("sample_mod.py")]
+    assert len(mod_frames) == 5
+    assert mod_frames[-1]["context_line"] == "    raise ValueError('boom')"
+    assert get_source_calls == 0
+
+
 def test_safe_serialize_plain_string():
     assert safe_serialize("already a string") == "already a string"
 
