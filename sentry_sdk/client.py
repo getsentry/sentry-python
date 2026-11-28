@@ -1,6 +1,7 @@
 import os
 import random
 import socket
+import time
 import uuid
 from collections.abc import Mapping
 from contextvars import ContextVar
@@ -943,11 +944,18 @@ class _Client(BaseClient):
         if self.monitor:
             self.monitor.kill()
 
-    def _flush_components(self) -> None:
-        """Flush all client components."""
+    def _flush_components(self, timeout: "Optional[float]" = None) -> "Optional[float]":
+        """Flush all client components and return remaining timeout budget."""
         self.session_flusher.flush()
+        if timeout is None:
+            for b in self._batchers:
+                b.flush()
+            return None
+
+        deadline = time.monotonic() + timeout
         for b in self._batchers:
-            b.flush()
+            b.flush(timeout=max(0.0, deadline - time.monotonic()))
+        return max(0.0, deadline - time.monotonic())
 
     def close(
         self,
@@ -963,7 +971,11 @@ class _Client(BaseClient):
                 logger.warning(
                     "close() used with AsyncHttpTransport. Use close_async() instead.",
                 )
-                self._flush_components()
+                self._flush_components(
+                    timeout=(
+                        self.options["shutdown_timeout"] if timeout is None else timeout
+                    )
+                )
             else:
                 self.flush(timeout=timeout, callback=callback)
             self._close_components()
@@ -1012,9 +1024,12 @@ class _Client(BaseClient):
                 return
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
-            self._flush_components()
+            remaining_timeout = self._flush_components(timeout=timeout)
 
-            self.transport.flush(timeout=timeout, callback=callback)
+            self.transport.flush(
+                timeout=timeout if remaining_timeout is None else remaining_timeout,
+                callback=callback,
+            )
 
     async def flush_async(
         self,
@@ -1036,8 +1051,11 @@ class _Client(BaseClient):
                 return
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
-            self._flush_components()
-            flush_task = self.transport.flush(timeout=timeout, callback=callback)  # type: ignore
+            remaining_timeout = self._flush_components(timeout=timeout)
+            flush_task = self.transport.flush(  # type: ignore
+                timeout=timeout if remaining_timeout is None else remaining_timeout,
+                callback=callback,
+            )
             if flush_task is not None:
                 await flush_task
 

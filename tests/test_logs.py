@@ -900,3 +900,98 @@ def test_flush_loop_swallows_flush_exception():
     batcher._flush_loop()
 
     assert calls == [1]
+
+
+def test_batcher_flush_waits_for_in_flight_flusher_batch():
+    import threading
+
+    from sentry_sdk._batcher import Batcher
+
+    class FakeBatcher(Batcher):
+        MAX_BEFORE_FLUSH = 1
+        TYPE = "log"
+        CLIENT_REPORT_TYPE = "log_item"
+        CONTENT_TYPE = "application/vnd.sentry.items.log+json"
+
+        @staticmethod
+        def _to_transport_format(item):
+            return item
+
+    received = []
+    taken = threading.Event()
+    release = threading.Event()
+
+    def capture_func(envelope):
+        if threading.current_thread() is not threading.main_thread():
+            taken.set()
+            release.wait(timeout=5)
+        received.append(envelope)
+
+    batcher = FakeBatcher(
+        capture_func=capture_func,
+        record_lost_func=lambda *a, **k: None,
+    )
+
+    try:
+        batcher.add({"body": "hello"})
+        assert taken.wait(timeout=5)
+
+        def release_soon():
+            time.sleep(0.1)
+            release.set()
+
+        releaser = threading.Thread(target=release_soon)
+        releaser.start()
+        try:
+            batcher.flush()
+            assert len(received) == 1
+        finally:
+            releaser.join(timeout=5)
+    finally:
+        release.set()
+        batcher.kill()
+
+
+def test_client_flush_and_close_wait_for_in_flight_span_batch():
+    import threading
+
+    from sentry_sdk.transport import Transport
+
+    received = []
+    taken = threading.Event()
+    release = threading.Event()
+
+    class SlowTransport(Transport):
+        def capture_envelope(self, envelope):
+            if threading.current_thread() is not threading.main_thread():
+                taken.set()
+                release.wait(timeout=5)
+            received.extend(item.type for item in envelope.items)
+
+    client = sentry_sdk.Client(
+        dsn="https://public@example.invalid/1",
+        transport=SlowTransport({"dsn": "https://public@example.invalid/1"}),
+        trace_lifecycle="stream",
+        traces_sample_rate=1.0,
+    )
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_client(client)
+        with sentry_sdk.traces.start_span(name="segment"):
+            pass
+
+    assert taken.wait(timeout=5)
+
+    def release_soon():
+        time.sleep(0.1)
+        release.set()
+
+    releaser = threading.Thread(target=release_soon)
+    releaser.start()
+    try:
+        client.flush(timeout=5.0)
+        assert received == ["span"]
+    finally:
+        releaser.join(timeout=5)
+        release.set()
+        client.close()

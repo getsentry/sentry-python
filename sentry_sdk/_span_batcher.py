@@ -1,6 +1,5 @@
 import os
 import random
-import threading
 import time
 import weakref
 from collections import defaultdict
@@ -16,7 +15,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    from typing import Any, Callable
 
     from sentry_sdk._types import SpanJSON
 
@@ -51,16 +50,10 @@ class SpanBatcher(Batcher["SpanJSON"]):
         self._running_size: dict[str, int] = defaultdict(lambda: 0)
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
-        self._running = True
-        self._lock = threading.Lock()
-        self._active: "threading.local" = threading.local()
+        self._reset_sync_state()
 
         self._last_full_flush: float = time.monotonic()  # drives time-based flushes
-        self._flush_event = threading.Event()
         self._pending_flush: set[str] = set()  # buckets to be flushed
-
-        self._flusher: "Optional[threading.Thread]" = None
-        self._flusher_pid: "Optional[int]" = None
 
         # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
         if hasattr(os, "register_at_fork"):
@@ -76,17 +69,10 @@ class SpanBatcher(Batcher["SpanJSON"]):
     def _reset_thread_state(self) -> None:
         self._span_buffer = defaultdict(list)
         self._running_size = defaultdict(lambda: 0)
-        self._running = True
-
-        self._lock = threading.Lock()
-        self._active = threading.local()
+        self._reset_sync_state()
 
         self._last_full_flush = time.monotonic()
-        self._flush_event = threading.Event()
         self._pending_flush = set()
-
-        self._flusher = None
-        self._flusher_pid = None
 
     def _flush_loop(self) -> None:
         self._active.flag = True
@@ -261,5 +247,15 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 del self._span_buffer[bucket_id]
                 del self._running_size[bucket_id]
 
-        for envelope in envelopes:
-            self._capture_func(envelope)
+            if not envelopes:
+                return
+            self._in_flight_flushes += 1
+
+        try:
+            for envelope in envelopes:
+                self._capture_func(envelope)
+        finally:
+            with self._flush_cond:
+                self._in_flight_flushes -= 1
+                if self._in_flight_flushes == 0:
+                    self._flush_cond.notify_all()
