@@ -219,3 +219,56 @@ def test_serialize_local_vars():
     assert result["custom"].startswith(
         "<tests.test_serializer.test_serialize_local_vars.<locals>.Custom object at"
     )
+
+
+def test_atomic_values_skip_memo(monkeypatch):
+    from sentry_sdk.serializer import Memo
+
+    memoized_types = []
+    orig_memoize = Memo.memoize
+
+    def counting_memoize(self, obj):
+        memoized_types.append(type(obj))
+        return orig_memoize(self, obj)
+
+    monkeypatch.setattr(Memo, "memoize", counting_memoize)
+
+    class CustomStr(str):
+        def __sentry_repr__(self):
+            return "custom-str"
+
+    cyclic_list = []
+    cyclic_list.append(cyclic_list)
+
+    payload = {
+        "extra": {
+            "s": "hello",
+            "i": 42,
+            "f": 3.14,
+            "inf": float("inf"),
+            "b": True,
+            "n": None,
+            "sub": CustomStr("abc"),
+            "nested": [1, "two", None, {"k": False}],
+            "cycle": cyclic_list,
+        }
+    }
+
+    result = serialize(payload)
+
+    assert result["extra"]["s"] == "hello"
+    assert result["extra"]["i"] == 42
+    assert result["extra"]["f"] == 3.14
+    assert result["extra"]["inf"] == "inf"
+    assert result["extra"]["b"] is True
+    assert result["extra"]["n"] is None
+    assert result["extra"]["sub"] == "custom-str"
+    assert result["extra"]["nested"] == [1, "two", None, {"k": False}]
+    assert result["extra"]["cycle"] == ["<cyclic>"]
+
+    for atomic_type in (str, int, float, bool, type(None)):
+        assert atomic_type not in memoized_types
+
+    assert CustomStr in memoized_types
+    assert dict in memoized_types
+    assert list in memoized_types

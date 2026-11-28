@@ -30,6 +30,10 @@ if TYPE_CHECKING:
 # Bytes are technically not strings in Python 3, but we can serialize them
 serializable_str_types = (str, bytes, bytearray, memoryview)
 
+# Exact built-in atomic types cannot hold references or form cycles, so
+# cycle-detection memoization can be skipped for them.
+_ATOMIC_TYPES = (str, int, float, bool, type(None))
+
 
 # Maximum length of JSON-serialized event payloads that can be safely sent
 # before the server may reject the event due to its size. This is not intended
@@ -199,6 +203,16 @@ class _Serializer:
             self.path.append(segment)
 
         try:
+            if type(obj) in _ATOMIC_TYPES:
+                return self._serialize_node_impl(
+                    obj,
+                    is_databag=is_databag,
+                    is_request_body=is_request_body,
+                    should_repr_strings=should_repr_strings,
+                    remaining_depth=remaining_depth,
+                    remaining_breadth=remaining_breadth,
+                )
+
             with self.memo.memoize(obj) as result:
                 if result:
                     return CYCLE_MARKER
