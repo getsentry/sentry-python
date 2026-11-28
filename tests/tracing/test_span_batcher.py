@@ -554,3 +554,144 @@ def test_flush_loop_swallows_flush_exception():
     batcher._flush_loop()
 
     assert calls == [1]
+
+
+def test_flush_waits_for_in_flight_flusher_batch():
+    import threading
+
+    received = []
+    taken = threading.Event()
+    release = threading.Event()
+
+    def capture_func(envelope):
+        if threading.current_thread() is not threading.main_thread():
+            taken.set()
+            release.wait(timeout=5)
+        received.append(envelope)
+
+    batcher = SpanBatcher(
+        capture_func=capture_func,
+        record_lost_func=lambda *a, **k: None,
+    )
+
+    class DummySegment:
+        def _dynamic_sampling_context(self):
+            return {"trace_id": "a" * 32}
+
+    def _make_span():
+        return {
+            "trace_id": "a" * 32,
+            "span_id": "b" * 16,
+            "name": "segment",
+            "is_segment": True,
+            "start_timestamp": 0.0,
+            "end_timestamp": 1.0,
+            "attributes": {},
+            "_segment_span": DummySegment(),
+        }
+
+    try:
+        batcher.add(_make_span())
+        assert taken.wait(timeout=5)
+
+        def release_soon():
+            time.sleep(0.1)
+            release.set()
+
+        releaser = threading.Thread(target=release_soon)
+        releaser.start()
+        try:
+            batcher.flush()
+            assert len(received) == 1
+        finally:
+            releaser.join(timeout=5)
+    finally:
+        release.set()
+        batcher.kill()
+
+
+def test_span_batcher_reentrant_flush_does_not_deadlock():
+    import threading
+
+    received = []
+    batcher_ref = []
+    done = threading.Event()
+
+    def capture_func(envelope):
+        if len(received) == 0:
+            received.append(envelope)
+            batcher_ref[0].flush()
+            done.set()
+
+    batcher = SpanBatcher(
+        capture_func=capture_func,
+        record_lost_func=lambda *a, **k: None,
+    )
+    batcher_ref.append(batcher)
+
+    class DummySegment:
+        def _dynamic_sampling_context(self):
+            return {"trace_id": "a" * 32}
+
+    try:
+        batcher.add(
+            {
+                "trace_id": "a" * 32,
+                "span_id": "b" * 16,
+                "name": "segment",
+                "is_segment": True,
+                "start_timestamp": 0.0,
+                "end_timestamp": 1.0,
+                "attributes": {},
+                "_segment_span": DummySegment(),
+            }
+        )
+        assert done.wait(timeout=5)
+        batcher.flush()
+        assert len(received) == 1
+    finally:
+        batcher.kill()
+
+
+def test_span_batcher_flush_respects_timeout():
+    import threading
+
+    taken = threading.Event()
+    release = threading.Event()
+
+    def capture_func(envelope):
+        if threading.current_thread() is not threading.main_thread():
+            taken.set()
+            release.wait(timeout=5)
+
+    batcher = SpanBatcher(
+        capture_func=capture_func,
+        record_lost_func=lambda *a, **k: None,
+    )
+
+    class DummySegment:
+        def _dynamic_sampling_context(self):
+            return {"trace_id": "a" * 32}
+
+    try:
+        batcher.add(
+            {
+                "trace_id": "a" * 32,
+                "span_id": "b" * 16,
+                "name": "segment",
+                "is_segment": True,
+                "start_timestamp": 0.0,
+                "end_timestamp": 1.0,
+                "attributes": {},
+                "_segment_span": DummySegment(),
+            }
+        )
+        assert taken.wait(timeout=5)
+
+        start = time.monotonic()
+        batcher.flush(timeout=0.05)
+        elapsed = time.monotonic() - start
+        assert elapsed < 1.0
+    finally:
+        release.set()
+        batcher.kill()

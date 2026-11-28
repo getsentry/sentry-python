@@ -304,20 +304,20 @@ def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
                 drained_count += 1
             wake.set()
 
-    def flush() -> None:
+    def flush(*args: "Any", **kwargs: "Any") -> None:
         nonlocal drained_count
         # Re-entrancy guard: if `flush()` is invoked from within a drain (e.g. a
         # custom transport), waiting on the flusher thread would deadlock, because
         # the flusher is blocked inside our own handler.
         if getattr(getattr(batcher, "_active", None), "flag", False):
-            orig_flush()
+            orig_flush(*args, **kwargs)
             return
 
         # If the background flusher thread was never started (no spans have
         # been added), there is no thread to drain and the counter will never
         # advance. Fall back to the original synchronous flush.
         if batcher._flusher is None or not batcher._flusher.is_alive():
-            orig_flush()
+            orig_flush(*args, **kwargs)
             return
 
         with lock:
@@ -330,7 +330,7 @@ def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
                     break
             wake.wait()
             wake.clear()
-        orig_flush()
+        orig_flush(*args, **kwargs)
 
     object.__setattr__(batcher, "_flush", _flush)
     object.__setattr__(batcher, "flush", flush)

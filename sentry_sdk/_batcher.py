@@ -1,6 +1,7 @@
 import os
 import random
 import threading
+import time
 import weakref
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Generic, TypeVar
@@ -31,14 +32,7 @@ class Batcher(Generic[T]):
         self._buffer: "list[T]" = []
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
-        self._running = True
-        self._lock = threading.Lock()
-        self._active: "threading.local" = threading.local()
-
-        self._flush_event: "threading.Event" = threading.Event()
-
-        self._flusher: "Optional[threading.Thread]" = None
-        self._flusher_pid: "Optional[int]" = None
+        self._reset_sync_state()
 
         # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
         if hasattr(os, "register_at_fork"):
@@ -51,14 +45,19 @@ class Batcher(Generic[T]):
 
             os.register_at_fork(after_in_child=_reset_in_child)
 
-    def _reset_thread_state(self) -> None:
-        self._buffer = []
+    def _reset_sync_state(self) -> None:
         self._running = True
         self._lock = threading.Lock()
-        self._active = threading.local()
-        self._flush_event = threading.Event()
-        self._flusher = None
-        self._flusher_pid = None
+        self._active: "threading.local" = threading.local()
+        self._flush_event: "threading.Event" = threading.Event()
+        self._flush_cond: "threading.Condition" = threading.Condition(self._lock)
+        self._in_flight_flushes = 0
+        self._flusher: "Optional[threading.Thread]" = None
+        self._flusher_pid: "Optional[int]" = None
+
+    def _reset_thread_state(self) -> None:
+        self._buffer = []
+        self._reset_sync_state()
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -145,11 +144,26 @@ class Batcher(Generic[T]):
         self._flush_event.set()
         self._flusher = None
 
-    def flush(self) -> None:
+    def _wait_for_in_flight_flushes(self, timeout: "Optional[float]" = None) -> None:
+        deadline = None if timeout is None else time.monotonic() + timeout
+        with self._flush_cond:
+            while self._in_flight_flushes > 0:
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    self._flush_cond.wait(timeout=remaining)
+                else:
+                    self._flush_cond.wait()
+
+    def flush(self, timeout: "Optional[float]" = None) -> None:
         was_active = getattr(self._active, "flag", False)
         self._active.flag = True
         try:
             self._flush()
+            # Avoid deadlocking if flush() is invoked re-entrantly from _capture_func.
+            if not was_active:
+                self._wait_for_in_flight_flushes(timeout=timeout)
         finally:
             self._active.flag = was_active
 
@@ -182,8 +196,15 @@ class Batcher(Generic[T]):
 
             self._add_to_envelope(envelope)
             self._buffer.clear()
+            self._in_flight_flushes += 1
 
-        self._capture_func(envelope)
+        try:
+            self._capture_func(envelope)
+        finally:
+            with self._flush_cond:
+                self._in_flight_flushes -= 1
+                if self._in_flight_flushes == 0:
+                    self._flush_cond.notify_all()
         return envelope
 
     def _record_lost(self, item: "T") -> None:
